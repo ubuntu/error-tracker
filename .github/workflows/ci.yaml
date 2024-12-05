@@ -1,0 +1,290 @@
+---
+name: CI
+
+on:  # yamllint disable-line rule:truthy
+  - push
+  - pull_request
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+# Note: ca-certificates and git are needed for actions/checkout to use git
+# which is needed for codecov/codecov-action.
+
+jobs:
+  linter:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    container:
+      image: ubuntu:oracular
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: >
+          apt-get update
+          && apt-get install --no-install-recommends --yes
+          black gir1.2-gtk-3.0 gir1.2-wnck-3.0 isort mypy pycodestyle
+          pydocstyle pyflakes3 pylint python3 python3-apt python3-dbus
+          python3-distutils-extra python3-gi python3-launchpadlib
+          python3-psutil python3-pyqt5 python3-pytest python3-rpm
+          python3-typeshed python3-yaml python3-systemd python3-zstandard
+      - name: Run linter tests
+        run: >
+          black -C --check --diff .
+          pycodestyle --max-line-length=88 -r --ignore=E203,W503 ${PYTHON_FILES} ${PYTHON_SCRIPTS}
+
+  unit-and-integration:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - debian:bookworm-slim
+          - debian:testing-slim
+          - ubuntu:jammy
+          - ubuntu:noble
+          - ubuntu:oracular
+    container:
+      image: ${{ matrix.container }}
+      options: --cap-add=SYS_PTRACE --security-opt seccomp=unconfined
+    steps:
+      - name: Sanitize container name (for artifact name)
+        run: |
+          container=$(echo "${{ matrix.container }}" | sed 's/:/-/')
+          echo "JOB=${GITHUB_JOB}-${container}" >> "$GITHUB_ENV"
+      - name: Install dependencies
+        run: >
+          apt-get update
+          && apt-get install --no-install-recommends --yes
+          bash binutils ca-certificates default-jdk-headless dpkg-dev gcc gdb
+          git iputils-ping kmod libc6-dev locales procps python3 python3-apt
+          python3-distutils-extra python3-launchpadlib python3-psutil
+          python3-pytest python3-pytest-cov python3-setuptools python3-systemd
+          valgrind
+      # python3-zstandard is not available on ubuntu:jammy
+      - name: Install optional dependencies
+        run: >
+          apt-get install --no-install-recommends --yes python3-zstandard
+          || true
+      - uses: actions/checkout@v4
+      - name: Enable German locale
+        run: sed -i 's/^# de_DE/de_DE/g' /etc/locale.gen && locale-gen
+      - name: Build Java subdir
+        run: >
+          python3 -m coverage run ./setup.py build_java_subdir
+          && python3 -m coverage xml -o coverage-setup.xml
+      - name: Run unit and integration tests
+        run: >
+          python3 -m pytest -ra --cov=$(pwd) --cov-branch --cov-report=xml
+          --durations=0 tests/unit/ tests/integration/
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ env.JOB }}
+          path: ./coverage*.xml
+
+  unit-and-integration-installed:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Remove system installed Apport
+        run: >
+          sudo apt-get remove --purge --yes
+          apport python3-apport python3-problem-report
+      - name: Install dependencies
+        run: >
+          sudo apt-get update
+          && sudo apt-get install --no-install-recommends --yes
+          bash binutils ca-certificates default-jdk-headless dpkg-dev gcc gdb
+          git iputils-ping kmod libc6-dev locales pkg-config python3 python3-apt
+          python3-distutils-extra python3-launchpadlib python3-psutil
+          python3-pytest python3-pytest-cov python3-setuptools python3-systemd
+          valgrind
+      - uses: actions/checkout@v4
+      - name: Enable German locale
+        run: sudo sed -i 's/^# de_DE/de_DE/g' /etc/locale.gen && sudo locale-gen
+      - name: Install
+        run: >
+          sudo python3 -m coverage run
+          ./setup.py install --install-layout=deb --prefix=/usr --root=/
+          && sudo chown "$SUDO_UID:$SUDO_GID" .coverage
+          && python3 -m coverage xml -o coverage-setup.xml
+      - name: Run unit and integration tests
+        run: >
+          WORKDIR=$(mktemp -d -t apport.XXXXXXXXXX)
+          && cp -r tests "$WORKDIR"
+          && cd "$WORKDIR"
+          && python3 -m pytest -ra --cov=$(pwd) --cov-branch --cov-report=xml
+          --durations=0 tests/unit/ tests/integration/
+          && cd -
+          && cp "$WORKDIR/coverage.xml" .
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.job }}
+          path: ./coverage*.xml
+
+  skip:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - ubuntu:jammy
+          - ubuntu:noble
+          - ubuntu:oracular
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - name: Sanitize container name (for artifact name)
+        run: |
+          container=$(echo "${{ matrix.container }}" | sed 's/:/-/')
+          echo "JOB=${GITHUB_JOB}-${container}" >> "$GITHUB_ENV"
+      - name: Install dependencies
+        run: >
+          apt-get update
+          && apt-get install --no-install-recommends --yes
+          bash ca-certificates git python3 python3-apt python3-psutil
+          python3-pytest python3-pytest-cov
+      - uses: actions/checkout@v4
+      - name: Run all tests (to check if they are skipped or succeed)
+        run: >
+          SKIP_ONLINE_TESTS=1 python3 -m pytest -ra --cov=$(pwd) --cov-branch
+          --cov-report=xml --durations=0 tests/
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ env.JOB }}
+          path: ./coverage.xml
+
+  system:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - ubuntu:jammy
+          - ubuntu:noble
+          - ubuntu:oracular
+    container:
+      image: ${{ matrix.container }}
+      options: --cap-add=SYS_PTRACE --security-opt seccomp=unconfined
+    steps:
+      - name: Sanitize container name (for artifact name)
+        run: |
+          container=$(echo "${{ matrix.container }}" | sed 's/:/-/')
+          echo "JOB=${GITHUB_JOB}-${container}" >> "$GITHUB_ENV"
+      - name: Enable 'deb-src' URIs in /etc/apt/sources.list
+        run: >
+          sed -i '/^#\sdeb-src /s/^#\s//' /etc/apt/sources.list
+          && ! test -e /etc/apt/sources.list.d/ubuntu.sources
+          || sed -i 's/^Types:.*/Types: deb deb-src/g'
+          /etc/apt/sources.list.d/ubuntu.sources
+      - name: Install dependencies
+        run: >
+          apt-get update
+          && apt-get install --no-install-recommends --yes
+          ca-certificates chaos-marmosets dbus dbus-x11 dirmngr dpkg-dev gcc gdb
+          gir1.2-gtk-3.0 gir1.2-wnck-3.0 git gnome-icon-theme gpg gvfs-daemons
+          psmisc python3 python3-apt python3-dbus python3-gi
+          python3-launchpadlib python3-psutil python3-pyqt5 python3-pytest
+          python3-pytest-cov ubuntu-dbgsym-keyring ubuntu-keyring valgrind
+          xterm xvfb
+      - uses: actions/checkout@v4
+      - name: Start D-Bus daemon
+        run: mkdir -p /run/dbus && dbus-daemon --system --fork
+      - name: Run system tests
+        env:
+          GDK_BACKEND: x11
+        run: >
+          xvfb-run python3 -m pytest -ra --cov=$(pwd) --cov-branch
+          --cov-report=xml --durations=0 tests/system/
+      - name: Stop D-Bus daemon
+        run: kill $(cat /run/dbus/pid)
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ env.JOB }}
+          path: ./coverage.xml
+
+  system-installed:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Remove system installed Apport
+        run: >
+          sudo apt-get remove --purge --yes
+          apport python3-apport python3-problem-report
+      - name: Enable 'deb-src' URIs in /etc/apt/sources.list
+        run: sudo sed -i '/^#\sdeb-src /s/^#\s//' /etc/apt/sources.list
+      - name: Install dependencies
+        run: >
+          sudo apt-get update
+          && sudo apt-get install --no-install-recommends --yes
+          ca-certificates chaos-marmosets dbus dbus-x11 dirmngr dpkg-dev gcc gdb
+          gir1.2-gtk-3.0 gir1.2-wnck-3.0 git gnome-icon-theme gpg gvfs-daemons
+          pkg-config psmisc python3 python3-apt python3-dbus
+          python3-distutils-extra python3-gi python3-launchpadlib python3-psutil
+          python3-pyqt5 python3-pytest python3-pytest-cov python3-setuptools
+          ubuntu-dbgsym-keyring ubuntu-keyring valgrind xvfb
+      - uses: actions/checkout@v4
+      - name: Install
+        run: >
+          sudo python3 -m coverage run
+          ./setup.py install --install-layout=deb --prefix=/usr --root=/
+          && sudo chown "$SUDO_UID:$SUDO_GID" .coverage
+          && python3 -m coverage xml -o coverage-setup.xml
+      - name: Cleanup /var/crash/
+        run: sudo rm -f /var/crash/*.crash
+      - name: Enable Apport
+        run: sudo /usr/share/apport/apport --start
+      - name: Run system tests
+        env:
+          GDK_BACKEND: x11
+        run: >
+          WORKDIR=$(mktemp -d -t apport.XXXXXXXXXX)
+          && cp -r tests "$WORKDIR"
+          && cd "$WORKDIR"
+          && sudo xvfb-run python3 -m pytest -ra --cov=$(pwd) --cov-branch
+          --cov-report=xml --durations=0 tests/system/
+          && cd -
+          && cp "$WORKDIR/coverage.xml" .
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.job }}
+          path: ./coverage*.xml
+
+  woke:
+    name: woke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: woke
+        uses: get-woke/woke-action@v0
+        with:
+          # Cause the check to fail on any broke rules
+          fail-on-error: true
+
+  upload-to-codecov:
+    if: ${{ always() }}
+    needs:
+      - unit-and-integration
+      - unit-and-integration-installed
+      - skip
+      - system
+      - system-installed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true

@@ -1,6 +1,22 @@
+**2024-12-05**
+I've now vendored this as part of the new error-tracker repository here:
+https://github.com/canonical/error-tracker
+
+This is in an effort to make all this stack work again on a Noble machine. As of
+now, this is still running on Bionic, has never seen a Python 3 interpreter, and
+nobody has been maintaining that for like at least 5 years:
+https://code.launchpad.net/~daisy-pluckers/+recipe/oops-repository-daily
+last modified on 2019-07-10
+
+I'll do my best to put that up to modern standards.
+
+-- Skia out
+
+----- OLD README STARTS HERE -----
 ==========================
 README for oops-repository
 ==========================
+
 
 OOPS repository is a storage and reporting system for the server fault reports
 - 'OOPSes' that Launchpad and other systems at Canonical use.
