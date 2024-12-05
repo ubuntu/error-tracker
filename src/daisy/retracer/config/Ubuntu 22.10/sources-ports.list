@@ -1,0 +1,13 @@
+deb http://ports.ubuntu.com/ kinetic main restricted universe multiverse
+deb http://ports.ubuntu.com/ kinetic-updates main restricted universe multiverse
+deb http://ports.ubuntu.com/ kinetic-proposed main restricted universe multiverse
+deb http://ports.ubuntu.com/ kinetic-security main restricted universe multiverse
+
+deb-src http://ports.ubuntu.com/ kinetic main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ kinetic-updates main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ kinetic-proposed main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ kinetic-security main restricted universe multiverse
+
+deb http://ddebs.ubuntu.com kinetic main restricted universe multiverse
+deb http://ddebs.ubuntu.com kinetic-updates main restricted universe multiverse
+deb http://ddebs.ubuntu.com kinetic-proposed main restricted universe multiverse

@@ -1,0 +1,13 @@
+deb http://ports.ubuntu.com/ plucky main restricted universe multiverse
+deb http://ports.ubuntu.com/ plucky-updates main restricted universe multiverse
+#deb http://ports.ubuntu.com/ plucky-proposed main restricted universe multiverse
+deb http://ports.ubuntu.com/ plucky-security main restricted universe multiverse
+
+deb-src http://ports.ubuntu.com/ plucky main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ plucky-updates main restricted universe multiverse
+#deb-src http://ports.ubuntu.com/ plucky-proposed main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ plucky-security main restricted universe multiverse
+
+deb http://ddebs.ubuntu.com plucky main restricted universe multiverse
+deb http://ddebs.ubuntu.com plucky-updates main restricted universe multiverse
+deb http://ddebs.ubuntu.com plucky-proposed main restricted universe multiverse

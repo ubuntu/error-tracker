@@ -1,0 +1,13 @@
+deb http://derived.archive.canonical.com/ubuntu-rtm/ 14.09 main restricted universe multiverse
+deb http://derived.archive.canonical.com/ubuntu-rtm/ 14.09-updates main restricted universe multiverse
+deb http://derived.archive.canonical.com/ubuntu-rtm/ 14.09-security main restricted universe multiverse
+deb http://derived.archive.canonical.com/ubuntu-rtm/ 14.09-proposed main restricted universe multiverse
+
+deb-src http://derived.archive.canonical.com/ubuntu-rtm/ 14.09 main restricted universe multiverse
+deb-src http://derived.archive.canonical.com/ubuntu-rtm/ 14.09-updates main restricted universe multiverse
+deb-src http://derived.archive.canonical.com/ubuntu-rtm/ 14.09-security main restricted universe multiverse
+deb-src http://derived.archive.canonical.com/ubuntu-rtm/ 14.09-proposed main restricted universe multiverse
+
+# deb http://ddebs.ubuntu.com/ubuntu-rtm 14.09 main restricted universe multiverse
+# deb http://ddebs.ubuntu.com/ubuntu-rtm 14.09-proposed main restricted universe multiverse
+# deb http://ddebs.ubuntu.com/ubuntu-rtm 14.09-updates main restricted universe multiverse

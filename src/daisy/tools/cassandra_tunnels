@@ -1,0 +1,34 @@
+#!/bin/sh
+
+START_PORT=9160
+PIDS=
+
+NODES='10.33.16.3
+10.33.16.40
+10.33.16.41
+10.33.16.60
+10.33.16.61
+10.33.16.74'
+
+cleanup () {
+    for pid in $PIDS; do
+        echo "Killing $pid."
+        kill $pid || :
+    done
+    exit 0
+}
+trap cleanup INT TERM EXIT
+
+for node in $NODES; do
+    hostname="$(ssh cassandra@${node} hostname -I | tr -d '\n' | tr -d ' ')"
+    if [ $? != 0 ] || [ -z "$hostname" ]; then
+        echo "Could not establish connection to ${node}."
+        continue
+    fi
+    ssh cassandra@${node} -L ${START_PORT}:${hostname}:9160 -N &
+    PIDS="${PIDS} $!"
+    echo "Connection established to $node on $START_PORT."
+    START_PORT=$((START_PORT + 1))
+done
+
+sleep inf

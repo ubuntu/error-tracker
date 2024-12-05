@@ -1,0 +1,13 @@
+deb http://ports.ubuntu.com/ oracular main restricted universe multiverse
+deb http://ports.ubuntu.com/ oracular-updates main restricted universe multiverse
+deb http://ports.ubuntu.com/ oracular-proposed main restricted universe multiverse
+deb http://ports.ubuntu.com/ oracular-security main restricted universe multiverse
+
+deb-src http://ports.ubuntu.com/ oracular main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ oracular-updates main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ oracular-proposed main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ oracular-security main restricted universe multiverse
+
+deb http://ddebs.ubuntu.com oracular main restricted universe multiverse
+deb http://ddebs.ubuntu.com oracular-updates main restricted universe multiverse
+deb http://ddebs.ubuntu.com oracular-proposed main restricted universe multiverse

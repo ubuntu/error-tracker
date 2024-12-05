@@ -1,0 +1,13 @@
+====================
+OOPS Repository NEWS
+====================
+
+next
+====
+
+* Create the basic tree.
+* Schemas can be instantiated by running::
+
+    $ OOPS_KEYSPACE=$something python -m oopsrepository.schema
+
+

@@ -1,0 +1,13 @@
+deb http://archive.ubuntu.com/ubuntu/ kinetic main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu/ kinetic-updates main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu/ kinetic-proposed main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu/ kinetic-security main restricted universe multiverse
+
+deb-src http://archive.ubuntu.com/ubuntu/ kinetic main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu/ kinetic-updates main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu/ kinetic-proposed main restricted universe multiverse
+deb-src http://security.ubuntu.com/ubuntu/ kinetic-security main restricted universe multiverse
+
+deb http://ddebs.ubuntu.com kinetic main restricted universe multiverse
+deb http://ddebs.ubuntu.com kinetic-updates main restricted universe multiverse
+deb http://ddebs.ubuntu.com kinetic-proposed main restricted universe multiverse

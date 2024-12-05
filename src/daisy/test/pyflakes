@@ -1,0 +1,16 @@
+#!/bin/sh
+
+if ! which pyflakes >/dev/null; then
+    echo "You need pyflakes installed to run this test."
+    exit 1
+fi
+
+failed=
+for x in $(find -name '*.py'); do
+    echo "Statically checking $x"
+    pyflakes $x || failed=:
+done
+
+[ -n "$failed" ] && exit 1
+
+exit 0

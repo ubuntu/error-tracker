@@ -1,0 +1,10 @@
+#!/bin/sh
+
+if pgrep -f jumbee.canonical.com >/dev/null; then
+    echo "Whoa there. You have a tunnel to the production database open."
+    echo "Please terminate this and set up a tunnel to a cloud instance."
+    exit 1
+fi
+for path in test/test_*.py; do
+    PYTHONPATH=$PYTHONPATH:. python $path
+done
