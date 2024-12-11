@@ -18,6 +18,7 @@
 # You should have received a copy of the GNU Affero Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# stdlib
 import amqp
 import argparse
 import atexit
@@ -28,24 +29,24 @@ import re
 import shutil
 import signal
 import socket
+import struct
 import sys
 import tempfile
 import traceback
 import time
-
-from apport import Report
 from subprocess import Popen, PIPE
 
-from pycassa import ConsistencyLevel
-from pycassa.columnfamily import ColumnFamily
-from pycassa.cassandra.ttypes import NotFoundException
-from pycassa.pool import MaximumRetryException
-from pycassa.types import IntegerType, FloatType, UTF8Type
+# external libs
+from apport import Report
 
-from daisy.metrics import wrapped_connection_pool, get_metrics, record_revno
+from cassandra.cqlengine import connection
+
+# internal libs
+from daisy.metrics import get_metrics, record_revno
 from daisy.version import version_info as daisy_version_info
 from daisy import config
 from daisy import utils
+from daisy import cassandra_schema
 from oopsrepository import config as oopsconfig
 
 apport_version_info = {}
@@ -119,31 +120,6 @@ def prefix_log_with_amqp_message(func):
     return wrapped
 
 
-def chunked_insert(cf, row_key, data):
-    # The thrift_framed_transport_size_in_mb limit is 15 MB by default, but
-    # there seems to be some additional overhead between 64 and 128 bytes.
-    # max_size = (1024 * 1024 * 15 - 128)
-    # Production doesn't seem to like 15 MB, so lets play it conservatively.
-    max_size = 1024 * 1024 * 4
-
-    for key in data:
-        val = data[key]
-        if len(val) > max_size:
-            riter = reversed(list(range(0, len(val), max_size)))
-            res = [val[i : i + max_size] for i in riter]
-            i = 0
-            for r in reversed(res):
-                params = (len(r), key, i, row_key)
-                log("Inserting chunk of size %d into %s-%d for %s" % params)
-                if i == 0:
-                    cf.insert(row_key, {key: r})
-                else:
-                    cf.insert(row_key, {"%s-%d" % (key, i): r})
-                i += 1
-        else:
-            cf.insert(row_key, {key: data[key]})
-
-
 class ApportException(Exception):
     """Class for exceptions caused by apport retrace"""
 
@@ -215,34 +191,12 @@ class Retracer:
     def setup_cassandra(self):
         os.environ["OOPS_KEYSPACE"] = config.cassandra_keyspace
         self.oops_config = oopsconfig.get_config()
+        connection.setup(config.cassandra_hosts, "crashdb")
         self.oops_config["host"] = config.cassandra_hosts
         self.oops_config["username"] = config.cassandra_username
         self.oops_config["password"] = config.cassandra_password
         self.oops_config["pool_size"] = config.cassandra_pool_size
         self.oops_config["max_overflow"] = config.cassandra_max_overflow
-
-        self.pool = wrapped_connection_pool("retracer")
-        self.oops_cf = ColumnFamily(self.pool, "OOPS")
-        self.indexes_fam = ColumnFamily(self.pool, "Indexes")
-        self.stacktrace_cf = ColumnFamily(self.pool, "Stacktrace")
-        self.awaiting_retrace_fam = ColumnFamily(self.pool, "AwaitingRetrace")
-        # Retry counter increments. This may result in double counting, but
-        # we'd end up risking that anyway if failing with a timeout exception
-        # and then re-rerunning the retrace later.
-        self.retrace_stats_fam = ColumnFamily(
-            self.pool, "RetraceStats", retry_counter_mutations=True
-        )
-        self.bucket_fam = ColumnFamily(self.pool, "Bucket")
-        self.bucketretracefail_fam = ColumnFamily(
-            self.pool, "BucketRetraceFailureReason"
-        )
-
-        # We didn't set a default_validation_class for these in the schema.
-        # Whoops.
-        self.oops_cf.default_validation_class = UTF8Type()
-        self.indexes_fam.default_validation_class = UTF8Type()
-        self.stacktrace_cf.default_validation_class = UTF8Type()
-        self.awaiting_retrace_fam.default_validation_class = UTF8Type()
 
     def listen(self):
         if self.failed:
@@ -314,24 +268,28 @@ class Retracer:
         # This is kept around for legacy reasons. The integration tests
         # currently depend on this being exposed in the API.
         status = result
-        # We can't mix counters and other data types
-        self.retrace_stats_fam.add(day_key, "%s:%s" % (release, status))
-        self.retrace_stats_fam.add(
-            day_key, "%s:%s:%s" % (release, self.architecture, status)
-        )
+        # Increment the counters. This will create the rows if they don't exist yet.
+        cassandra_schema.RetraceStats(
+            key=day_key, column1="%s:%s" % (release, status)
+        ).update(value=1)
+        cassandra_schema.RetraceStats(
+            key=day_key, column1="%s:%s:%s" % (release, self.architecture, status)
+        ).update(value=1)
 
         # Compute the cumulative moving average
         mean_key = "%s:%s:%s" % (day_key, release, self.architecture)
         count_key = "%s:count" % mean_key
-        self.indexes_fam.column_validators = {
-            mean_key: FloatType(),
-            count_key: IntegerType(),
-        }
         try:
-            mean = self.indexes_fam.get(
-                "mean_retracing_time", column_start=mean_key, column_finish=count_key
+            mean = cassandra_schema.Indexes.get_as_dict(
+                key=b"mean_retracing_time",
+                column1=[
+                    mean_key,
+                    count_key,
+                ],
             )
-        except NotFoundException:
+            mean[mean_key] = struct.unpack("!f", mean[mean_key])[0]
+            mean[count_key] = int.from_bytes(mean[count_key])
+        except cassandra_schema.DoesNotExist:
             mean = {mean_key: 0.0, count_key: 0}
 
         new_mean = float(
@@ -339,7 +297,16 @@ class Retracer:
         )
         mean[mean_key] = new_mean
         mean[count_key] += 1
-        self.indexes_fam.insert("mean_retracing_time", mean)
+        cassandra_schema.Indexes.objects.create(
+            key=b"mean_retracing_time",
+            column1=mean_key,
+            value=struct.pack("!f", mean[mean_key]),
+        )
+        cassandra_schema.Indexes.objects.create(
+            key=b"mean_retracing_time",
+            column1=count_key,
+            value=mean[count_key].to_bytes(),
+        )
 
         # Report this into statsd as well.
         prefix = "timings.retracing"
@@ -421,12 +388,17 @@ class Retracer:
             metrics.meter("retrace.failure.old_missing_core")
         # Also remove it from the retracing index, if we haven't already.
         try:
-            addr_sig = self.oops_cf.get(oops_id, ["StacktraceAddressSignature"])
-            addr_sig = list(addr_sig.values())[0]
-            if addr_sig:
-                self.indexes_fam.remove("retracing", [addr_sig])
-        except NotFoundException:
-            log("Could not remove from the retracing row (%s):" % oops_id)
+            addr_sig = cassandra_schema.OOPS.objects.get(
+                key=oops_id, column1="StacktraceAddressSignature"
+            )["value"]
+            cassandra_schema.Indexes.objects.filter(
+                key=b"retracing", column1=addr_sig
+            ).delete()
+        except cassandra_schema.DoesNotExist as e:
+            log(
+                "Could not remove from the retracing row (%s) (%s):"
+                % (oops_id, repr(e))
+            )
 
     def write_swift_bucket_to_disk(self, key, provider_data):
         global _cached_swift
@@ -635,9 +607,8 @@ class Retracer:
         parts = msg.body.split(":", 1)
         oops_id, provider = parts
         try:
-            quorum = ConsistencyLevel.LOCAL_QUORUM
-            col = self.oops_cf.get(oops_id, read_consistency_level=quorum)
-        except NotFoundException:
+            col = cassandra_schema.OOPS.get_as_dict(key=oops_id)
+        except cassandra_schema.DoesNotExist:
             # We do not have enough information at this point to be able to
             # remove this from the retracing row in the Indexes CF. Throw it
             # back on the queue and hope that eventual consistency works its
@@ -947,7 +918,9 @@ class Retracer:
                 m = "Retrace failed (%i), %s"
                 action = "leaving as failed."
                 if give_up:
-                    self.oops_cf.insert(oops_id, {"RetraceStatus": "Failure"})
+                    cassandra_schema.OOPS.objects.create(
+                        key=oops_id, column1="RetraceStatus", value="Failure"
+                    )
                     # we don't want to see this OOPS again so process it
                     self.processed(msg)
                 else:
@@ -977,7 +950,9 @@ class Retracer:
                 # another core
                 sas = report.get("StacktraceAddressSignature", "")
                 if sas:
-                    self.indexes_fam.remove("retracing", [sas])
+                    cassandra_schema.Indexes.objects.filter(
+                        key="retracing", column1=sas
+                    ).delete()
                 self.update_retrace_stats(
                     release, day_key, retracing_time, result=retrace_result
                 )
@@ -1022,7 +997,9 @@ class Retracer:
                     missing_dbgsym_pkg = True
             if not crash_signature:
                 log("Apport did not return a crash_signature.")
-                self.oops_cf.insert(oops_id, {"RetraceStatus": "Failure"})
+                cassandra_schema.OOPS.objects.create(
+                    key=oops_id, column1="RetraceStatus", value="Failure"
+                )
                 if unreportable_reason:
                     log("UnreportableReason is: %s" % unreportable_reason)
                 metrics.meter("retrace.missing.crash_signature")
@@ -1062,8 +1039,10 @@ class Retracer:
                         if count < 2:
                             count += 1
                             log("Requeueing a possible apport failure (#%s)." % count)
-                            self.oops_cf.insert(
-                                oops_id, {"RetraceAttempts": "%s" % count}
+                            cassandra_schema.OOPS.objects.create(
+                                key=oops_id,
+                                column1="RetraceAttempts",
+                                value="%s" % count,
                             )
                             self.requeue(msg, oops_id)
                             # don't record it as a failure in the metrics as it is
@@ -1083,10 +1062,14 @@ class Retracer:
                 if type(stacktrace_addr_sig) is str:
                     stacktrace_addr_sig = stacktrace_addr_sig.encode("utf-8")
                 # if the OOPS doesn't already have a SAS add one
-                self.oops_cf.insert(
-                    oops_id, {"StacktraceAddressSignature": stacktrace_addr_sig}
+                cassandra_schema.OOPS.objects.create(
+                    key=oops_id,
+                    column1="StacktraceAddressSignature",
+                    value=stacktrace_addr_sig,
                 )
-                self.oops_cf.insert(oops_id, {"RetraceStatus": "Success"})
+                cassandra_schema.OOPS.objects.create(
+                    key=oops_id, column1="RetraceStatus", value="Success"
+                )
             else:
                 metrics.meter("retrace.missing.stacktrace_address_signature")
                 metrics.meter(
@@ -1099,7 +1082,9 @@ class Retracer:
                     "retrace.missing.%s.%s.stacktrace_address_signature"
                     % (release, architecture)
                 )
-                self.oops_cf.insert(oops_id, {"RetraceStatus": "Failure"})
+                cassandra_schema.OOPS.objects.create(
+                    key=oops_id, column1="RetraceStatus", value="Failure"
+                )
 
             # Use the unretraced report's SAS for the index and stacktrace_cf,
             # otherwise use the one from the retraced report as apport / gdb
@@ -1116,16 +1101,18 @@ class Retracer:
             if crash_signature and stacktrace_addr_sig and "Stacktrace" in report:
                 if "CoreDump" in report:
                     report.pop("CoreDump")
-                try:
-                    self.stacktrace_cf.insert(stacktrace_addr_sig, report)
-                except MaximumRetryException:
-                    total = sum(len(x) for x in list(report.values()))
-                    m = "Could not fit data in a single insert (%s, %d):"
-                    log(m % (path, total))
-                    chunked_insert(self.stacktrace_cf, stacktrace_addr_sig, report)
+                # TODO: this is highly untested
+                print("UNTESTED CODE #1")
+                for k, v in report:
+                    cassandra_schema.Stacktrace.objects.create(
+                        key=stacktrace_addr_sig, column1=k, value=v
+                    )
+                print("UNTESTED CODE #1 DIDN'T THROW")
                 args = (release, day_key, retracing_time, "success")
                 self.update_retrace_stats(*args)
-                self.oops_cf.insert(oops_id, {"RetraceStatus": "Success"})
+                cassandra_schema.OOPS.objects.create(
+                    key=oops_id, column1="RetraceStatus", value="Success"
+                )
                 log("Successfully retraced.")
                 metrics.meter("retrace.success")
                 metrics.meter("retrace.success.%s" % release)
@@ -1154,7 +1141,9 @@ class Retracer:
                     if failure_storage:
                         self.save_crash(failure_storage, report, oops_id, core_file)
 
-                self.oops_cf.insert(oops_id, {"RetraceStatus": "Failure"})
+                cassandra_schema.OOPS.objects.create(
+                    key=oops_id, column1="RetraceStatus", value="Failure"
+                )
                 # Given that we do not as yet keep debugging symbols around for
                 # every package version ever released, it's worth knowing the
                 # extent of the problem. If we ever decide to keep debugging
@@ -1214,18 +1203,18 @@ class Retracer:
                         failure_reason += " and missing ddebs."
                     else:
                         failure_reason += " and outdated packages."
-                    self.oops_cf.insert(
-                        oops_id, {"RetraceFailureReason": failure_reason}
+                    cassandra_schema.OOPS.objects.create(
+                        key=oops_id,
+                        column1="RetraceFailureReason",
+                        value=failure_reason,
                     )
                     if outdated_pkgs:
                         outdated_pkg_count = len(outdated_pkgs)
                         outdated_pkgs.sort()
-                        self.oops_cf.insert(
-                            oops_id,
-                            {
-                                "RetraceFailureOutdatedPackages": "%s"
-                                % " ".join(outdated_pkgs)
-                            },
+                        cassandra_schema.OOPS.objects.create(
+                            key=oops_id,
+                            column1="RetraceFailureOutdatedPackages",
+                            value=" ".join(outdated_pkgs),
                         )
                     else:
                         outdated_pkgs = ""
@@ -1233,19 +1222,21 @@ class Retracer:
                     if missing_ddebs:
                         missing_ddeb_count = len(missing_ddebs)
                         missing_ddebs.sort()
-                        self.oops_cf.insert(
-                            oops_id,
-                            {
-                                "RetraceFailureMissingDebugSymbols": "%s"
-                                % " ".join(missing_ddebs)
-                            },
+                        cassandra_schema.OOPS.objects.create(
+                            key=oops_id,
+                            column1="RetraceFailureMissingDebugSymbols",
+                            value=" ".join(missing_ddebs),
                         )
                     else:
                         missing_ddebs = ""
                         missing_ddeb_count = 0
                     if crash_signature:
                         try:
-                            rf_reason = self.bucketretracefail_fam.get(crash_signature)
+                            rf_reason = (
+                                cassandra_schema.BucketRetraceFailureReason.get_as_dict(
+                                    key=crash_signature.encode()
+                                )
+                            )
                             if "missing_ddeb_count" in rf_reason:
                                 least_missing_ddeb_count = int(
                                     rf_reason["missing_ddeb_count"]
@@ -1258,25 +1249,24 @@ class Retracer:
                                 )
                             else:
                                 least_outdated_pkg_count = 9999
-                        except NotFoundException:
+                        except cassandra_schema.DoesNotExist:
                             least_missing_ddeb_count = 9999
                             least_outdated_pkg_count = 9999
                         if (
                             outdated_pkg_count < least_outdated_pkg_count
                             and missing_ddeb_count < least_missing_ddeb_count
                         ):
-                            self.bucketretracefail_fam.insert(
-                                crash_signature,
-                                {
-                                    "oops": oops_id,
-                                    "missing_ddeb_count": "%s" % missing_ddeb_count,
-                                    "outdated_pkg_count": "%s" % outdated_pkg_count,
-                                    "Reason": failure_reason,
-                                    "MissingDebugSymbols": "%s"
-                                    % " ".join(missing_ddebs),
-                                    "OutdatedPackages": "%s" % " ".join(outdated_pkgs),
-                                },
-                            )
+                            for k, v in {
+                                "oops": oops_id,
+                                "missing_ddeb_count": "%s" % missing_ddeb_count,
+                                "outdated_pkg_count": "%s" % outdated_pkg_count,
+                                "Reason": failure_reason,
+                                "MissingDebugSymbols": "%s" % " ".join(missing_ddebs),
+                                "OutdatedPackages": "%s" % " ".join(outdated_pkgs),
+                            }:
+                                cassandra_schema.BucketRetraceFailureReason.objects.create(
+                                    key=crash_signature.encode(), column1=k, value=v
+                                )
                         metrics.meter("retrace.failure.outdated_packages")
                         metrics.meter("retrace.failure.%s.outdated_packages" % release)
                         metrics.meter(
@@ -1290,13 +1280,16 @@ class Retracer:
                         pass
                 else:
                     failure_reason += "."
-                    self.oops_cf.insert(
-                        oops_id, {"RetraceFailureReason": failure_reason}
+                    cassandra_schema.OOPS.objects.create(
+                        key=oops_id,
+                        column1="RetraceFailureReason",
+                        value=failure_reason,
                     )
                     if crash_signature:
-                        self.bucketretracefail_fam.insert(
-                            crash_signature, {"oops": oops_id, "Reason": failure_reason}
-                        )
+                        for k, v in {"oops": oops_id, "Reason": failure_reason}:
+                            cassandra_schema.BucketRetraceFailureReason.objects.create(
+                                key=crash_signature.encode(), column1=k, value=v
+                            )
                 args = (release, day_key, retracing_time, "failed")
                 self.update_retrace_stats(*args)
                 metrics.meter("retrace.failed")
@@ -1308,18 +1301,22 @@ class Retracer:
             # this signature, so that we can quickly tell the client whether we
             # need a core dump from it.
             if stacktrace_addr_sig and crash_signature:
-                self.indexes_fam.insert(
-                    "crash_signature_for_stacktrace_address_signature",
-                    {stacktrace_addr_sig: crash_signature},
+                cassandra_schema.Indexes.objects.create(
+                    key=b"crash_signature_for_stacktrace_address_signature",
+                    column1=stacktrace_addr_sig,
+                    value=crash_signature,
                 )
             # Use the unretraced report's SAS for the index as these were
             # created with that version of the report
             if original_sas:
-                self.indexes_fam.remove("retracing", [original_sas])
+                cassandra_schema.Indexes.objects.filter(
+                    key=b"retracing", column1=original_sas
+                ).delete()
                 # This will contain the OOPS ID we're currently processing as
                 # well.
-                gen = self.awaiting_retrace_fam.xget(original_sas)
-                ids = [k for k, v in gen]
+                ids = cassandra_schema.AwaitingRetrace.objects.filter(
+                    key=original_sas
+                ).values_list("column1", flat=True)
                 oops_ids = ids
             else:
                 # The initial report didn't have a SAS so don't check
@@ -1336,8 +1333,10 @@ class Retracer:
 
             if original_sas:
                 try:
-                    self.awaiting_retrace_fam.remove(original_sas, oops_ids)
-                except NotFoundException:
+                    cassandra_schema.AwaitingRetrace.objects.filter(
+                        key=original_sas, column1__in=oops_ids
+                    ).delete()
+                except cassandra_schema.DoesNotExist:
                     # An oops may not exist in awaiting_retrace if the initial
                     # report didn't have a SAS
                     pass
@@ -1433,7 +1432,12 @@ class Retracer:
 
         ids = []
         failed_key = "failed:" + crash_signature
-        ids = [k for k, v in self.bucket_fam.xget(failed_key)]
+        ids = [
+            str(id).encode()
+            for id in cassandra_schema.Bucket.objects.filter(
+                key=failed_key
+            ).values_list("column1", flat=True)
+        ]
 
         if not ids:
             return False
@@ -1459,8 +1463,8 @@ class Retracer:
 
         for oops_id in ids:
             try:
-                o = self.oops_cf.get(oops_id)
-            except NotFoundException:
+                o = cassandra_schema.OOPS.get_as_dict(key=oops_id)
+            except cassandra_schema.DoesNotExist:
                 log("Could not find %s for %s." % (oops_id, crash_signature))
                 o = {}
             utils.bucket(self.oops_config, oops_id, crash_signature, o)
@@ -1472,7 +1476,9 @@ class Retracer:
         """Remove no longer needed columns from the OOPS column family for a
         specific OOPS id."""
         unneeded_columns = ["Disassembly", "ProcStatus", "Registers", "StacktraceTop"]
-        self.oops_cf.remove(oops_id, columns=unneeded_columns)
+        cassandra_schema.OOPS.objects.filter(
+            key=oops_id, column1__in=unneeded_columns
+        ).delete()
 
 
 def parse_options():
