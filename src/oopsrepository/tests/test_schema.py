@@ -18,6 +18,6 @@ class TestCreateSchema(TestCase):
 
     def test_creates_columnfamily(self):
         keyspace = self.useFixture(TemporaryKeyspace()).keyspace
-        os.environ['OOPS_KEYSPACE'] = keyspace
+        os.environ["OOPS_KEYSPACE"] = keyspace
         schema.create(config.get_config())
         self.assertThat(keyspace, HasOOPSSchema())

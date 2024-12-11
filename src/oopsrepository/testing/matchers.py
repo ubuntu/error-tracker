@@ -25,25 +25,26 @@ class HasOOPSSchema(Matcher):
     """
 
     def match(self, keyspace):
-        os.environ['OOPS_KEYSPACE'] = keyspace
+        os.environ["OOPS_KEYSPACE"] = keyspace
         c = config.get_config()
-        pool = pycassa.ConnectionPool(c['keyspace'], c['host'],
-                                      username=c['username'],
-                                      password=c['password'])
+        pool = pycassa.ConnectionPool(
+            c["keyspace"], c["host"], username=c["username"], password=c["password"]
+        )
         try:
-            cf = pycassa.ColumnFamily(pool, 'OOPS')
-            cf.insert('key',
-                {"date":json.dumps(time.time()), "URL":'a bit boring'})
-            cf = pycassa.ColumnFamily(pool, 'DayOOPS')
-            cf.insert('20100212', {uuid.uuid1(): 'key'})
-            cf = pycassa.ColumnFamily(pool, 'UserOOPS')
-            cf.insert('user-token', {'key':''})
+            cf = pycassa.ColumnFamily(pool, "OOPS")
+            cf.insert("key", {"date": json.dumps(time.time()), "URL": "a bit boring"})
+            cf = pycassa.ColumnFamily(pool, "DayOOPS")
+            cf.insert("20100212", {uuid.uuid1(): "key"})
+            cf = pycassa.ColumnFamily(pool, "UserOOPS")
+            cf.insert("user-token", {"key": ""})
 
-            cf = pycassa.ColumnFamily(pool, 'Bucket')
-            cf.insert('/bin/bash:11:x86_64:[vdso]+70c:...', {pycassa.util.uuid.uuid1():''})
-            cf = pycassa.ColumnFamily(pool, 'DayBuckets')
-            cf.insert(('20100212', '/bin/bash:11:x86_64:[vdso]+70c:...'), {'key':''})
-            cf = pycassa.ColumnFamily(pool, 'DayBucketsCount')
-            cf.add('20100212', '/bin/bash:11:x86_64:[vdso]+70c:...', 13)
+            cf = pycassa.ColumnFamily(pool, "Bucket")
+            cf.insert(
+                "/bin/bash:11:x86_64:[vdso]+70c:...", {pycassa.util.uuid.uuid1(): ""}
+            )
+            cf = pycassa.ColumnFamily(pool, "DayBuckets")
+            cf.insert(("20100212", "/bin/bash:11:x86_64:[vdso]+70c:..."), {"key": ""})
+            cf = pycassa.ColumnFamily(pool, "DayBucketsCount")
+            cf.add("20100212", "/bin/bash:11:x86_64:[vdso]+70c:...", 13)
         except NotFoundException as e:
             return Mismatch(e.why)

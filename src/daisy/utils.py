@@ -181,7 +181,7 @@ def bucket(oops_config, oops_id, crash_signature, report_dict):
 
     # BucketMetadata is displayed on the main page and shouldn't include
     # derivative or custom releases, so don't write them to the table.
-    release_re = re.compile("^Ubuntu \d\d.\d\d$")
+    release_re = re.compile(r"^Ubuntu \d\d.\d\d$")
     if (package and version) and release_re.match(release):
         oopses.update_bucket_metadata(
             oops_config,
@@ -234,7 +234,7 @@ def wrap_in_oops_wsgi(wsgi_handler):
 def retraceable_release(release):
     if release in EOL_RELEASES:
         return False
-    derivative_re = re.compile("^Ubuntu( RTM| Kylin)? \d\d.\d\d$")
+    derivative_re = re.compile(r"^Ubuntu( RTM| Kylin)? \d\d.\d\d$")
     if derivative_re.match(release):
         return True
     else:
