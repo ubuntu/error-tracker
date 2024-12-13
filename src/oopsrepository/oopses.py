@@ -97,10 +97,10 @@ def _insert(
     if isinstance(session, dict):
         session = cassandra_session(session)
     day_key = time.strftime("%Y%m%d", time.gmtime())
-    hex_day_key = "0x" + hexlify(day_key)
+    hex_day_key = "0x" + hexlify(day_key.encode())
     now_uuid = uuid.uuid1()
 
-    hex_oopsid = "0x" + hexlify(oopsid)
+    hex_oopsid = "0x" + hexlify(oopsid.encode())
     for key, value in list(insert_dict.items()):
         # try to avoid an OOPS re column1 being missing
         if not key:
@@ -132,7 +132,7 @@ def _insert(
     if not automated_testing:
         # Provide quick lookups of the total number of oopses for the day by
         # maintaining a counter.
-        hex_oopses = "0x" + hexlify("oopses")
+        hex_oopses = "0x" + hexlify(b"oopses")
         session.execute(
             SimpleStatement(
                 "UPDATE \"%s\" SET value = value + 1 WHERE key = %s AND column1 ='%s'"
@@ -143,7 +143,7 @@ def _insert(
             for field in fields:
                 field = field.encode("ascii", errors="replace")
                 cql_field = field.replace("'", "''")
-                hex_oopses_field = "0x" + hexlify("oopses:%s" % cql_field)
+                hex_oopses_field = "0x" + hexlify(("oopses:%s" % cql_field).encode())
                 session.execute(
                     SimpleStatement(
                         "UPDATE \"%s\" SET value = value + 1 WHERE key = %s AND column1 ='%s'"
@@ -154,7 +154,7 @@ def _insert(
             for field in fields:
                 field = field.encode("ascii", errors="replace")
                 cql_field = field.replace("'", "''")
-                hex_oopses_field = "0x" + hexlify("oopses:%s" % cql_field)
+                hex_oopses_field = "0x" + hexlify(("oopses:%s" % cql_field).encode())
                 session.execute(
                     SimpleStatement(
                         "UPDATE \"%s\" SET value = value + 1 WHERE key = %s AND column1 ='%s'"
@@ -163,7 +163,7 @@ def _insert(
                 )
 
     if user_token:
-        hex_user_token = "0x" + hexlify(user_token)
+        hex_user_token = "0x" + hexlify(user_token.encode())
         session.execute(
             SimpleStatement(
                 "INSERT INTO \"%s\" (key, column1, value) VALUES (%s, '%s', %s)"
@@ -199,7 +199,7 @@ def _insert(
             for field in fields:
                 field = field.encode("ascii", errors="replace")
                 cql_field = field.replace("'", "''")
-                hex_field_day = "0x" + hexlify("%s:%s" % (field, day_key))
+                hex_field_day = b"0x" + hexlify(("%s:%s" % (field, day_key)).encode())
                 session.execute(
                     SimpleStatement(
                         "INSERT INTO \"%s\" (key, column1, value) VALUES (%s, '%s', %s)"
@@ -222,12 +222,9 @@ def bucket(session, oopsid, bucketid, fields=None, proposed_fields=False):
     cql_bucketid = bucketid.replace("'", "''")
     # Get the timestamp.
     try:
-        hex_oopsid = "0x" + hexlify(oopsid)
         results = session.execute(
-            SimpleStatement(
-                'SELECT WRITETIME (value) FROM "%s" WHERE key = %s'
-                % ("OOPS", hex_oopsid)
-            )
+            session.prepare('SELECT WRITETIME (value) FROM "OOPS" WHERE key = ?'),
+            [oopsid.encode()],
         )
         timestamp = [r[0] for r in results][0]
         day_key = time.strftime("%Y%m%d", time.gmtime(timestamp / 1000000))
@@ -236,16 +233,18 @@ def bucket(session, oopsid, bucketid, fields=None, proposed_fields=False):
         day_key = time.strftime("%Y%m%d", time.gmtime())
 
     session.execute(
-        SimpleStatement(
-            "INSERT INTO \"%s\" (key, column1, value) VALUES ('%s', %s, %s)"
-            % ("Bucket", cql_bucketid, uuid.UUID(oopsid), "0x")
-        )
+        session.prepare(
+            'INSERT INTO "Bucket" \
+        (key, column1, value) VALUES (?, ?, ?)'
+        ),
+        [cql_bucketid, uuid.UUID(oopsid), b""],
     )
     session.execute(
-        SimpleStatement(
-            "INSERT INTO \"%s\" (key, key2, column1, value) VALUES ('%s', '%s', '%s', %s)"
-            % ("DayBuckets", day_key, cql_bucketid, oopsid, "0x")
-        )
+        session.prepare(
+            'INSERT INTO "DayBuckets" \
+        (key, key2, column1, value) VALUES (?, ?, ?, ?)'
+        ),
+        [day_key, cql_bucketid, oopsid, b""],
     )
 
     if fields is not None:
@@ -264,9 +263,9 @@ def bucket(session, oopsid, bucketid, fields=None, proposed_fields=False):
                 # done by counting the number of columns in DayBuckets for the
                 # day and bucket ID.
                 field_resolution = ":".join((field, resolution))
-                session.execute(dbc_update, [field_resolution, cql_bucketid])
+                session.execute(dbc_update, [field_resolution.encode(), cql_bucketid])
         for resolution in resolutions:
-            session.execute(dbc_update, [resolution, cql_bucketid])
+            session.execute(dbc_update, [resolution.encode(), cql_bucketid])
     return day_key
 
 
@@ -280,57 +279,54 @@ def update_bucket_versions(session, bucketid, version, release=None, oopsid=None
         # OOPS gets processed here, we should still clean it up when we're
         # handling the data for today.
         day_key = time.strftime("%Y%m%d", time.gmtime())
-        hex_day_key = "0x" + hexlify(day_key)
         cql_bucketid = bucketid.replace("'", "''")
 
         uuid_oopsid = uuid.UUID(oopsid)
-        release = release.encode("ascii", errors="ignore")
-        cql_release = release.replace("'", "''")
+        release = release.replace("'", "''")
+        cql_release = release.encode("ascii", errors="ignore").decode()
+
         if version:
-            version = version.encode("ascii", errors="replace")
+            version = version.encode("ascii", errors="replace").decode()
 
         # When correcting the counts in bv_count, we'll iterate
         # BucketVersionsDay for day_key. For each of these columns, we'll look
         # up the correct value by calling bv_full.get_count(...).
         session.execute(
-            SimpleStatement(
-                "INSERT INTO \"%s\" (key, key2, key3, column1, value) VALUES ('%s', '%s', '%s', %s, %s)"
-                % (
-                    "BucketVersionsFull",
-                    cql_bucketid,
-                    cql_release,
-                    version,
-                    uuid_oopsid,
-                    "0x",
-                )
-            )
+            session.prepare(
+                'INSERT INTO "BucketVersionsFull" (key, key2, key3, column1, value) VALUES (?, ?, ?, ?, ?)'
+            ),
+            [
+                cql_bucketid,
+                cql_release,
+                version,
+                uuid_oopsid,
+                b"",
+            ],
         )
         session.execute(
-            SimpleStatement(
-                "INSERT INTO \"%s\" (key, column1, column2, column3, value) VALUES (%s, '%s', '%s', '%s', %s)"
-                % (
-                    "BucketVersionsDay",
-                    hex_day_key,
-                    cql_bucketid,
-                    cql_release,
-                    version,
-                    "0x",
-                )
-            )
+            session.prepare(
+                'INSERT INTO "BucketVersionsDay" (key, column1, column2, column3, value) VALUES (?, ?, ?, ?, ?)'
+            ),
+            [
+                day_key.encode(),
+                cql_bucketid,
+                cql_release,
+                version,
+                b"",
+            ],
         )
-
         session.execute(
-            SimpleStatement(
-                "UPDATE \"%s\" SET value = value + 1 WHERE key = '%s' AND column1 ='%s' AND column2 = '%s'"
-                % ("BucketVersionsCount", cql_bucketid, cql_release, version)
-            )
+            session.prepare(
+                'UPDATE "BucketVersionsCount" SET value = value + 1 WHERE key = ? AND column1 = ? AND column2 = ?'
+            ),
+            [cql_bucketid, cql_release, version],
         )
     else:
         session.execute(
-            SimpleStatement(
-                "UPDATE \"%s\" SET value = value + 1 WHERE key = '%s' AND column1 ='%s'"
-                % ("BucketVersions", cql_bucketid, version)
-            )
+            session.prepare(
+                'UPDATE "BucketVersions" SET value = value + 1 WHERE key = ? AND column1 = ?'
+            ),
+            [cql_bucketid.encode(), version],
         )
 
 
@@ -338,7 +334,6 @@ def update_errors_by_release(session, oops_id, system_token, release):
     # retracer.py hasn't been updated to pass in a python-cassandra session
     if isinstance(session, dict):
         session = cassandra_session(session)
-    release = release.encode("utf8")
     cql_release = release.replace("'", "''")
     today = datetime.datetime.today()
     today = today.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -398,14 +393,11 @@ def update_bucket_metadata(session, bucketid, source, version, comparator, relea
     metadata = {}
     bucketmetadata = {}
     release_re = re.compile(r"^Ubuntu \d\d.\d\d$")
-    hex_bucketid = "0x" + hexlify(bucketid)
     cql_bucketid = bucketid.replace("'", "''")
 
     bucketmetadata_rows = session.execute(
-        SimpleStatement(
-            'SELECT column1, value FROM "%s" WHERE key = %s'
-            % ("BucketMetadata", hex_bucketid)
-        )
+        session.prepare('SELECT column1, value FROM "BucketMetadata" WHERE key = ?'),
+        [bucketid.encode()],
     )
     for row in bucketmetadata_rows:
         bucketmetadata[row[0]] = row[1]
@@ -464,7 +456,7 @@ def update_bucket_metadata(session, bucketid, source, version, comparator, relea
         for k in metadata:
             # a prepared statement seems to convert into hex so using hexlify
             # with bucketid is not needed
-            session.execute(bmd_insert, [cql_bucketid, k, metadata[k]])
+            session.execute(bmd_insert, [cql_bucketid.encode(), k, metadata[k]])
 
 
 def update_bucket_systems(session, bucketid, system, version=None):
@@ -475,16 +467,15 @@ def update_bucket_systems(session, bucketid, system, version=None):
         session = cassandra_session(session)
     if not system or not version:
         return
-    version = version.encode("ascii", errors="replace")
     if not version:
-        # If all we had were unicode characters.
         return
     cql_bucketid = bucketid.replace("'", "''")
     session.execute(
-        SimpleStatement(
-            "INSERT INTO \"%s\" (key, key2, column1, value) VALUES ('%s', '%s', '%s', %s)"
-            % ("BucketVersionSystems2", cql_bucketid, version, system, "0x")
-        )
+        session.prepare(
+            'INSERT INTO "BucketVersionSystems2" \
+        (key, key2, column1, value) VALUES (?, ?, ?, ?)'
+        ),
+        [cql_bucketid, version, system, b""],
     )
 
 
@@ -496,13 +487,14 @@ def update_source_version_buckets(session, source, version, bucketid):
     # according to debian policy neither the package or version should have
     # utf8 in it but either some archives do not know that or something is
     # wonky with apport
-    source = source.encode("ascii", errors="replace")
-    version = version.encode("ascii", errors="replace")
+    source = source.encode("ascii", errors="replace").decode()
+    version = version.encode("ascii", errors="replace").decode()
     session.execute(
-        SimpleStatement(
-            "INSERT INTO \"%s\" (key, key2, column1, value) VALUES ('%s', '%s', '%s', %s)"
-            % ("SourceVersionBuckets", source, version, cql_bucketid, "0x")
-        )
+        session.prepare(
+            'INSERT INTO "SourceVersionBuckets" \
+        (key, key2, column1, value) VALUES (?, ?, ?, ?)'
+        ),
+        [source, version, cql_bucketid, b""],
     )
 
 
@@ -513,13 +505,12 @@ def update_bucket_hashes(session, bucketid):
     if isinstance(session, dict):
         session = cassandra_session(session)
     cql_bucketid = bucketid.replace("'", "''")
-    bucket_sha1 = sha1(bucketid).hexdigest()
-    hex_bucket_sha1 = "0x" + hexlify(bucket_sha1)
+    bucket_sha1 = sha1(bucketid.encode()).hexdigest()
     k = "bucket_%s" % bucket_sha1[0]
-    hex_k = "0x" + hexlify(k)
     session.execute(
-        SimpleStatement(
-            "INSERT INTO \"%s\" (key, column1, value) VALUES (%s, %s, '%s')"
-            % ("Hashes", hex_k, hex_bucket_sha1, cql_bucketid)
-        )
+        session.prepare(
+            'INSERT INTO "Hashes" \
+        (key, column1, value) VALUES (?, ?, ?)'
+        ),
+        [k.encode(), bucket_sha1.encode(), cql_bucketid],
     )
