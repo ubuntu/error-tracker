@@ -38,9 +38,12 @@ class RetracerCharm(ops.CharmBase):
                     "apt-get",
                     "install",
                     "-y",
+                    "apport-retrace",
                     "git",
                     "python3-amqp",
+                    "python3-cassandra",
                     "python3-pygit2",
+                    "ubuntu-dbgsym-keyring",
                     "vim",
                 ]
             )

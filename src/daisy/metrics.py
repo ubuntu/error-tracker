@@ -22,6 +22,9 @@ class Metrics:
     def gauge(self, *args, **kwargs):
         print(f"gauge: {self.namespace}: {args=} | {kwargs=}")
 
+    def timing(self, *args, **kwargs):
+        print(f"timing: {self.namespace}: {args=} | {kwargs=}")
+
 
 def get_metrics(namespace="daisy"):
     global METRICS
