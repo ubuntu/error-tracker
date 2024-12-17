@@ -4,6 +4,7 @@ import apt
 import re
 import socket
 import uuid
+import logging
 
 # From oops-amqp
 # These exception types always indicate an AMQP connection error/closure.
@@ -100,8 +101,8 @@ def split_package_and_version(package):
     # according to debian policy neither the package or version should have
     # utf8 in it but either some archives do not know that or something is
     # wonky with apport
-    package = package.encode("ascii", errors="replace")
-    version = version.encode("ascii", errors="replace")
+    package = package.encode("ascii", errors="replace").decode()
+    version = version.encode("ascii", errors="replace").decode()
     return (package, version)
 
 
@@ -116,7 +117,7 @@ def get_package_architecture(report_dict):
     return pkg_arch
 
 
-def format_crash_signature(crash_signature):
+def format_crash_signature(crash_signature) -> str:
     # https://errors.ubuntu.com/oops-local/2013-03-07/50428.daisy.ubuntu.com3
     # Exception-Value: InvalidRequestException(why='Key length of 127727 is
     # longer than maximum of 65535')
@@ -126,13 +127,10 @@ def format_crash_signature(crash_signature):
         return ""
 
     # Translate back to unicode so we can correctly slice this.
-    if type(crash_signature) == str:
+    if type(crash_signature) is bytes:
         crash_signature = crash_signature.decode("utf-8")
 
     crash_signature = crash_signature[:32768]
-
-    if type(crash_signature) == str:
-        crash_signature = crash_signature.encode("utf-8")
 
     return crash_signature
 
@@ -181,7 +179,7 @@ def bucket(oops_config, oops_id, crash_signature, report_dict):
 
     # BucketMetadata is displayed on the main page and shouldn't include
     # derivative or custom releases, so don't write them to the table.
-    release_re = re.compile("^Ubuntu \d\d.\d\d$")
+    release_re = re.compile(r"^Ubuntu \d\d.\d\d$")
     if (package and version) and release_re.match(release):
         oopses.update_bucket_metadata(
             oops_config,
@@ -233,11 +231,13 @@ def wrap_in_oops_wsgi(wsgi_handler):
 
 def retraceable_release(release):
     if release in EOL_RELEASES:
+        logging.info("%s is EoL, not retraceable", release)
         return False
-    derivative_re = re.compile("^Ubuntu( RTM| Kylin)? \d\d.\d\d$")
+    derivative_re = re.compile(r"^Ubuntu( RTM| Kylin)? \d\d.\d\d$")
     if derivative_re.match(release):
         return True
     else:
+        logging.info("%s doesn't match %s, not retraceable", release, derivative_re)
         return False
 
 

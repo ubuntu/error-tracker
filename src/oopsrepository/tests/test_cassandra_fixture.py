@@ -19,10 +19,10 @@ class TestTemporaryKeyspace(TestCase):
     def test_manages_keyspace(self):
         fixture = TemporaryKeyspace()
         with fixture:
-            os.environ['OOPS_KEYSPACE'] = fixture.keyspace
+            os.environ["OOPS_KEYSPACE"] = fixture.keyspace
             c = config.get_config()
-            creds = {'username': c['username'], 'password': c['password']}
-            mgr = SystemManager(c['host'][0], credentials=creds)
+            creds = {"username": c["username"], "password": c["password"]}
+            mgr = SystemManager(c["host"][0], credentials=creds)
             keyspace = fixture.keyspace
             # The keyspace should be accessible.
             self.assertTrue(keyspace in mgr.list_keyspaces())

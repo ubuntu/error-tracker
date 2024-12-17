@@ -4,4 +4,4 @@
 # the GNU Affero General Public License, version 3 ("AGPLv3"). See the file
 # LICENSE in the source tree for more information.
 
-__version__ = (0, 0, 0, 'dev', 0)
+__version__ = (0, 0, 0, "dev", 0)

@@ -8,12 +8,13 @@
 
 from pycassa.cassandra.ttypes import InvalidRequestException
 
+
 def workaround_1779(callable, *args, **kwargs):
     """Workaround cassandra not being able to do concurrent schema edits.
 
     The callable is tried until it does not raised InvalidRequestException
     with why = "Previous version mismatch. cannot apply."
-    
+
     :param callable: The callable to call.
     :param args: The args for it.
     :param kwargs: The kwargs for it.
@@ -26,5 +27,5 @@ def workaround_1779(callable, *args, **kwargs):
             return callable(*args, **kwargs)
             break
         except InvalidRequestException as e:
-            if e.why != 'Previous version mismatch. cannot apply.':
+            if e.why != "Previous version mismatch. cannot apply.":
                 raise

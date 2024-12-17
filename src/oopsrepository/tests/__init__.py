@@ -6,14 +6,15 @@
 
 from unittest import TestLoader
 
+
 def test_suite():
     test_names = [
-        'cassandra_fixture',
-        'config',
-        'matchers',
-        'oopses',
-        'schema',
-        ]
-    tests = ['oopsrepository.tests.test_' + test for test in test_names]
+        "cassandra_fixture",
+        "config",
+        "matchers",
+        "oopses",
+        "schema",
+    ]
+    tests = ["oopsrepository.tests.test_" + test for test in test_names]
     loader = TestLoader()
     return loader.loadTestsFromNames(tests)
