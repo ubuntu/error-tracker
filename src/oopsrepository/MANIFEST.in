@@ -1,7 +1,0 @@
-include LICENSE
-include COPYING
-include Makefile
-include MANIFEST.in
-include NEWS
-include README
-include .bzrignore
