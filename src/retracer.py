@@ -216,11 +216,6 @@ class Retracer:
                 )
             else:
                 self.connection = amqp.Connection(host=config.amqp_host)
-            self.connection.connect()
-            self.channel = self.connection.channel()
-            self.channel.queue_declare(queue=retrace, durable=True, auto_delete=False)
-            self.channel.basic_qos(0, 1, False)
-            log("Waiting for messages. ^C to exit.")
             self.run_forever(queue=retrace)
         finally:
             if self.connection:
@@ -229,7 +224,6 @@ class Retracer:
                 self.channel.close()
 
     def run_forever(self, queue):
-        tag = self.channel.basic_consume(callback=self.callback, queue=queue)
         try:
             while (
                 not self._lost_connection
@@ -238,6 +232,16 @@ class Retracer:
                 and not self._processing_callback
             ):
                 try:
+                    self.connection.connect()
+                    self.channel = self.connection.channel()
+                    self.channel.queue_declare(
+                        queue=queue, durable=True, auto_delete=False
+                    )
+                    self.channel.basic_qos(0, 1, False)
+                    tag = self.channel.basic_consume(
+                        callback=self.callback, queue=queue
+                    )
+                    log("Waiting for messages. ^C to exit.")
                     self.connection.drain_events()
                 except (socket.error, IOError) as e:
                     is_amqplib_ioerror = type(e) is IOError and e.args == (
