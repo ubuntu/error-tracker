@@ -8,11 +8,12 @@ import logging
 import ops
 
 from pathlib import Path
-from subprocess import check_call, CalledProcessError
+from subprocess import check_call, check_output, CalledProcessError
 
 logger = logging.getLogger(__name__)
 
-REPO_LOCATION = Path("/home/ubuntu/error-tracker")
+HOME = Path("~ubuntu").expanduser()
+REPO_LOCATION = HOME / "error-tracker"
 
 
 class RetracerCharm(ops.CharmBase):
@@ -38,9 +39,13 @@ class RetracerCharm(ops.CharmBase):
                     "apt-get",
                     "install",
                     "-y",
+                    "apport-retrace",
                     "git",
                     "python3-amqp",
+                    "python3-cassandra",
                     "python3-pygit2",
+                    "python3-swiftclient",
+                    "ubuntu-dbgsym-keyring",
                     "vim",
                 ]
             )
@@ -75,20 +80,59 @@ class RetracerCharm(ops.CharmBase):
             return
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
-        channel = self.config.get("channel")
-        if channel in ["beta", "edge", "candidate", "stable"]:
-            # os.system(f"snap refresh microsample --{channel}")
-            workload_version = self._getWorkloadVersion()
-            self.unit.set_workload_version(workload_version)
-            self.unit.status = ops.ActiveStatus("Ready at '%s'" % channel)
-        else:
-            self.unit.status = ops.BlockedStatus("Invalid channel configured.")
+        config = self.config.get("configuration")
+
+        config_location = HOME / "config"
+        config_location.mkdir(parents=True, exist_ok=True)
+        (config_location / "local_config.py").write_text(config)
+
+        systemd_unit_location = Path("/") / "etc" / "systemd" / "system"
+        systemd_unit_location.mkdir(parents=True, exist_ok=True)
+        (systemd_unit_location / "retracer.service").write_text(
+            f"""
+[Unit]
+Description=Retracer
+
+[Service]
+User=ubuntu
+Group=ubuntu
+Environment=PYTHONPATH={HOME}/config
+ExecStart={HOME}/error-tracker/src/retracer.py --config-dir {HOME}/error-tracker/src/retracer/config --sandbox-dir {HOME}/cache --architecture amd64 --core-storage {HOME}/var --output {HOME}/retracer-amd64.log --verbose
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+"""
+        )
+
+        check_call(["systemctl", "daemon-reload"])
+        check_call(["systemctl", "enable", "--now", "retracer"])
+        self.unit.set_workload_version(self._getWorkloadVersion())
+        self.unit.status = ops.ActiveStatus("Ready")
 
     def _getWorkloadVersion(self):
         """Get the retracer version from the git repository"""
-        workload_version = "retracer_v2"
-
-        return workload_version
+        try:
+            version = check_output(
+                [
+                    "sudo",
+                    "-u",
+                    "ubuntu",
+                    "git",
+                    "-C",
+                    REPO_LOCATION,
+                    "describe",
+                    "--tags",
+                    "--always",
+                    "--dirty",
+                ]
+            )
+            return version.decode()
+        except CalledProcessError as e:
+            logger.debug(
+                "Unable to get workload version (%d, %s)", e.returncode, e.stderr
+            )
+            self.unit.status = ops.BlockedStatus("Failed git describe.")
 
 
 if __name__ == "__main__":  # pragma: nocover
