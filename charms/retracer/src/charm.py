@@ -31,6 +31,11 @@ class RetracerCharm(ops.CharmBase):
 
     def _on_install(self, event: ops.InstallEvent):
         """Handle install event."""
+        # Work around https://bugs.launchpad.net/ubuntu/+source/gdb/+bug/1818918
+        # Apport will not be run as root, thus the included workaround here will hit ENOPERM
+        (Path("/") / "usr" / "lib" / "debug" / ".dwz").mkdir(
+            parents=True, exist_ok=True
+        )
         try:
             self.unit.status = ops.MaintenanceStatus("Installing apt dependencies")
             check_call(["apt-get", "update", "-y"])
