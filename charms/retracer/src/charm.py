@@ -93,7 +93,7 @@ class RetracerCharm(ops.CharmBase):
 
         systemd_unit_location = Path("/") / "etc" / "systemd" / "system"
         systemd_unit_location.mkdir(parents=True, exist_ok=True)
-        (systemd_unit_location / "retracer.service").write_text(
+        (systemd_unit_location / "retracer@.service").write_text(
             f"""
 [Unit]
 Description=Retracer
@@ -102,7 +102,7 @@ Description=Retracer
 User=ubuntu
 Group=ubuntu
 Environment=PYTHONPATH={HOME}/config
-ExecStart={HOME}/error-tracker/src/retracer.py --config-dir {HOME}/error-tracker/src/retracer/config --sandbox-dir {HOME}/cache --architecture amd64 --core-storage {HOME}/var --output {HOME}/retracer-amd64.log --verbose
+ExecStart={HOME}/error-tracker/src/retracer.py --config-dir {HOME}/error-tracker/src/retracer/config --sandbox-dir {HOME}/cache --architecture %i --core-storage {HOME}/var --output {HOME}/retracer-%i.log --verbose
 Restart=on-failure
 
 [Install]
@@ -111,7 +111,10 @@ WantedBy=multi-user.target
         )
 
         check_call(["systemctl", "daemon-reload"])
-        check_call(["systemctl", "enable", "--now", "retracer"])
+        check_call(["systemctl", "enable", "--now", "retracer@amd64"])
+        check_call(["systemctl", "enable", "--now", "retracer@arm64"])
+        check_call(["systemctl", "enable", "--now", "retracer@armhf"])
+        check_call(["systemctl", "enable", "--now", "retracer@i386"])
         self.unit.set_workload_version(self._getWorkloadVersion())
         self.unit.status = ops.ActiveStatus("Ready")
 
