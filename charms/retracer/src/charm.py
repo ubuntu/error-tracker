@@ -85,6 +85,8 @@ class RetracerCharm(ops.CharmBase):
             return
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
+        failed_queue = self.config.get("failed_queue")
+        failed = "--failed" if failed_queue else ""
         config = self.config.get("configuration")
 
         config_location = HOME / "config"
@@ -102,7 +104,7 @@ Description=Retracer
 User=ubuntu
 Group=ubuntu
 Environment=PYTHONPATH={HOME}/config
-ExecStart={HOME}/error-tracker/src/retracer.py --config-dir {HOME}/error-tracker/src/retracer/config --sandbox-dir {HOME}/cache --architecture %i --core-storage {HOME}/var --output {HOME}/retracer-%i.log --verbose
+ExecStart={HOME}/error-tracker/src/retracer.py --config-dir {HOME}/error-tracker/src/retracer/config --sandbox-dir {HOME}/cache --architecture %i --core-storage {HOME}/var --output {HOME}/retracer-%i.log --verbose {failed}
 Restart=on-failure
 
 [Install]

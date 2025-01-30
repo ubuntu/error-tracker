@@ -37,6 +37,11 @@ config:
         Acceptable values are: "info", "debug", "warning", "error" and "critical"
       default: "info"
       type: string
+    failed_queue:
+      description: |
+        Whether the retracer will listen on the "failed_retrace_<arch>" queue
+      default: false
+      type: boolean
     configuration:
       description: |
         Full configuration file. Must be valid Python, will be imported directly by daisy.
