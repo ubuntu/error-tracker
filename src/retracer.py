@@ -41,7 +41,7 @@ from apport import Report
 
 from cassandra.cqlengine import connection
 from cassandra.auth import PlainTextAuthProvider
-from cassandra.cluster import Cluster
+from cassandra.policies import RoundRobinPolicy
 
 # internal libs
 from daisy.metrics import get_metrics, record_revno
@@ -196,7 +196,13 @@ class Retracer:
         auth_provider = PlainTextAuthProvider(
             username=config.cassandra_username, password=config.cassandra_password
         )
-        connection.setup(config.cassandra_hosts, "crashdb", auth_provider=auth_provider)
+        connection.setup(
+            config.cassandra_hosts,
+            "crashdb",
+            auth_provider=auth_provider,
+            load_balancing_policy=RoundRobinPolicy(),
+            protocol_version=4,
+        )
         self.oops_config["host"] = config.cassandra_hosts
         self.oops_config["username"] = config.cassandra_username
         self.oops_config["password"] = config.cassandra_password
@@ -241,7 +247,7 @@ class Retracer:
                     tag = self.channel.basic_consume(
                         callback=self.callback, queue=queue
                     )
-                    log("Waiting for messages. ^C to exit.")
+                    log(f"Waiting for messages in `{queue}`. ^C to exit.")
                     self.connection.drain_events()
                 except (socket.error, IOError) as e:
                     is_amqplib_ioerror = type(e) is IOError and e.args == (
@@ -255,8 +261,7 @@ class Retracer:
                         metrics.meter("lost_rabbit_connection")
                         # Don't probe immediately, give the network/process
                         # time to come back.
-                        time.sleep(0.1)
-                        self.connection.connect()
+                        time.sleep(10)
                     else:
                         raise
             if self._stop_now and not self._processing_callback:
