@@ -693,7 +693,9 @@ class Retracer:
             return
         # confirm that gdb thinks the core file is good
         gdb_cmd = [self.gdb_path, "--batch", "--ex", "target core %s" % core_file]
-        proc = Popen(gdb_cmd, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+        proc = Popen(
+            gdb_cmd, stdout=PIPE, stderr=PIPE, universal_newlines=True, errors="ignore"
+        )
         (out, err) = proc.communicate()
         if "is truncated: expected core file size" in err or "not a core dump" in err:
             # Not a core file, there's no value in trying again.
