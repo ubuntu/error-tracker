@@ -136,7 +136,7 @@ Description=Retracer
 User=ubuntu
 Group=ubuntu
 Environment=PYTHONPATH={HOME}/config
-ExecStart={HOME}/error-tracker/src/retracer.py --config-dir {HOME}/error-tracker/src/retracer/config --sandbox-dir {HOME}/cache --cleanup-sandbox --architecture %i --core-storage {HOME}/var --output {HOME}/retracer-%i.log --verbose {failed}
+ExecStart={HOME}/error-tracker/src/retracer.py --config-dir {HOME}/error-tracker/src/retracer/config --sandbox-dir {HOME}/cache --cleanup-debs --cleanup-sandbox --architecture %i --core-storage {HOME}/var --output {HOME}/retracer-%i.log --verbose {failed}
 Restart=on-failure
 
 [Install]
