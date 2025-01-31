@@ -85,6 +85,38 @@ class RetracerCharm(ops.CharmBase):
             return
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
+        # Make sure the repo is up to date
+        repo_url = self.config.get("repo-url")
+        repo_branch = self.config.get("repo-branch")
+        check_call(
+            [
+                "sudo",
+                "-u",
+                "ubuntu",
+                "git",
+                "-C",
+                REPO_LOCATION,
+                "fetch",
+                "--update-head-ok",
+                "--force",
+                repo_url,
+                f"refs/heads/{repo_branch}:refs/heads/{repo_branch}",
+            ]
+        )
+        check_call(
+            [
+                "sudo",
+                "-u",
+                "ubuntu",
+                "git",
+                "-C",
+                REPO_LOCATION,
+                "reset",
+                "--hard",
+                repo_branch,
+            ]
+        )
+
         failed_queue = self.config.get("failed_queue")
         failed = "--failed" if failed_queue else ""
         config = self.config.get("configuration")
