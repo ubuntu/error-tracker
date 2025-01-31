@@ -256,6 +256,7 @@ class Retracer:
                         # Don't probe immediately, give the network/process
                         # time to come back.
                         time.sleep(0.1)
+                        self.connection.connect()
                     else:
                         raise
             if self._stop_now and not self._processing_callback:
