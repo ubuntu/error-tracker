@@ -149,6 +149,10 @@ WantedBy=multi-user.target
         check_call(["systemctl", "enable", "--now", "retracer@arm64"])
         check_call(["systemctl", "enable", "--now", "retracer@armhf"])
         check_call(["systemctl", "enable", "--now", "retracer@i386"])
+        check_call(["systemctl", "restart", "retracer@amd64"])
+        check_call(["systemctl", "restart", "retracer@arm64"])
+        check_call(["systemctl", "restart", "retracer@armhf"])
+        check_call(["systemctl", "restart", "retracer@i386"])
         self.unit.set_workload_version(self._getWorkloadVersion())
         self.unit.status = ops.ActiveStatus("Ready")
 
