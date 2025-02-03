@@ -231,44 +231,16 @@ class Retracer:
 
     def run_forever(self, queue):
         try:
-            while (
-                not self._lost_connection
-                or time.time() < self._lost_connection + 120
-                or self._stop_now
-                and not self._processing_callback
-            ):
-                try:
-                    self.connection.connect()
-                    self.channel = self.connection.channel()
-                    self.channel.queue_declare(
-                        queue=queue, durable=True, auto_delete=False
-                    )
-                    self.channel.basic_qos(0, 1, False)
-                    tag = self.channel.basic_consume(
-                        callback=self.callback, queue=queue
-                    )
-                    log(f"Waiting for messages in `{queue}`. ^C to exit.")
-                    self.connection.drain_events()
-                except (socket.error, IOError) as e:
-                    is_amqplib_ioerror = type(e) is IOError and e.args == (
-                        "Socket error",
-                    )
-                    amqplib_conn_errors = (socket.error, amqp.ConnectionError)
-                    is_amqplib_conn_error = isinstance(e, amqplib_conn_errors)
-                    if is_amqplib_conn_error or is_amqplib_ioerror:
-                        self._lost_connection = time.time()
-                        log("lost connection to Rabbit")
-                        metrics.meter("lost_rabbit_connection")
-                        # Don't probe immediately, give the network/process
-                        # time to come back.
-                        time.sleep(10)
-                    else:
-                        raise
-            if self._stop_now and not self._processing_callback:
-                log("Exiting due to SIGTERM.")
-            log("Rabbit did not reappear quickly enough.")
+            self.connection.connect()
+            self.channel = self.connection.channel()
+            self.channel.queue_declare(queue=queue, durable=True, auto_delete=False)
+            self.channel.basic_qos(0, 1, False)
+            tag = self.channel.basic_consume(callback=self.callback, queue=queue)
+            while not self._stop_now:
+                log(f"Waiting for messages in `{queue}`. ^C to exit.")
+                self.connection.drain_events()
         except KeyboardInterrupt:
-            pass
+            log("Keyboard interrupt received, exiting properly")
         if self.channel and self.channel.is_open:
             self.channel.basic_cancel(tag)
 
