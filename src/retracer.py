@@ -412,7 +412,7 @@ class Retracer:
         # Also remove it from the retracing index, if we haven't already.
         try:
             addr_sig = cassandra_schema.OOPS.objects.get(
-                key=oops_id, column1="StacktraceAddressSignature"
+                key=oops_id.encode(), column1="StacktraceAddressSignature"
             )["value"]
             cassandra_schema.Indexes.objects.filter(
                 key=b"retracing", column1=addr_sig
