@@ -1,0 +1,13 @@
+deb http://archive.ubuntu.com/ubuntu/ questing main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu/ questing-updates main restricted universe multiverse
+#deb http://archive.ubuntu.com/ubuntu/ questing-proposed main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu/ questing-security main restricted universe multiverse
+
+deb-src http://archive.ubuntu.com/ubuntu/ questing main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu/ questing-updates main restricted universe multiverse
+#deb-src http://archive.ubuntu.com/ubuntu/ questing-proposed main restricted universe multiverse
+deb-src http://security.ubuntu.com/ubuntu/ questing-security main restricted universe multiverse
+
+deb http://ddebs.ubuntu.com questing main restricted universe multiverse
+deb http://ddebs.ubuntu.com questing-updates main restricted universe multiverse
+deb http://ddebs.ubuntu.com questing-proposed main restricted universe multiverse
