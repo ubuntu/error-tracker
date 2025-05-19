@@ -280,7 +280,7 @@ class Retracer:
 
             mean[mean_key] = struct.unpack("!f", mean[mean_key])[0]
             mean[count_key] = int.from_bytes(mean[count_key])
-        except cassandra_schema.DoesNotExist:
+        except (cassandra_schema.DoesNotExist, KeyError):
             mean = {mean_key: 0.0, count_key: 0}
 
         new_mean = float(
