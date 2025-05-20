@@ -110,7 +110,7 @@ def prefix_log_with_amqp_message(func):
             # message.
             format_string = (
                 "%(asctime)s:%(process)d:%(thread)d:%(levelname)s"
-                ":%(name)s:" + msg.body + ":%(message)s"
+                ":%(name)s:" + str(msg.body) + ":%(message)s"
             )
             formatter = logging.Formatter(format_string)
             logging.getLogger().handlers[0].setFormatter(formatter)
