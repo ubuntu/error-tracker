@@ -363,7 +363,7 @@ class Retracer:
 
     def failed_to_process(self, msg, oops_id, old=False):
         # Try to remove the core file from the storage provider
-        parts = msg.body.decode().split(":", 1)
+        parts = self.msg_body.split(":", 1)
         oops_id = None
         oops_id, provider = parts
         removed = self.remove(*parts)
@@ -599,7 +599,10 @@ class Retracer:
     def callback(self, msg):
         self._processing_callback = True
         log("Processing.")
-        parts = msg.body.decode().split(":", 1)
+        self.msg_body = msg.body
+        if isinstance(self.msg_body, bytes):
+            self.msg_body = self.msg_body.decode()
+        parts = self.msg_body.split(":", 1)
         oops_id, provider = parts
         try:
             col = cassandra_schema.OOPS.get_as_dict(key=oops_id.encode())
@@ -740,7 +743,7 @@ class Retracer:
             report.write(fp)
 
         try:
-            retrace_msg = "Retracing {}".format(msg.body.decode())
+            retrace_msg = "Retracing {}".format(self.msg_body)
             sandbox, cache = self.setup_cache(self.sandbox_dir, release)
             day_key = time.strftime("%Y%m%d", time.gmtime())
 
@@ -789,7 +792,7 @@ class Retracer:
             out, err = proc.communicate()
         except:
             rm_eff("%s.new" % report_path)
-            log("Failure in retrace set up for {}".format(msg.body))
+            log("Failure in retrace set up for {}".format(self.msg_body))
             log(traceback.format_exc())
             metrics.meter("retrace.failed")
             metrics.meter("retrace.failed.%s" % release)
@@ -1357,7 +1360,7 @@ class Retracer:
             sys.exit()
 
     def processed(self, msg):
-        parts = msg.body.decode().split(":", 1)
+        parts = self.msg_body.split(":", 1)
         oops_id = None
         oops_id, provider = parts
         removed = self.remove(*parts)
@@ -1399,7 +1402,7 @@ class Retracer:
 
         key = msg.delivery_info["routing_key"]
 
-        body = amqp.Message(msg.body, timestamp=ts)
+        body = amqp.Message(self.msg_body, timestamp=ts)
         body.properties["delivery_mode"] = 2
         msg.channel.basic_publish(body, exchange="", routing_key=key)
         msg.channel.basic_reject(msg.delivery_tag, False)
