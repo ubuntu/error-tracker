@@ -69,6 +69,12 @@ _swift_auth_failure = False
 metrics = get_metrics("retracer.%s" % socket.gethostname())
 
 
+def ensure_str(var):
+    if isinstance(var, bytes):
+        return var.decode()
+    return var
+
+
 def log(message, level=logging.INFO):
     logging.log(level, message)
 
@@ -599,9 +605,7 @@ class Retracer:
     def callback(self, msg):
         self._processing_callback = True
         log("Processing.")
-        self.msg_body = msg.body
-        if isinstance(self.msg_body, bytes):
-            self.msg_body = self.msg_body.decode()
+        self.msg_body = ensure_str(msg.body)
         parts = self.msg_body.split(":", 1)
         oops_id, provider = parts
         try:
@@ -1101,7 +1105,9 @@ class Retracer:
                     report.pop("CoreDump")
                 for k, v in report.items():
                     cassandra_schema.Stacktrace.objects.create(
-                        key=stacktrace_addr_sig.encode(), column1=k, value=v
+                        key=stacktrace_addr_sig.encode(),
+                        column1=ensure_str(k),
+                        value=ensure_str(v),
                     )
                 args = (release, day_key, retracing_time, "success")
                 self.update_retrace_stats(*args)
