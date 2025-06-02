@@ -2,6 +2,7 @@
 
 import sys
 import datetime
+import distro_info
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
@@ -15,7 +16,8 @@ auth_provider = PlainTextAuthProvider(
 )
 cluster = Cluster(config.cassandra_hosts, auth_provider=auth_provider)
 session = cluster.connect(config.cassandra_keyspace)
-session.default_consistency_level = ConsistencyLevel.LOCAL_ONE
+
+d = distro_info.UbuntuDistroInfo()
 
 
 # Utilities
@@ -34,59 +36,55 @@ if __name__ == "__main__":
         sys.argv.remove("--dry-run")
     else:
         dry_run = False
-    if len(sys.argv) > 2:
-        d = datetime.datetime.strptime(sys.argv[2], "%Y%m%d")
-        formatted = sys.argv[2]
-    elif len(sys.argv) == 2:
-        # Yesterday
-        d = datetime.datetime.today() - datetime.timedelta(days=1)
-        formatted = d.strftime("%Y%m%d")
-    else:
-        print("Usage: release_name [date]", file=sys.stderr)
-        sys.exit(1)
-    release = sys.argv[1]
-    i = _date_range_iterator(d - datetime.timedelta(days=89), d)
-    users = set()
-    day_count = 0
-    for date in i:
-        if dry_run:
-            print(("looking up %s" % date))
-            day_count += 1
-        user_count = 0
-        # don't need to use hexlify and bytearray because that's redundant
-        hex_daterelease = bytearray("%s:%s" % (release, date))
-        # column1 is the system uuid
-        results = session.execute(
-            SimpleStatement('SELECT column1 FROM "DayUsers" WHERE key=%s'),
-            [hex_daterelease],
-        )
-        rows = [row for row in results]
-        user_count += len(rows)
-        # row[0] is column1 which is the system uuid
-        users.update([row[0] for row in rows])
-        if dry_run:
-            print(("%s" % user_count))
-    # value is the number of users
-    uu_results = session.execute(
-        SimpleStatement(
-            'SELECT value from "UniqueUsers90Days" WHERE key=%s and column1=%s'
-        ),
-        [release, formatted],
-    )
+
+    releases = ["Ubuntu " + r.replace(" LTS", "") for r in sorted(set(d.supported(result="release") + d.supported_esm(result="release")))]
     try:
-        uu_count = [r[0] for r in uu_results][0]
-    except IndexError:
-        uu_count = 0
-    print(("Was %s" % uu_count))
-    print(("Now %s" % len(users)))
-    if not dry_run:
-        session.execute(
-            SimpleStatement(
-                "INSERT INTO \"%s\" (key, column1, value) \
-                         VALUES ('%s', '%s', %d)"
-                % ("UniqueUsers90Days", release, formatted, len(users))
+        releases.append("Ubuntu " + d.devel(result="release"))
+    except distro_info.DistroDataOutdated:
+        print("Distro info outdated, unable to process devel")
+
+    d = datetime.datetime.today() - datetime.timedelta(days=1)
+    formatted = d.strftime("%Y%m%d")
+    for release in releases:
+        print(f"Updating {release}")
+        i = _date_range_iterator(d - datetime.timedelta(days=89), d)
+        users = set()
+        day_count = 0
+        for date in i:
+            print(f"  processing {date} - ", end="")
+            day_count += 1
+            user_count = 0
+            hex_daterelease = ("%s:%s" % (release, date)).encode()
+            # column1 is the system uuid
+            results = session.execute(
+                SimpleStatement('SELECT column1 FROM "DayUsers" WHERE key=%s'),
+                [hex_daterelease],
             )
+            rows = [row for row in results]
+            user_count += len(rows)
+            # row[0] is column1 which is the system uuid
+            users.update([row[0] for row in rows])
+            print(f"found {user_count} users")
+        # value is the number of users
+        uu_results = session.execute(
+            SimpleStatement(
+                'SELECT value from "UniqueUsers90Days" WHERE key=%s and column1=%s'
+            ),
+            [release, formatted],
         )
-    else:
+        try:
+            uu_count = [r[0] for r in uu_results][0]
+        except IndexError:
+            uu_count = 0
+        print(("Was %s" % uu_count))
+        print(("Now %s" % len(users)))
+        if not dry_run:
+            session.execute(
+                SimpleStatement(
+                    "INSERT INTO \"%s\" (key, column1, value) \
+                             VALUES ('%s', '%s', %d)"
+                    % ("UniqueUsers90Days", release, formatted, len(users))
+                )
+            )
         print(("%s:%s" % (release, len(users))))
-    print(("from %s days" % day_count))
+        print(("from %s days" % day_count))
