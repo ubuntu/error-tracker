@@ -7,6 +7,9 @@ summary: Regularly run some script, for various purposes
 description: |
   This is what regularly updates various indexes and counters, along with some
   clean up and self-healing.
+links:
+  source:
+    - https://github.com/canonical/error-tracker/tree/main/charms/timers
 
 platforms:
   ubuntu@24.04:amd64:

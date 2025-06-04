@@ -7,6 +7,9 @@ summary: Retrace user crashes to get traceback with symbols
 description: |
   The retracer part of the Error Tracker. This is what connects the RabbitMQ
   retracing queue to `apport-retrace`, and updates the results in Cassandra.
+links:
+  source:
+    - https://github.com/canonical/error-tracker/tree/main/charms/retracer
 
 platforms:
   ubuntu@24.04:amd64:
