@@ -16,6 +16,40 @@ HOME = Path("~ubuntu").expanduser()
 REPO_LOCATION = HOME / "error-tracker"
 
 
+def setup_systemd_timer(unit_name, description, command, calendar):
+    systemd_unit_location = Path("/") / "etc" / "systemd" / "system"
+    systemd_unit_location.mkdir(parents=True, exist_ok=True)
+
+    (systemd_unit_location / f"{unit_name}.service").write_text(
+        f"""
+[Unit]
+Description={description}
+
+[Service]
+Type=oneshot
+User=ubuntu
+Environment=PYTHONPATH={HOME}/config
+ExecStart={command}
+"""
+    )
+    (systemd_unit_location / f"{unit_name}.timer").write_text(
+        f"""
+[Unit]
+Description={description}
+
+[Timer]
+OnCalendar={calendar}
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+"""
+    )
+
+    check_call(["systemctl", "daemon-reload"])
+    check_call(["systemctl", "enable", "--now", f"{unit_name}.timer"])
+
+
 class TimersCharm(ops.CharmBase):
     """Charm the application."""
 
@@ -117,38 +151,17 @@ class TimersCharm(ops.CharmBase):
         config_location.mkdir(parents=True, exist_ok=True)
         (config_location / "local_config.py").write_text(config)
 
-        systemd_unit_location = Path("/") / "etc" / "systemd" / "system"
-        systemd_unit_location.mkdir(parents=True, exist_ok=True)
-
-        (systemd_unit_location / "et-unique-users-daily-update.service").write_text(
-            f"""
-[Unit]
-Description=Error Tracker - Unique users daily update
-
-[Service]
-Type=oneshot
-User=ubuntu
-Environment=PYTHONPATH={HOME}/config
-ExecStart={REPO_LOCATION}/src/tools/unique_users_daily_update.py
-"""
+        setup_systemd_timer(
+            "et-unique-users-daily-update",
+            "Error Tracker - Unique users daily update",
+            f"{REPO_LOCATION}/src/tools/unique_users_daily_update.py",
+            "*-*-* 00:30:00",
         )
-        (systemd_unit_location / "et-unique-users-daily-update.timer").write_text(
-            """
-[Unit]
-Description=Error Tracker - Unique users daily update
-
-[Timer]
-OnCalendar=daily
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-"""
-        )
-
-        check_call(["systemctl", "daemon-reload"])
-        check_call(
-            ["systemctl", "enable", "--now", "et-unique-users-daily-update.timer"]
+        setup_systemd_timer(
+            "et-import-bugs",
+            "Error Tracker - Import bugs",
+            f"{REPO_LOCATION}/src/tools/import_bugs.py",
+            "*-*-* 01,04,07,10,13,16,19,22:00:00",  # every three hours
         )
         self.unit.set_workload_version(self._getWorkloadVersion())
         self.unit.status = ops.ActiveStatus("Ready")
