@@ -78,6 +78,7 @@ class TimersCharm(ops.CharmBase):
                     "python3-amqp",
                     "python3-cassandra",
                     "python3-pygit2",
+                    "python3-requests",
                     "python3-swiftclient",
                     "vim",
                 ]
@@ -162,6 +163,12 @@ class TimersCharm(ops.CharmBase):
             "Error Tracker - Import bugs",
             f"{REPO_LOCATION}/src/tools/import_bugs.py",
             "*-*-* 01,04,07,10,13,16,19,22:00:00",  # every three hours
+        )
+        setup_systemd_timer(
+            "et-import-team-packages",
+            "Error Tracker - Import team packages",
+            f"{REPO_LOCATION}/src/tools/import_team_packages.py",
+            "*-*-* 02:30:00",
         )
         self.unit.set_workload_version(self._getWorkloadVersion())
         self.unit.status = ops.ActiveStatus("Ready")
