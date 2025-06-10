@@ -1,13 +1,18 @@
 #!/usr/bin/python3
 
-from binascii import hexlify
-
+import requests
+from contextlib import suppress
 from cassandra import ConsistencyLevel
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
-from cassandra.query import SimpleStatement
+from launchpadlib.launchpad import Launchpad
+from launchpadlib.errors import ResponseError
 
-from daisy import config, launchpad
+from daisy import config
+
+SRC_PACKAGE_TEAM_MAPPING = (
+    "https://ubuntu-archive-team.ubuntu.com/package-team-mapping.json"
+)
 
 auth_provider = PlainTextAuthProvider(
     username=config.cassandra_username, password=config.cassandra_password
@@ -15,35 +20,44 @@ auth_provider = PlainTextAuthProvider(
 cluster = Cluster(config.cassandra_hosts, auth_provider=auth_provider)
 session = cluster.connect(config.cassandra_keyspace)
 session.default_consistency_level = ConsistencyLevel.LOCAL_ONE
+user_binary_packages_insert = session.prepare(
+    'INSERT INTO "UserBinaryPackages" (key, column1, value) VALUES (?, ?, 0x)'
+)
+
+launchpad = Launchpad.login_anonymously("unsubscribed-packages", "production")
+ubuntu = launchpad.distributions["ubuntu"]
+archive = ubuntu.getArchive(name="primary")
 
 
-def import_user_binary_packages(user):
-    binary_packages = launchpad.get_subscribed_packages(user)
-    bin_pkgs_tbl = "UserBinaryPackages"
-    hex_empty = "0x" + hexlify("")
-    for binary_package in binary_packages:
-        # print("%s: %s" % (user, binary_package))
-        session.execute(
-            SimpleStatement(
-                "INSERT INTO \"%s\" (key, column1, value) VALUES ('%s', '%s', %s)"
-                % (bin_pkgs_tbl, user, binary_package, hex_empty)
-            )
-        )
+def get_binary_packages(src_pkg) -> set[str]:
+    print(f" source: {src_pkg} ", end="")
+    src = archive.getPublishedSources(
+        source_name=src_pkg,
+        exact_match=True,
+        order_by_date=True,
+        status="Published",
+    )[0]
+    bins = set()
+    for bin_pkg in src.getPublishedBinaries(active_binaries_only=True):
+        bins.add(bin_pkg.binary_package_name)
+    print(f"binaries: {bins}")
+
+    return bins
+
+
+def import_user_binary_packages(team_name, src_pkgs):
+    print(f"Fetching packages for {team_name}")
+    for src_pkg in src_pkgs:
+        with suppress(IndexError, ResponseError):
+            binary_packages = get_binary_packages(src_pkg)
+            for binary_package in binary_packages:
+                session.execute(
+                    user_binary_packages_insert, [team_name, binary_package]
+                )
 
 
 if __name__ == "__main__":
-    teams = [
-        "debcrafters-packages",
-        "desktop-packages",
-        "edubuntu-bugs",
-        "foundations-bugs",
-        "kernel-packages",
-        "kubuntu-bugs",
-        "lubuntu-packaging",
-        "ubuntu-security",
-        "ubuntu-server",
-        "ubuntu-x-swat",
-        "xubuntu-bugs",
-    ]
-    for team in teams:
-        import_user_binary_packages(team)
+    print("Downloading package team mapping")
+    mapping = requests.get(SRC_PACKAGE_TEAM_MAPPING).json()
+    for team, packages in mapping.items():
+        import_user_binary_packages(team, packages)
