@@ -156,7 +156,7 @@ class TimersCharm(ops.CharmBase):
             "et-unique-users-daily-update",
             "Error Tracker - Unique users daily update",
             f"{REPO_LOCATION}/src/tools/unique_users_daily_update.py",
-            "*-*-* 00:30:00",
+            "*-*-* 00:30:00",  # every day at 00:30
         )
         setup_systemd_timer(
             "et-import-bugs",
@@ -168,7 +168,19 @@ class TimersCharm(ops.CharmBase):
             "et-import-team-packages",
             "Error Tracker - Import team packages",
             f"{REPO_LOCATION}/src/tools/import_team_packages.py",
-            "*-*-* 02:30:00",
+            "*-*-* 02:30:00",  # every day at 02:30
+        )
+        setup_systemd_timer(
+            "et-swift-corrupt-core-check",
+            "Error Tracker - Swift - Check for corrupt cores",
+            f"{REPO_LOCATION}/src/tools/swift_corrupt_core_check.py",
+            "*-*-* 04:30:00",  # every day at 04:30
+        )
+        setup_systemd_timer(
+            "et-swift-handle-old-cores",
+            "Error Tracker - Swift - Handle old cores",
+            f"{REPO_LOCATION}/src/tools/swift_handle_old_cores.py",
+            "*-*-* *:45:00",  # every hour at minute 45
         )
         self.unit.set_workload_version(self._getWorkloadVersion())
         self.unit.status = ops.ActiveStatus("Ready")
