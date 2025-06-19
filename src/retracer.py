@@ -756,6 +756,8 @@ class Retracer:
             # command line option like don't use sandbox even though we will
             # provide it on the cli
             cmd = [
+                "timeout",
+                "2h",
                 "python3",
                 self.apport_retrace_path,
                 report_path,
