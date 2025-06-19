@@ -1,7 +1,6 @@
 from amqp import ConnectionError as AMQPConnectionException
 
-# TODO: see to replace that
-# from oopsrepository import oopses
+from oopsrepository import oopses
 import apt
 import re
 import socket
@@ -138,9 +137,6 @@ def format_crash_signature(crash_signature) -> str:
 
 
 def bucket(oops_config, oops_id, crash_signature, report_dict):
-    raise NotImplementedError(
-        "We need oopses from oopsrepository for this function to work"
-    )
     release = report_dict.get("DistroRelease", "")
     package = report_dict.get("Package", "")
     src_package = report_dict.get("SourcePackage", "")
