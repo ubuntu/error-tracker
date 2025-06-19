@@ -757,7 +757,7 @@ class Retracer:
             # provide it on the cli
             cmd = [
                 "timeout",
-                "2h",
+                "45m",
                 "python3",
                 self.apport_retrace_path,
                 report_path,
