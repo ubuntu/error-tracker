@@ -5,8 +5,6 @@ import mock
 from testtools import TestCase
 from oopsrepository.testing.cassandra import TemporaryOOPSDB
 import pycassa
-import tempfile
-import shutil
 import os
 import time
 from hashlib import sha512

@@ -2,7 +2,6 @@ from daisy import submit
 from daisy import submit_core
 from daisy import utils
 from daisy import metrics
-from daisy import config
 from daisy.version_middleware import VersionMiddleware
 from daisy.version import version_info
 import errno
@@ -57,7 +56,7 @@ def app(environ, start_response):
     # clean up core files in directories for which there is no pid
     # this might be better done by worker_abort (need newer gunicorn)
     for d in os.listdir("/tmp/"):
-        if not "cores-" in d:
+        if "cores-" not in d:
             continue
         pid = int(d.split("-")[1])
         try:

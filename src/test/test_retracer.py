@@ -15,7 +15,7 @@ import time
 import pycassa
 from pycassa.types import IntegerType, FloatType
 import uuid
-import amqplib.client_0_8 as amqp
+import amqp
 import datetime
 
 # Actually show the messages (info) with the retracer format.
