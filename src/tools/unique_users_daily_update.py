@@ -36,7 +36,12 @@ if __name__ == "__main__":
     else:
         dry_run = False
 
-    releases = ["Ubuntu " + r.replace(" LTS", "") for r in sorted(set(d.supported(result="release") + d.supported_esm(result="release")))]
+    releases = [
+        "Ubuntu " + r.replace(" LTS", "")
+        for r in sorted(
+            set(d.supported(result="release") + d.supported_esm(result="release"))
+        )
+    ]
     try:
         releases.append("Ubuntu " + d.devel(result="release"))
     except distro_info.DistroDataOutdated:
