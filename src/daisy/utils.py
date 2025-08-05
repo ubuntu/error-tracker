@@ -243,7 +243,7 @@ def retraceable_release(release):
 
 
 def retraceable_package(package):
-    if not "[origin: " in package:
+    if "[origin: " not in package:
         return True
     elif "[origin: Ubuntu RTM]" in package:
         return True
@@ -279,7 +279,7 @@ def blacklisted_device(system_token):
 def is_amqplib_ioerror(e):
     """Returns True if e is an amqplib internal exception."""
     # Raised by amqplib rather than socket.error on ssl issues and short reads.
-    if not type(e) is IOError:
+    if type(e) is not IOError:
         return False
     if e.args == ("Socket error",) or e.args == ("Socket closed",):
         return True
