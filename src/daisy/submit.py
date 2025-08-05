@@ -146,7 +146,7 @@ def submit(_session, environ, system_token):
             metrics.meter("invalid.invalid_bson")
             return (False, "Invalid BSON.")
         data = bson.BSON(data).decode()
-    except bson.errors.InvalidBSON as TypeError:
+    except bson.errors.InvalidBSON:
         metrics.meter("invalid.invalid_bson")
         return (False, "Invalid BSON.")
     except bson.errors.InvalidDocument:

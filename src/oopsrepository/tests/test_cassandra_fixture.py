@@ -4,7 +4,6 @@
 # the GNU Affero General Public License, version 3 ("AGPLv3"). See the file
 # LICENSE in the source tree for more information.
 
-import pycassa
 from pycassa.system_manager import SystemManager
 from testtools import TestCase
 import os

@@ -11,7 +11,6 @@ from pycassa.types import (
     AsciiType,
     UTF8Type,
     CounterColumnType,
-    IntegerType,
     DateType,
 )
 from pycassa.system_manager import (
