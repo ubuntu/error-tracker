@@ -1,6 +1,6 @@
 # This file configures Charmcraft.
 # See https://juju.is/docs/sdk/charmcraft-config for guidance.
-name: retracer
+name: error-tracker-retracer
 type: charm
 title: Error Tracker - Retracer
 summary: Retrace user crashes to get traceback with symbols
