@@ -1,11 +1,8 @@
 name: Build and test charms
 
 on:
+  push:
   pull_request:
-  workflow_call:
-    secrets:
-      CHARMHUB_TOKEN:
-        required: true
 
 env:
   DEBIAN_FRONTEND: noninteractive
@@ -103,3 +100,11 @@ jobs:
           name: ${{ matrix.charm }}.charm
           path: charms/${{ matrix.charm }}/*.charm
 
+      - name: Upload charm to charmhub
+        uses: canonical/charming-actions/upload-charm@1753e0803f70445132e92acd45c905aba6473225 # 2.7.0
+        with:
+          credentials: '${{ secrets.CHARMHUB_TOKEN }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          charm-path: charms/${{ matrix.charm }}
+          built-charm-path: error-tracker-${{ matrix.charm }}_ubuntu@24.04-amd64.charm
+        if: github.ref == 'refs/heads/main'

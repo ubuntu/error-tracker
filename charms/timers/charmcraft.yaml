@@ -1,6 +1,6 @@
 # This file configures Charmcraft.
 # See https://juju.is/docs/sdk/charmcraft-config for guidance.
-name: timers
+name: error-tracker-timers
 type: charm
 title: Error Tracker - Timers
 summary: Regularly run some script, for various purposes
