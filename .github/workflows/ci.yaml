@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
     container:
-      image: ubuntu:plucky
+      image: ubuntu:rolling
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
@@ -32,8 +32,8 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - ubuntu:noble
-          - ubuntu:plucky
+          - ubuntu:latest
+          - ubuntu:rolling
     container:
       image: ${{ matrix.container }}
     steps:
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: woke
-        uses: get-woke/woke-action@v0
+        uses: get-woke/woke-action@b2ec032c4a2c912142b38a6a453ad62017813ed0 # v0
         with:
           # Cause the check to fail on any broke rules
           fail-on-error: true
