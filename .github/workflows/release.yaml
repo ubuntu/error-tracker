@@ -15,8 +15,8 @@ on:
         required: true
         type: choice
         options:
-          - stable
           - edge
+          - stable
 
       # for multi charm repo
       charm-name:
