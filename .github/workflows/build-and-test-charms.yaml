@@ -87,11 +87,21 @@ jobs:
       - name: Setup LXD
         uses: canonical/setup-lxd@a3c85fc6fb7fff43fcfeae87659e41a8f635b7dd
 
-      - name: Install charmcraft
-        run: sudo snap install charmcraft --classic
+      - name: Install and bootstrap toolchains
+        run: |
+          sudo snap install astral-uv --classic
+          sudo snap install concierge --classic
+          sudo concierge prepare \
+              --juju-channel=3/stable \
+              --charmcraft-channel=3.x/stable \
+              --preset machine
 
       - name: Pack charm
         run: charmcraft pack -v
+        working-directory: charms/${{ matrix.charm }}
+
+      - name: Test charm
+        run: uv run pytest tests/ -vv --log-level=INFO
         working-directory: charms/${{ matrix.charm }}
 
       - name: Upload charm artifact
