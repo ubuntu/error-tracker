@@ -4,18 +4,17 @@
 # got dropped from the amqp queue somehow and readd them after looking up the
 # arch and release for the core file in cassandra.
 
-import amqp
 import atexit
-import swiftclient
 import sys
+from datetime import UTC, datetime, timedelta
 
+import amqp
+import swiftclient
 from cassandra import ConsistencyLevel
-from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
+from cassandra.cluster import Cluster
 
-from daisy import config
-from daisy import utils
-from datetime import datetime, timedelta, UTC
+from daisy import config, utils
 
 limit = None
 if len(sys.argv) == 2:

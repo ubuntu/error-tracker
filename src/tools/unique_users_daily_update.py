@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 
-import sys
 import datetime
-import distro_info
+import sys
 
-from cassandra.cluster import Cluster
+import distro_info
 from cassandra.auth import PlainTextAuthProvider
+from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
 
 from daisy import config

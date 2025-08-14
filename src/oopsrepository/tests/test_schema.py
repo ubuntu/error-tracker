@@ -5,11 +5,11 @@
 # LICENSE in the source tree for more information.
 
 
-from testtools import TestCase
 import os
 
-from oopsrepository import schema
-from oopsrepository import config
+from testtools import TestCase
+
+from oopsrepository import config, schema
 from oopsrepository.testing.cassandra import TemporaryKeyspace
 from oopsrepository.testing.matchers import HasOOPSSchema
 

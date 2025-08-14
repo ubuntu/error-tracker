@@ -9,13 +9,13 @@
 import os
 import os.path
 
-from fixtures import Fixture, TempDir
 import pycassa
+from fixtures import Fixture, TempDir
 from pycassa.system_manager import SystemManager
 
 from oopsrepository.cassandra_shim import workaround_1779
-from oopsrepository.schema import create
 from oopsrepository.config import get_config
+from oopsrepository.schema import create
 
 
 class TemporaryKeyspace(Fixture):

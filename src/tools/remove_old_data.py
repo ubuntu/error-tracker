@@ -1,14 +1,13 @@
 #!/usr/bin/python3
 
-from binascii import hexlify
 import sys
-
-from cassandra import OperationTimedOut
-from cassandra.cluster import Cluster, NoHostAvailable
-from cassandra.auth import PlainTextAuthProvider
-
+from binascii import hexlify
 from datetime import datetime, timedelta
 from time import sleep
+
+from cassandra import OperationTimedOut
+from cassandra.auth import PlainTextAuthProvider
+from cassandra.cluster import Cluster, NoHostAvailable
 
 from daisy import config
 

@@ -1,6 +1,6 @@
 from cassandra import ConsistencyLevel
-from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
+from cassandra.cluster import Cluster
 
 from daisy import config
 
@@ -45,8 +45,9 @@ def cassandra_session():
 
 
 def record_revno(namespace="daisy"):
-    from daisy.version import version_info
     import socket
+
+    from daisy.version import version_info
 
     if "revno" in version_info:
         m = "%s.version.daisy" % socket.gethostname()

@@ -5,17 +5,16 @@
 # the GNU Affero General Public License, version 3 ("AGPLv3"). See the file
 # LICENSE in the source tree for more information.
 
-import json
-import time
 import datetime
-import uuid
+import json
 import os
+import time
+import uuid
 
 import pycassa
 from testtools import TestCase
 
-from oopsrepository import oopses
-from oopsrepository import config
+from oopsrepository import config, oopses
 from oopsrepository.testing.cassandra import TemporaryOOPSDB
 
 
@@ -78,31 +77,27 @@ class TestInsert(ClearCache):
         dayoops_cf = pycassa.ColumnFamily(self.pool, "DayOOPS")
         oops_refs = dayoops_cf.get(day_key)
         self.assertEqual([oopsid], list(oops_refs.values()))
-        ## TODO - the aggregates for the OOPS have been updated.
+        # TODO - the aggregates for the OOPS have been updated.
 
     def test_insert_oops(self):
-        keyspace = self.useFixture(TemporaryOOPSDB()).keyspace
         oopsid = str(uuid.uuid1())
         oops = json.dumps({"duration": 13000})
         day_key = oopses.insert(self.config, oopsid, oops)
         self._test_insert_check(oopsid, day_key)
 
     def test_insert_oops_dict(self):
-        keyspace = self.useFixture(TemporaryOOPSDB()).keyspace
         oopsid = str(uuid.uuid1())
         oops = {"duration": "13000"}
         day_key = oopses.insert_dict(self.config, oopsid, oops)
         self._test_insert_check(oopsid, day_key)
 
     def test_insert_unicode(self):
-        keyspace = self.useFixture(TemporaryOOPSDB()).keyspace
         oopsid = str(uuid.uuid1())
         oops = {"duration": "♥"}
         day_key = oopses.insert_dict(self.config, oopsid, oops)
         self._test_insert_check(oopsid, day_key, value="♥")
 
     def test_insert_updates_counters(self):
-        keyspace = self.useFixture(TemporaryOOPSDB()).keyspace
         counters_cf = pycassa.ColumnFamily(self.pool, "Counters")
         oopsid = str(uuid.uuid1())
         oops = {"duration": "13000"}
@@ -121,7 +116,6 @@ class TestInsert(ClearCache):
 class TestBucket(ClearCache):
 
     def test_insert_bucket(self):
-        keyspace = self.useFixture(TemporaryOOPSDB()).keyspace
         fields = [
             "Ubuntu 12.04",
             "Ubuntu 12.04:whoopsie",
@@ -163,7 +157,6 @@ class TestBucket(ClearCache):
     def test_update_bucket_metadata(self):
         import apt
 
-        keyspace = self.useFixture(TemporaryOOPSDB()).keyspace
         bucketmetadata_cf = pycassa.ColumnFamily(self.pool, "BucketMetadata")
         # Does not exist yet.
         oopses.update_bucket_metadata(
@@ -239,7 +232,6 @@ class TestBucket(ClearCache):
         self.assertEqual(v, "bucket-id")
 
     def test_update_bucket_versions(self):
-        keyspace = self.useFixture(TemporaryOOPSDB()).keyspace
         bucketversions_cf = pycassa.ColumnFamily(self.pool, "BucketVersions")
         oopses.update_bucket_versions(self.config, "bucket-id", "1.2.3")
         self.assertEqual(bucketversions_cf.get("bucket-id")["1.2.3"], 1)
@@ -256,7 +248,6 @@ class TestBucket(ClearCache):
         self.assertEqual(1, c)
 
     def test_dpkg_comparator(self):
-        keyspace = self.useFixture(TemporaryOOPSDB()).keyspace
         bv_count = pycassa.ColumnFamily(self.pool, "BucketVersionsCount")
         bv_count.add("bucket-id", ("release", "1.0"))
         bv_count.get("bucket-id", columns=[("release", "1.0")])
@@ -273,7 +264,6 @@ class TestBucket(ClearCache):
         )
 
     def test_update_errors_by_release(self):
-        keyspace = self.useFixture(TemporaryOOPSDB()).keyspace
         firsterror = pycassa.ColumnFamily(self.pool, "FirstError")
         errorsbyrelease = pycassa.ColumnFamily(self.pool, "ErrorsByRelease")
         release = "Ubuntu 12.04"
@@ -289,7 +279,6 @@ class TestBucket(ClearCache):
         self.assertEqual(today, d)
 
     def test_update_source_version_buckets(self):
-        keyspace = self.useFixture(TemporaryOOPSDB()).keyspace
         srcversbuckets = pycassa.ColumnFamily(self.pool, "SourceVersionBuckets")
         src_package = "whoopsie"
         version = "1.2.3"
@@ -300,7 +289,6 @@ class TestBucket(ClearCache):
         self.assertEqual(oops_id, bucket_id)
 
     def test_update_bucket_systems(self):
-        keyspace = self.useFixture(TemporaryOOPSDB()).keyspace
         bv_systems = pycassa.ColumnFamily(self.pool, "BucketVersionSystems2")
         bucketid = "foo"
         system_token = "system-id"

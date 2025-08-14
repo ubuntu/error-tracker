@@ -1,25 +1,23 @@
 #!/usr/bin/python
 
-import unittest
-import mock
-import bson
-import apport
-from io import StringIO
-from testtools import TestCase
-from oopsrepository.testing.cassandra import TemporaryOOPSDB
-import pycassa
-import tempfile
-import shutil
 import os
+import shutil
+import tempfile
 import time
+import unittest
+from io import StringIO
 
+import apport
+import bson
+import mock
+import pycassa
+from testtools import TestCase
+
+from daisy import config, schema, submit, wsgi
+from oopsrepository import config as oopsconfig
 from oopsrepository import oopses
 from oopsrepository import schema as oopsschema
-from oopsrepository import config as oopsconfig
-from daisy import config
-from daisy import submit
-from daisy import schema
-from daisy import wsgi
+from oopsrepository.testing.cassandra import TemporaryOOPSDB
 
 # SHA-512 of the system-uuid
 sha512_system_uuid = (
@@ -135,8 +133,8 @@ class TestCrashSubmission(TestSubmission):
     def test_kerneloops_submission(self):
         oops_text = """BUG: unable to handle kernel paging request at ffffb4ff
 IP: [<c11e4690>] ext4_get_acl+0x80/0x210
-*pde = 01874067 *pte = 00000000 
-Oops: 0000 [#1] SMP 
+*pde = 01874067 *pte = 00000000
+Oops: 0000 [#1] SMP
 Modules linked in: bnep rfcomm bluetooth dm_crypt olpc_xo1 scx200_acb snd_cs5535audio snd_ac97_codec ac97_bus snd_pcm snd_seq_midi snd_rawmidi snd_seq_midi_event snd_seq snd_timer snd_seq_device snd cs5535_gpio soundcore snd_page_alloc binfmt_misc geode_aes cs5535_mfd geode_rng msr vesafb usbhid hid 8139too pata_cs5536 8139cp
 
 Pid: 1798, comm: gnome-session-c Not tainted 3.0.0-11-generic #17-Ubuntu First International Computer, Inc.  ION603/ION603
@@ -174,7 +172,7 @@ Call Trace:
  [<c100a0a7>] sys_execve+0x37/0x70
  [<c15336ae>] ptregs_execve+0x12/0x18
  [<c152c8d4>] ? syscall_call+0x7/0xb
-Code: 8d 76 00 8d 93 54 01 00 00 8b 32 85 f6 74 e2 8d 43 14 89 55 e4 89 45 f0 e8 2e 7e 34 00 8b 55 e4 8b 32 83 fe ff 74 07 85 f6 74 03 <3e> ff 06 8b 45 f0 e8 25 19 e4 ff 90 83 fe ff 75 b5 81 ff 00 40 
+Code: 8d 76 00 8d 93 54 01 00 00 8b 32 85 f6 74 e2 8d 43 14 89 55 e4 89 45 f0 e8 2e 7e 34 00 8b 55 e4 8b 32 83 fe ff 74 07 85 f6 74 03 <3e> ff 06 8b 45 f0 e8 25 19 e4 ff 90 83 fe ff 75 b5 81 ff 00 40
 EIP: [<c11e4690>] ext4_get_acl+0x80/0x210 SS:ESP 0068:f29b3da4
 CR2: 00000000ffffb4ff
 ---[ end trace b567e6a3070ffb42 ]---"""
@@ -194,9 +192,7 @@ CR2: 00000000ffffb4ff
         pool = pycassa.ConnectionPool(
             self.keyspace, config.cassandra_hosts, credentials=self.creds
         )
-        oops_cf = pycassa.ColumnFamily(pool, "OOPS")
         bucket_cf = pycassa.ColumnFamily(pool, "Bucket")
-        oops_id = oops_cf.get_range().next()[0]
         bucket_id, unused_oops_id = next(bucket_cf.get_range())
         self.assertEqual(bucket_id, bucket)
 

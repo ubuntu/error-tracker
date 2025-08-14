@@ -7,9 +7,9 @@
 """Various oopsrepository specific matchers."""
 
 import json
+import os
 import time
 import uuid
-import os
 
 import pycassa
 from pycassa.cassandra.ttypes import NotFoundException

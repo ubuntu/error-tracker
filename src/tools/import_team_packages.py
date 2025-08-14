@@ -1,12 +1,13 @@
 #!/usr/bin/python3
 
-import requests
 from contextlib import suppress
+
+import requests
 from cassandra import ConsistencyLevel
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
-from launchpadlib.launchpad import Launchpad
 from launchpadlib.errors import ResponseError
+from launchpadlib.launchpad import Launchpad
 
 from daisy import config
 

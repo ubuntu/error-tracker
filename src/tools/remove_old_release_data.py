@@ -2,15 +2,13 @@
 
 import os
 import sys
-
-import distro_info
-
-from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.cluster import Cluster, NoHostAvailable
-from cassandra.auth import PlainTextAuthProvider
-
 from datetime import datetime, timedelta
 from time import sleep
+
+import distro_info
+from cassandra import ConsistencyLevel, OperationTimedOut
+from cassandra.auth import PlainTextAuthProvider
+from cassandra.cluster import Cluster, NoHostAvailable
 
 from daisy import config
 

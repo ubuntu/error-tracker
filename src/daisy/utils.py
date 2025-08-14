@@ -1,11 +1,12 @@
-from amqp import ConnectionError as AMQPConnectionException
-
-from oopsrepository import oopses
-import apt
+import logging
 import re
 import socket
 import uuid
-import logging
+
+import apt
+from amqp import ConnectionError as AMQPConnectionException
+
+from oopsrepository import oopses
 
 # From oops-amqp
 # These exception types always indicate an AMQP connection error/closure.
@@ -222,6 +223,7 @@ def attach_error_report(report, context):
 def wrap_in_oops_wsgi(wsgi_handler):
     import oops_dictconfig
     from oops_wsgi import install_hooks, make_app
+
     from daisy import config
 
     cfg = oops_dictconfig.config_from_dict(config.oops_config)

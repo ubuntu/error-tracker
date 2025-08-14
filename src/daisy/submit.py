@@ -17,25 +17,23 @@
 # You should have received a copy of the GNU Affero Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import bson
 import hashlib
 import logging
 import os
 import socket
 import time
 import uuid
-
-from oopsrepository import config as oopsconfig
-from oopsrepository import oopses
-
-from apport import Report
 from binascii import hexlify, unhexlify
+
+import bson
+from apport import Report
 from cassandra import WriteTimeout
 from cassandra.query import SimpleStatement
 
-from daisy import config
-from daisy import utils
+from daisy import config, utils
 from daisy.metrics import get_metrics
+from oopsrepository import config as oopsconfig
+from oopsrepository import oopses
 
 os.environ["OOPS_KEYSPACE"] = config.cassandra_keyspace
 oops_config = oopsconfig.get_config()
@@ -220,7 +218,7 @@ def submit(_session, environ, system_token):
             )
             reported_crash_ids = (row[0] for row in results)
             crash_id = "%s:%s:%s" % (date, exec_path, proc_status)
-            if type(crash_id) == str:
+            if isinstance(crash_id, str):
                 crash_id = crash_id.encode("utf-8")
             crash_id = hashlib.md5(crash_id).hexdigest()
             if crash_id in reported_crash_ids:
@@ -554,7 +552,6 @@ def bucket(_session, oops_config, oops_id, data, day_key):
                 try:
                     key = "retracing"
                     results = _session.execute(indexes_select, [key, cql_addr_sig])
-                    retracing = [row[0] for row in results][0]
                     waiting = True
                 except IndexError:
                     pass

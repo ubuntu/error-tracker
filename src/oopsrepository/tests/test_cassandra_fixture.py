@@ -4,13 +4,14 @@
 # the GNU Affero General Public License, version 3 ("AGPLv3"). See the file
 # LICENSE in the source tree for more information.
 
-from pycassa.system_manager import SystemManager
-from testtools import TestCase
 import os
 
+from pycassa.system_manager import SystemManager
+from testtools import TestCase
+
+from oopsrepository import config
 from oopsrepository.testing.cassandra import TemporaryKeyspace, TemporaryOOPSDB
 from oopsrepository.testing.matchers import HasOOPSSchema
-from oopsrepository import config
 
 
 class TestTemporaryKeyspace(TestCase):

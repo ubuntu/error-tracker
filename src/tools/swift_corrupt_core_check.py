@@ -4,12 +4,13 @@
 # if they are we won't be able to retrace them so remove them from swift
 
 import os
-import swiftclient
 import sys
 import tempfile
+from subprocess import PIPE, Popen
+
+import swiftclient
 
 from daisy import config
-from subprocess import Popen, PIPE
 
 # get container returns a max of 10000 listings, if an integer is not given
 # lets get everything not 10k.

@@ -19,7 +19,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # stdlib
-import amqp
 import argparse
 import atexit
 import datetime
@@ -32,29 +31,29 @@ import socket
 import struct
 import sys
 import tempfile
-import traceback
 import time
-from subprocess import Popen, PIPE
+import traceback
+from subprocess import PIPE, Popen
+
+import amqp
 
 # external libs
 from apport import Report
-
-from cassandra.cqlengine import connection
 from cassandra.auth import PlainTextAuthProvider
+from cassandra.cqlengine import connection
 from cassandra.policies import RoundRobinPolicy
+
+from daisy import cassandra_schema, config, utils
 
 # internal libs
 from daisy.metrics import get_metrics, record_revno
 from daisy.version import version_info as daisy_version_info
-from daisy import config
-from daisy import utils
-from daisy import cassandra_schema
 from oopsrepository import config as oopsconfig
 
 apport_version_info = {}
 try:
     from apport.version_info import version_info as apport_version_info
-except:
+except:  # noqa: E722
     pass
 
 
@@ -498,8 +497,8 @@ class Retracer:
 
     def write_s3_bucket_to_disk(self, key, provider_data):
         global _cached_s3
-        from boto.s3.connection import S3Connection
         from boto.exception import S3ResponseError
+        from boto.s3.connection import S3Connection
 
         if not _cached_s3:
             _cached_s3 = S3Connection(
@@ -525,8 +524,8 @@ class Retracer:
 
     def remove_from_s3(self, key, provider_data):
         global _cached_s3
-        from boto.s3.connection import S3Connection
         from boto.exception import S3ResponseError
+        from boto.s3.connection import S3Connection
 
         try:
             if not _cached_s3:

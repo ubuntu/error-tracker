@@ -193,7 +193,6 @@ def get_versions_for_binary(binary_package, ubuntu_version):
         except IndexError:
             return ""
         pb_url = ps + "/?ws.op=getPublishedBinaries"
-        pbs = []
         json_data = urllib2_request_json(
             pb_url, config.lp_oauth_token, config.lp_oauth_secret
         )

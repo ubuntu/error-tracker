@@ -16,18 +16,19 @@
 # You should have received a copy of the GNU Affero Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import amqplib.client_0_8 as amqp
 import logging
 import os
 import random
 import shutil
 import socket
-from . import utils
-
 from datetime import datetime
+
+import amqplib.client_0_8 as amqp
 
 from daisy import config
 from daisy.metrics import get_metrics
+
+from . import utils
 
 metrics = get_metrics("daisy.%s" % socket.gethostname())
 logger = logging.getLogger("gunicorn.error")
@@ -59,7 +60,7 @@ def write_policy_allow(oops_id, bytes_used, provider_data):
 
 
 def swift_delete_ignoring_error(swift_cmd, bucket, oops_id):
-    from subprocess import check_call, CalledProcessError
+    from subprocess import CalledProcessError, check_call
 
     swift_delete_cmd = swift_cmd + ["delete", bucket, oops_id]
     try:
@@ -70,7 +71,7 @@ def swift_delete_ignoring_error(swift_cmd, bucket, oops_id):
 
 def write_to_swift(environ, fileobj, oops_id, provider_data):
     """Write the core file to OpenStack Swift."""
-    from subprocess import check_call, CalledProcessError
+    from subprocess import CalledProcessError, check_call
 
     swift_cmd = [
         "/usr/bin/swift",
@@ -150,8 +151,8 @@ def s3_delete_ignoring_error(bucket, oops_id):
 def write_to_s3(fileobj, oops_id, provider_data):
     global _cached_s3
     """Write the core file to Amazon S3."""
-    from boto.s3.connection import S3Connection
     from boto.exception import S3ResponseError
+    from boto.s3.connection import S3Connection
 
     if not _cached_s3:
         _cached_s3 = S3Connection(
@@ -290,7 +291,7 @@ def submit(_session, environ, fileobj, uuid, arch):
     try:
         # every OOPS will have a SystemIdentifier
         sys_id_results = _session.execute(oops_select, [uuid, "SystemIdentifier"])
-        sys_id = [row[0] for row in sys_id_results][0]
+        _sys_id = [row[0] for row in sys_id_results][0]  # noqa: F841
     except IndexError:
         # Due to Cassandra's eventual consistency model, we may receive
         # the core dump before the OOPS has been written to all the
