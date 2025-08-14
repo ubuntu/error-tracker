@@ -1,20 +1,20 @@
 #!/usr/bin/python
 
-import unittest
-import mock
-from testtools import TestCase
-from oopsrepository.testing.cassandra import TemporaryOOPSDB
-import pycassa
+import datetime
 import os
 import time
+import unittest
+import uuid
 from hashlib import sha512
 
-from oopsrepository import schema as oopsschema
+import mock
+import pycassa
+from testtools import TestCase
+
+from daisy import config, schema
 from oopsrepository import config as oopsconfig
-from daisy import config
-from daisy import schema
-import datetime
-import uuid
+from oopsrepository import schema as oopsschema
+from oopsrepository.testing.cassandra import TemporaryOOPSDB
 
 
 class T(TestCase):
@@ -49,9 +49,11 @@ class T(TestCase):
 
         # This has to go here and there can't be any other tests in this file,
         # as these modules set up the Cassandra connections at import time.
-        from tools import build_errors_by_release
-        from tools import weight_errors_per_day
-        from tools import unique_systems_for_errors_by_release
+        from tools import (
+            build_errors_by_release,
+            unique_systems_for_errors_by_release,
+            weight_errors_per_day,
+        )
 
         # Configure the script that back populates the data to use our test
         # Cassandra keyspace for writing data into.

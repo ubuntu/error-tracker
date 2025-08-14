@@ -6,22 +6,23 @@
 
 """The schema for oopsrepository."""
 
-from pycassa.types import (
-    CompositeType,
-    AsciiType,
-    UTF8Type,
-    CounterColumnType,
-    DateType,
-)
 from pycassa.system_manager import (
-    SystemManager,
+    ASCII_TYPE,
     TIME_UUID_TYPE,
     UTF8_TYPE,
-    ASCII_TYPE,
+    SystemManager,
+)
+from pycassa.types import (
+    AsciiType,
+    CompositeType,
+    CounterColumnType,
+    DateType,
+    UTF8Type,
 )
 
-from . import config
 from oopsrepository.cassandra_shim import workaround_1779
+
+from . import config
 
 
 def create(config):

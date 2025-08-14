@@ -16,23 +16,22 @@
 # You should have received a copy of the GNU Affero Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from pycassa.types import (
-    DateType,
-)
-
 from pycassa.system_manager import (
-    SystemManager,
-    UTF8_TYPE,
-    LONG_TYPE,
     ASCII_TYPE,
-    INT_TYPE,
-    TIME_UUID_TYPE,
     FLOAT_TYPE,
+    INT_TYPE,
+    LONG_TYPE,
+    TIME_UUID_TYPE,
+    UTF8_TYPE,
+    SystemManager,
+)
+from pycassa.types import (
+    CounterColumnType,
+    DateType,
 )
 
 from daisy import config
 from oopsrepository.cassandra_shim import workaround_1779
-from pycassa.types import CounterColumnType
 
 
 def create():

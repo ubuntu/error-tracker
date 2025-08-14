@@ -5,10 +5,10 @@
 """Charm the timers for Error Tracker."""
 
 import logging
-import ops
-
 from pathlib import Path
-from subprocess import check_call, check_output, CalledProcessError
+from subprocess import CalledProcessError, check_call, check_output
+
+import ops
 
 logger = logging.getLogger(__name__)
 

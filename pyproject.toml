@@ -15,3 +15,7 @@ version = {attr = "src.errortracker.__version__"}
 [tool.ruff]
 line-length = 99
 extend-exclude = ["__pycache__", "*.egg_info"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "Q", "I"]
+ignore = ["E501"]

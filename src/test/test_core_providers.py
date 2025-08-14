@@ -1,8 +1,10 @@
-from testtools import TestCase
 import unittest
-import daisy
-import mock
 import uuid
+
+import mock
+from testtools import TestCase
+
+import daisy
 
 
 class TestSubmitCore(TestCase):

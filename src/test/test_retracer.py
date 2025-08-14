@@ -1,25 +1,25 @@
 # -*- coding: utf8 -*-
-import unittest
-import mock
-from testtools import TestCase
-from oopsrepository.testing.cassandra import TemporaryOOPSDB
-from oopsrepository import schema as oopsschema
-from oopsrepository import config as oopsconfig
-from daisy import schema
-from daisy import retracer
-from daisy import config
-import tempfile
-import os
-import shutil
-import time
-import pycassa
-from pycassa.types import IntegerType, FloatType
-import uuid
-import amqp
 import datetime
 
 # Actually show the messages (info) with the retracer format.
 import logging
+import os
+import shutil
+import tempfile
+import time
+import unittest
+import uuid
+
+import amqp
+import mock
+import pycassa
+from pycassa.types import FloatType, IntegerType
+from testtools import TestCase
+
+from daisy import config, retracer, schema
+from oopsrepository import config as oopsconfig
+from oopsrepository import schema as oopsschema
+from oopsrepository.testing.cassandra import TemporaryOOPSDB
 
 logging.basicConfig(format=retracer.LOGGING_FORMAT, level=logging.INFO)
 

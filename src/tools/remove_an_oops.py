@@ -3,12 +3,11 @@
 # Remove a specific crash report from the OOPS and UserOOPS tables in the Error Tracker
 
 import sys
+from time import sleep
 
 from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.cluster import Cluster, NoHostAvailable
 from cassandra.auth import PlainTextAuthProvider
-
-from time import sleep
+from cassandra.cluster import Cluster, NoHostAvailable
 
 from daisy import config
 

@@ -6,20 +6,19 @@
 
 """basic operations on oopses in the db."""
 
+import datetime
 import json
 import re
 import time
 import uuid
-import datetime
-from hashlib import sha1, md5
+from binascii import hexlify
+from hashlib import md5, sha1
 
 from cassandra import ConsistencyLevel
-from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
+from cassandra.cluster import Cluster
 from cassandra.protocol import InvalidRequestException
 from cassandra.query import SimpleStatement
-
-from binascii import hexlify
 
 DAY = 60 * 60 * 24
 MONTH = DAY * 30
@@ -177,7 +176,7 @@ def _insert(
         proc_status = insert_dict.get("ProcStatus", "")
         if date and exec_path and proc_status:
             crash_id = "%s:%s:%s" % (date, exec_path, proc_status)
-            if type(crash_id) == str:
+            if isinstance(crash_id, str):
                 crash_id = crash_id.encode("utf-8")
             crash_id = md5(crash_id).hexdigest()
             session.execute(

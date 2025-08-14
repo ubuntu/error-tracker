@@ -1,14 +1,12 @@
-from daisy import submit
-from daisy import submit_core
-from daisy import utils
-from daisy import metrics
-from daisy.version_middleware import VersionMiddleware
-from daisy.version import version_info
 import errno
 import logging
 import os
 import re
 import shutil
+
+from daisy import metrics, submit, submit_core, utils
+from daisy.version import version_info
+from daisy.version_middleware import VersionMiddleware
 
 _session = None
 path_filter = re.compile(r"[^a-zA-Z0-9-_]")
@@ -29,9 +27,8 @@ def bad_request_response(start_response, text=""):
 
 
 def handle_core_dump(_session, environ, fileobj, components, content_type):
-    l = len(components)
     operation = ""
-    if l >= 4:
+    if len(components) >= 4:
         # We also accept a system_hash parameter on the end of the URL, but do
         # not actually do anything with it.
         uuid, operation, arch = components[1:4]
@@ -88,11 +85,11 @@ def app(environ, start_response):
             return bad_request_response(start_response, "Not allowed.")
 
     components = path.split("/")
-    l = len(components)
+    length = len(components)
 
     # There is only one path component with slashes either side.
-    if (l == 2 and not components[0]) or (
-        l == 3 and not components[0] and not components[2]
+    if (length == 2 and not components[0]) or (
+        length == 3 and not components[0] and not components[2]
     ):
         # An error report submission.
         if len(components[1]) == 128:

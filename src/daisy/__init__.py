@@ -1,6 +1,6 @@
 from functools import reduce
 
-#!/usr/bin/python
+# !/usr/bin/python
 # -*- coding: utf-8 -*-
 #
 # Copyright © 2011-2013 Canonical Ltd.

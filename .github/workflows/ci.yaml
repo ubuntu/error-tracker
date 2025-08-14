@@ -16,12 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-    container:
-      image: ubuntu:rolling
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: apt-get update && apt-get install --no-install-recommends --yes ruff
+        run: sudo snap install ruff
       - name: Run linter tests
         run: |
           ruff check --preview .

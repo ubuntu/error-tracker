@@ -193,22 +193,22 @@ errors_secret_key = ""
 
 # Hooks for relations in charms to contribute their configuration settings.
 try:
-    from db_settings import *
+    from db_settings import *  # noqa: F403
 except ImportError:
     pass
 
 try:
-    from amqp_settings import *
+    from amqp_settings import *  # noqa: F403
 except ImportError:
     pass
 
 try:
-    from postgres_settings import *
+    from postgres_settings import *  # noqa: F403
 except ImportError:
     pass
 
 try:
-    from local_settings import *
+    from local_settings import *  # noqa: F403
 except ImportError:
     pass
 
