@@ -91,8 +91,7 @@ def validate_and_set_configuration():
             aws_secret_key = getattr(config, "aws_secret_key", "")
             if not (host and aws_access_key and aws_secret_key):
                 msg = (
-                    "EC2 provider set but host, bucket, aws_access_key, or"
-                    " aws_secret_key not set."
+                    "EC2 provider set but host, bucket, aws_access_key, or aws_secret_key not set."
                 )
                 raise ImportError(msg)
             config.storage_write_weights = {"s3": 1.0}
@@ -118,7 +117,7 @@ def validate_and_set_configuration():
     if not getattr(config, "storage_write_weights", ""):
         d = config.core_storage.get("default", "")
         if not d:
-            msg = "No storage_write_weights set, but no default set in core" " storage"
+            msg = "No storage_write_weights set, but no default set in core storage"
             raise ImportError(msg)
         config.storage_write_weights = {d: 1.0}
 
