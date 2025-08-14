@@ -356,13 +356,13 @@ def submit(_session, environ, system_token):
                     date=day_key,
                 )
 
-    # A device is manually blacklisted if it has repeatedly failed to have an
+    # A device is manually blocklisted if it has repeatedly failed to have an
     # crash inserted into the OOPS table.
-    if utils.blacklisted_device(system_token):
+    if utils.blocklisted_device(system_token):
         # If the device stops appearing in the log file then the offending
-        # crash file may have been removed and it could be unblacklisted.
+        # crash file may have been removed and it could be unblocklisted.
         logger.info(
-            "Blacklisted device %s disallowed from sending a crash." % system_token
+            "Blocklisted device %s disallowed from sending a crash." % system_token
         )
         return (False, "Device blocked from sending crash reports.")
 
