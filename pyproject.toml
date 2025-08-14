@@ -1,0 +1,17 @@
+[project]
+name = "error-tracker"
+requires-python = ">=3.8"
+dynamic = ["version"]
+dependencies = [
+    "jubilant>=1.3.0",
+    "pytest>=8.3.5",
+]
+
+
+[tool.setuptools.dynamic]
+version = {attr = "src.errortracker.__version__"}
+
+# Linting tools configuration
+[tool.ruff]
+line-length = 99
+extend-exclude = ["__pycache__", "*.egg_info"]

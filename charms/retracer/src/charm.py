@@ -88,6 +88,9 @@ class RetracerCharm(ops.CharmBase):
         # Make sure the repo is up to date
         repo_url = self.config.get("repo-url")
         repo_branch = self.config.get("repo-branch")
+        self.unit.status = ops.MaintenanceStatus(
+            "Fetching latest updates of retracer code"
+        )
         check_call(
             [
                 "sudo",
@@ -123,10 +126,12 @@ class RetracerCharm(ops.CharmBase):
 
         config_location = HOME / "config"
         config_location.mkdir(parents=True, exist_ok=True)
+        self.unit.status = ops.MaintenanceStatus("writing retracer configuration")
         (config_location / "local_config.py").write_text(config)
 
         systemd_unit_location = Path("/") / "etc" / "systemd" / "system"
         systemd_unit_location.mkdir(parents=True, exist_ok=True)
+        self.unit.status = ops.MaintenanceStatus("setting up systemd units")
         (systemd_unit_location / "retracer@.service").write_text(
             f"""
 [Unit]
@@ -145,10 +150,12 @@ WantedBy=multi-user.target
         )
 
         check_call(["systemctl", "daemon-reload"])
-        check_call(["systemctl", "enable", "--now", "retracer@amd64"])
-        check_call(["systemctl", "enable", "--now", "retracer@arm64"])
-        check_call(["systemctl", "enable", "--now", "retracer@armhf"])
-        check_call(["systemctl", "enable", "--now", "retracer@i386"])
+        self.unit.status = ops.MaintenanceStatus("enabling systemd units")
+        check_call(["systemctl", "enable", "retracer@amd64"])
+        check_call(["systemctl", "enable", "retracer@arm64"])
+        check_call(["systemctl", "enable", "retracer@armhf"])
+        check_call(["systemctl", "enable", "retracer@i386"])
+        self.unit.status = ops.MaintenanceStatus("restarting systemd units")
         check_call(["systemctl", "restart", "retracer@amd64"])
         check_call(["systemctl", "restart", "retracer@arm64"])
         check_call(["systemctl", "restart", "retracer@armhf"])
@@ -159,6 +166,7 @@ WantedBy=multi-user.target
     def _getWorkloadVersion(self):
         """Get the retracer version from the git repository"""
         try:
+            self.unit.status = ops.MaintenanceStatus("fetching code version")
             version = check_output(
                 [
                     "sudo",

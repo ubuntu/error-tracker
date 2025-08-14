@@ -9,8 +9,8 @@ METRICS = None
 
 class Metrics:
     """
-    Dummy Metrics class making the rest of the code to work before moving that
-    to some more modern tech.
+    No-opPrintingMetrics class making the rest of the code to work before moving
+    that to some more modern tech.
     """
 
     def __init__(self, namespace):
