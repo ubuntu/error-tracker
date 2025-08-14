@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install dependencies
         run: sudo snap install ruff
       - name: Run linter tests
@@ -62,7 +62,7 @@ jobs:
     name: woke
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: woke
         uses: get-woke/woke-action@b2ec032c4a2c912142b38a6a453ad62017813ed0 # v0
