@@ -116,5 +116,6 @@ jobs:
           credentials: '${{ secrets.CHARMHUB_TOKEN }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           charm-path: charms/${{ matrix.charm }}
+          tag-prefix: ${{ matrix.charm }}
           built-charm-path: error-tracker-${{ matrix.charm }}_ubuntu@24.04-amd64.charm
         if: github.ref == 'refs/heads/main'
