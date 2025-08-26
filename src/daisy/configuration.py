@@ -194,6 +194,8 @@ errors_secret_key = ""
 # Hooks for relations in charms to contribute their configuration settings.
 try:
     from db_settings import *  # noqa: F403
+
+    print("Loaded local db settings")
 except ImportError:
     pass
 

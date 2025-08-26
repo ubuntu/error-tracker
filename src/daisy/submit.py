@@ -32,6 +32,7 @@ from cassandra.query import SimpleStatement
 
 from daisy import config, utils
 from daisy.metrics import get_metrics
+from errortracker.cassandra import cassandra_session
 from oopsrepository import config as oopsconfig
 from oopsrepository import oopses
 
@@ -118,7 +119,10 @@ def try_to_repair_sas(data):
                 metrics.meter("repair.failed_sas")
 
 
-def submit(_session, environ, system_token):
+def submit(request, system_token):
+    logger.info("Submit handler")
+    logger.info(f"request: {request}")
+    _session = cassandra_session()
     # N.B. prepared statements do the hexlify() conversion on their own
     global counters_update
     if not counters_update:
@@ -131,7 +135,7 @@ def submit(_session, environ, system_token):
             'UPDATE "CountersForProposed" SET value = value +1 WHERE key = ? and column1 = ?'
         )
     try:
-        data = environ["wsgi.input"].read()
+        data = request["wsgi.input"].read()
     except IOError as e:
         if e.message == "request data read error":
             # The client disconnected while sending the report.
@@ -156,14 +160,14 @@ def submit(_session, environ, system_token):
 
     # Keep a reference to the decoded report data. If we crash, we'll
     # potentially attach it to the OOPS report.
-    environ["wsgi.input.decoded"] = data
+    request["wsgi.input.decoded"] = data
 
     oops_id = str(uuid.uuid1())
 
     # In theory one should be able to use map_environ with make_app in
     # oops_wsgi to write arbitary data to the OOPS report but I couldn't get
     # that to work so cheat and uses HTTP_ which always gets written.
-    environ["HTTP_Z_CRASH_ID"] = oops_id
+    request["HTTP_Z_CRASH_ID"] = oops_id
 
     day_key = time.strftime("%Y%m%d", time.gmtime())
 
@@ -184,10 +188,8 @@ def submit(_session, environ, system_token):
         # we want to try and find out which releases are sending reports with
         # a missing SystemIdentifier
         try:
-            whoopsie_version = environ["HTTP_X_WHOOPSIE_VERSION"]
-            metrics.meter(
-                "missing.missing_system_token_%s" % whoopsie_version.replace(".", "_")
-            )
+            whoopsie_version = request["HTTP_X_WHOOPSIE_VERSION"]
+            metrics.meter("missing.missing_system_token_%s" % whoopsie_version.replace(".", "_"))
         except KeyError:
             pass
         metrics.meter("missing.missing_system_token")
@@ -224,10 +226,9 @@ def submit(_session, environ, system_token):
             if crash_id in reported_crash_ids:
                 return (False, "Crash already reported.")
             try:
-                whoopsie_version = environ["HTTP_X_WHOOPSIE_VERSION"]
+                whoopsie_version = request["HTTP_X_WHOOPSIE_VERSION"]
                 metrics.meter(
-                    "invalid.duplicate_report.whoopise_%s"
-                    % whoopsie_version.replace(".", "_")
+                    "invalid.duplicate_report.whoopise_%s" % whoopsie_version.replace(".", "_")
                 )
             except KeyError:
                 pass
@@ -248,9 +249,9 @@ def submit(_session, environ, system_token):
     # wonky with apport
     src_package = data.get("SourcePackage", "")
     src_package = src_package.encode("ascii", errors="replace")
-    environ["HTTP_Z_SRC_PKG"] = src_package
+    request["HTTP_Z_SRC_PKG"] = src_package
     problem_type = data.get("ProblemType", "")
-    environ["HTTP_Z_PROBLEMTYPE"] = problem_type
+    request["HTTP_Z_PROBLEMTYPE"] = problem_type
     apport_version = data.get("ApportVersion", "")
     third_party = False
     if not utils.retraceable_package(package):
@@ -286,7 +287,7 @@ def submit(_session, environ, system_token):
         return (True, "Crash report successfully submitted.")
 
     package, version = utils.split_package_and_version(package)
-    environ["HTTP_Z_PKG"] = package
+    request["HTTP_Z_PKG"] = package
     # src_version is None and is never used, nor should it be.
     src_package, src_version = utils.split_package_and_version(src_package)
     fields = utils.get_fields_for_bucket_counters(
@@ -297,9 +298,7 @@ def submit(_session, environ, system_token):
     # phased-updater and only includes official Ubuntu packages and not those
     # crahses from systems under auto testing.
     if not third_party and not automated_testing and problem_type == "Crash":
-        update_counters(
-            _session, release=release, src_package=src_package, date=day_key
-        )
+        update_counters(_session, release=release, src_package=src_package, date=day_key)
         if version == "":
             metrics.meter("missing.missing_package_version")
         else:
@@ -359,9 +358,7 @@ def submit(_session, environ, system_token):
     if utils.blocklisted_device(system_token):
         # If the device stops appearing in the log file then the offending
         # crash file may have been removed and it could be unblocklisted.
-        logger.info(
-            "Blocklisted device %s disallowed from sending a crash." % system_token
-        )
+        logger.info("Blocklisted device %s disallowed from sending a crash." % system_token)
         return (False, "Device blocked from sending crash reports.")
 
     try:
@@ -382,9 +379,7 @@ def submit(_session, environ, system_token):
         msg = "%s: WriteTimeout with %s keys." % (system_token, len(list(data.keys())))
         logger.info(msg)
         logger.info("%s: The keys are %s" % (system_token, list(data.keys())))
-        logger.info(
-            "%s: The crash has a ProblemType of: %s" % (system_token, problem_type)
-        )
+        logger.info("%s: The crash has a ProblemType of: %s" % (system_token, problem_type))
         if "Traceback" in data:
             logger.info("%s: The crash has a python traceback." % system_token)
         raise
@@ -477,9 +472,7 @@ def bucket(_session, oops_config, oops_id, data, day_key):
         stacktrace = False
         if cql_addr_sig:
             try:
-                stacktraces = _session.execute(
-                    stacktrace_select, [cql_addr_sig, "Stacktrace"]
-                )
+                stacktraces = _session.execute(stacktrace_select, [cql_addr_sig, "Stacktrace"])
                 stacktrace = [stacktrace[0] for stacktrace in stacktraces][0]
                 threadstacktraces = _session.execute(
                     stacktrace_select, [cql_addr_sig, "ThreadStacktrace"]
@@ -506,9 +499,7 @@ def bucket(_session, oops_config, oops_id, data, day_key):
             # The crash is a duplicate so we don't need this data.
             # Stacktrace, and ThreadStacktrace were already not accepted
             if "ProcMaps" in data:
-                oops_delete = _session.prepare(
-                    'DELETE FROM "OOPS" WHERE key = ? AND column1 = ?'
-                )
+                oops_delete = _session.prepare('DELETE FROM "OOPS" WHERE key = ? AND column1 = ?')
                 unneeded_columns = (
                     "Disassembly",
                     "ProcMaps",
