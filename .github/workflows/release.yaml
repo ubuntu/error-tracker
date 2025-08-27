@@ -46,3 +46,5 @@ jobs:
           # for multi charm repo
           tag-prefix: ${{ inputs.charm-name }}
           charm-path: charms/${{ inputs.charm-name }}
+
+          base-channel: "24.04"
