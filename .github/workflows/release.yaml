@@ -40,9 +40,9 @@ jobs:
         with:
           credentials: ${{ secrets.CHARMHUB_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          destination-channel: ${{ github.event.inputs.destination-channel }}
-          origin-channel: ${{ github.event.inputs.origin-channel }}
+          destination-channel: ${{ inputs.destination-channel }}
+          origin-channel: ${{ inputs.origin-channel }}
 
           # for multi charm repo
-          tag-prefix: ${{ github.event.inputs.charm-name }}
-          charm-path: charms/${{ github.event.inputs.charm-name }}
+          tag-prefix: ${{ inputs.charm-name }}
+          charm-path: charms/${{ inputs.charm-name }}
