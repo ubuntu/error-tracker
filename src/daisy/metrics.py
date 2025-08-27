@@ -1,9 +1,3 @@
-from cassandra import ConsistencyLevel
-from cassandra.auth import PlainTextAuthProvider
-from cassandra.cluster import Cluster
-
-from daisy import config
-
 METRICS = None
 
 
@@ -32,16 +26,6 @@ def get_metrics(namespace="daisy"):
         namespace = "whoopsie-daisy." + namespace
         METRICS = Metrics(namespace=namespace)
     return METRICS
-
-
-def cassandra_session():
-    auth_provider = PlainTextAuthProvider(
-        username=config.cassandra_username, password=config.cassandra_password
-    )
-    cluster = Cluster(config.cassandra_hosts, auth_provider=auth_provider)
-    cassandra_session = cluster.connect(config.cassandra_keyspace)
-    cassandra_session.default_consistency_level = ConsistencyLevel.LOCAL_ONE
-    return cassandra_session
 
 
 def record_revno(namespace="daisy"):
