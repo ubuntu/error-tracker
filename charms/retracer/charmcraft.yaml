@@ -9,7 +9,7 @@ description: |
   retracing queue to `apport-retrace`, and updates the results in Cassandra.
 links:
   source:
-    - https://github.com/canonical/error-tracker/tree/main/charms/retracer
+    - https://github.com/ubuntu/error-tracker/tree/main/charms/retracer
 
 platforms:
   ubuntu@24.04:amd64:
@@ -26,7 +26,7 @@ config:
     repo-url:
       description: |
         Address of the git repository to clone
-      default: "https://github.com/canonical/error-tracker"
+      default: "https://github.com/ubuntu/error-tracker"
       type: string
     repo-branch:
       description: |
