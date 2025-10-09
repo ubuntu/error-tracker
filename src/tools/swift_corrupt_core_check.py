@@ -10,7 +10,7 @@ from subprocess import PIPE, Popen
 
 import swiftclient
 
-from daisy import config
+from errortracker import config, swift_utils
 
 # get container returns a max of 10000 listings, if an integer is not given
 # lets get everything not 10k.
@@ -21,29 +21,11 @@ if len(sys.argv) == 2:
 else:
     unlimited = True
 
-cs = getattr(config, "core_storage", "")
-if not cs:
-    print("core_storage not set.")
-    sys.exit(1)
-
-provider_data = cs["swift"]
-opts = {
-    "tenant_name": provider_data["os_tenant_name"],
-    "region_name": provider_data["os_region_name"],
-}
-_cached_swift = swiftclient.client.Connection(
-    provider_data["os_auth_url"],
-    provider_data["os_username"],
-    provider_data["os_password"],
-    os_options=opts,
-    auth_version="3.0",
-)
-bucket = provider_data["bucket"]
+swift_client = swift_utils.get_swift_client()
+bucket = config.swift_bucket
 
 gdb_which = Popen(["which", "gdb"], stdout=PIPE, universal_newlines=True)
 gdb_path = gdb_which.communicate()[0].strip()
-
-_cached_swift.http_conn = None
 
 count = 0
 unqueued_count = 0
@@ -58,9 +40,7 @@ def rm_eff(path):
             raise
 
 
-for container in _cached_swift.get_container(
-    container=bucket, limit=limit, full_listing=unlimited
-):
+for container in swift_client.get_container(container=bucket, limit=limit, full_listing=unlimited):
     # the dict is the metadata for the container
     if isinstance(container, dict):
         continue
@@ -75,9 +55,7 @@ for container in _cached_swift.get_container(
         fd, path = tempfile.mkstemp(fmt)
         os.close(fd)
         try:
-            headers, body = _cached_swift.get_object(
-                bucket, uuid, resp_chunk_size=65536
-            )
+            headers, body = swift_client.get_object(bucket, uuid, resp_chunk_size=65536)
             with open(path, "wb") as fp:
                 for chunk in body:
                     fp.write(chunk)
@@ -101,7 +79,7 @@ for container in _cached_swift.get_container(
                     print(line)
             # We couldn't decompress this, so there's no value in trying again.
             try:
-                _cached_swift.delete_object(bucket, uuid)
+                swift_client.delete_object(bucket, uuid)
             except swiftclient.client.ClientException as e:
                 if "404 Not Found" in str(e):
                     rm_eff(core_file)
@@ -112,14 +90,12 @@ for container in _cached_swift.get_container(
             continue
         # confirm that gdb thinks the core file is good
         gdb_cmd = [gdb_path, "--batch", "--ex", "target core %s" % core_file]
-        proc = Popen(
-            gdb_cmd, stdout=PIPE, stderr=PIPE, universal_newlines=True, errors="replace"
-        )
+        proc = Popen(gdb_cmd, stdout=PIPE, stderr=PIPE, universal_newlines=True, errors="replace")
         (out, err) = proc.communicate()
         if "is truncated: expected core file size" in err or "not a core dump" in err:
             # Not a core file, there's no value in trying again.
             try:
-                _cached_swift.delete_object(bucket, uuid)
+                swift_client.delete_object(bucket, uuid)
             except swiftclient.client.ClientException as e:
                 if "404 Not Found" in str(e):
                     rm_eff(core_file)

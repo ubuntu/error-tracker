@@ -1,4 +1,5 @@
 # error-tracker
+
 Code behind https://errors.ubuntu.com
 
 
@@ -14,26 +15,49 @@ sudo snap install charmcraft --classic
 charmcraft.spread -v -reuse -resend
 ```
 
-## Running the tests locally for development
+## Setting up local development
 
 
 Start with the Python dependencies
 ```
-sudo apt install  apport-retrace python3-amqp python3-bson python3-cassandra python3-flask python3-mock python3-pygit2 python3-pytest python3-pytest-cov python3-swiftclient ubuntu-dbgsym-keyring
+sudo apt install apport-retrace python3-amqp python3-bson python3-cassandra python3-flask python3-mock python3-pygit2 python3-pytest python3-pytest-cov python3-swiftclient ubuntu-dbgsym-keyring
 ```
 
-Then by having a local Cassandra and RabbitMQ:
+Then start a local Cassandra, RabbitMQ and swift (`docker` should works fine too):
 ```
-docker run --name cassandra --network host --rm -d docker.io/cassandra
-docker run --name rabbitmq --network host --rm -d docker.io/rabbitmq
+podman run --name cassandra --network host --rm -d -e HEAP_NEWSIZE=10M -e MAX_HEAP_SIZE=200M docker.io/cassandra
+podman run --name rabbitmq --network host --rm -d docker.io/rabbitmq
+podman run --name swift --network host --rm -d docker.io/openstackswift/saio
 ```
-And then run the tests with `pytest`:
+
+You can then then run the tests with `pytest`:
 ```
 cd src
-pytest -o log_cli=1 -vv --log-level=INFO tests/
+python3 -m pytest -o log_cli=1 -vv --log-level=INFO tests/
 ```
 
-## Documentation
+Or start each individual process (from the `./src` folder):
+
+daisy:
+```
+python3 ./daisy/app.py
+```
+
+retracer:
+```
+python3 ./retracer.py -a amd64 --sandbox-dir /tmp/sandbox -v --config-dir ./retracer/config
+```
+
+From there, you can manually upload a crash with the following, from any folder
+containing a `.crash` file with its corresponding `.upload` file:
+```
+CRASH_DB_URL=http://127.0.0.1:5000 APPORT_REPORT_DIR=$(pwd) CRASH_DB_IDENTIFIER=my_custom_machine_id whoopsie --no-polling -f
+```
+This will create a corresponding `.uploaded` file containing the OOPS ID, that
+you need to delete if you want to upload the crash again.
+
+
+## More documentation
 
 ### Opening a new series
 

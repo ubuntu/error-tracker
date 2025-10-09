@@ -1,23 +1,9 @@
 import logging
 import re
-import socket
-import uuid
 
 import apt
-from amqp import ConnectionError as AMQPConnectionException
 
-from oopsrepository import oopses
-
-# From oops-amqp
-# These exception types always indicate an AMQP connection error/closure.
-# However you should catch amqplib_error_types and post-filter with
-# is_amqplib_connection_error.
-amqplib_connection_errors = (socket.error, AMQPConnectionException)
-# A tuple to reduce duplication in different code paths. Lists the types of
-# exceptions legitimately raised by amqplib when the AMQP server goes down.
-# Not all exceptions *will* be such errors - use is_amqplib_connection_error to
-# do a second-stage filter after catching the exception.
-amqplib_error_types = amqplib_connection_errors + (IOError,)
+from errortracker import oopses
 
 EOL_RELEASES = {
     "Ubuntu 10.04": "lucid",
@@ -47,6 +33,7 @@ EOL_RELEASES = {
     "Ubuntu 22.10": "kinetic",
     "Ubuntu 23.04": "lunar",
     "Ubuntu 23.10": "mantic",
+    "Ubuntu 24.10": "oracular",
 }
 
 
@@ -100,11 +87,6 @@ def split_package_and_version(package):
     if version == "(not":
         # The version is set to '(not installed)'
         version = ""
-    # according to debian policy neither the package or version should have
-    # utf8 in it but either some archives do not know that or something is
-    # wonky with apport
-    package = package.encode("ascii", errors="replace").decode()
-    version = version.encode("ascii", errors="replace").decode()
     return (package, version)
 
 
@@ -137,21 +119,12 @@ def format_crash_signature(crash_signature) -> str:
     return crash_signature
 
 
-def bucket(oops_config, oops_id, crash_signature, report_dict):
+def bucket(oops_id, crash_signature, report_dict):
     release = report_dict.get("DistroRelease", "")
     package = report_dict.get("Package", "")
     src_package = report_dict.get("SourcePackage", "")
     problem_type = report_dict.get("ProblemType", "")
-    dependencies = report_dict.get("Dependencies", "")
     system_uuid = report_dict.get("SystemIdentifier", "")
-
-    if "[origin:" in package or "[origin:" in dependencies:
-        # This package came from a third-party source. We do not want to show
-        # its version as the Last Seen field on the most common problems table,
-        # so skip updating the bucket metadata.
-        third_party = True
-    else:
-        third_party = False
 
     version = None
     if package:
@@ -165,71 +138,27 @@ def bucket(oops_config, oops_id, crash_signature, report_dict):
     if automated_testing:
         fields = None
     else:
-        fields = get_fields_for_bucket_counters(
-            problem_type, release, package, version, pkg_arch
-        )
+        fields = get_fields_for_bucket_counters(problem_type, release, package, version, pkg_arch)
     if version:
-        oopses.update_bucket_systems(
-            oops_config, crash_signature, system_uuid, version=version
-        )
+        oopses.update_bucket_systems(crash_signature, system_uuid, version=version)
     # DayBucketsCount is only added to if fields is not None, so set fields to
     # None for crashes from systems running automated tests.
-    oopses.bucket(oops_config, oops_id, crash_signature, fields)
+    oopses.bucket(oops_id, crash_signature, fields)
 
-    if hasattr(oopses, "update_bucket_hashes"):
-        oopses.update_bucket_hashes(oops_config, crash_signature)
+    oopses.update_bucket_hashes(crash_signature)
 
     # BucketMetadata is displayed on the main page and shouldn't include
     # derivative or custom releases, so don't write them to the table.
     release_re = re.compile(r"^Ubuntu \d\d.\d\d$")
-    if (package and version) and release_re.match(release):
+    if (src_package and package and version) and release_re.match(release):
         oopses.update_bucket_metadata(
-            oops_config,
             crash_signature,
             package,
             version,
             apt.apt_pkg.version_compare,
             release,
         )
-        if hasattr(oopses, "update_source_version_buckets"):
-            oopses.update_source_version_buckets(
-                oops_config, src_package, version, crash_signature
-            )
-    if version and release:
-        oopses.update_bucket_versions(
-            oops_config, crash_signature, version, release=release, oopsid=oops_id
-        )
-
-    if hasattr(oopses, "update_errors_by_release"):
-        if (system_uuid and release) and not third_party:
-            oops_uuid = uuid.UUID(oops_id)
-            oopses.update_errors_by_release(
-                oops_config, oops_uuid, system_uuid, release
-            )
-
-
-def attach_error_report(report, context):
-    # We only attach error report that was submitted by the client if we've hit
-    # a MaximumRetryException from Cassandra.
-    if "type" in report and report["type"] == "MaximumRetryException":
-        env = context["wsgi_environ"]
-        if "wsgi.input.decoded" in env:
-            data = env["wsgi.input.decoded"]
-            if "req_vars" not in report:
-                report["req_vars"] = {}
-            report["req_vars"]["wsgi.input.decoded"] = data
-
-
-def wrap_in_oops_wsgi(wsgi_handler):
-    import oops_dictconfig
-    from oops_wsgi import install_hooks, make_app
-
-    from daisy import config
-
-    cfg = oops_dictconfig.config_from_dict(config.oops_config)
-    cfg.template["reporter"] = "daisy"
-    install_hooks(cfg)
-    return make_app(wsgi_handler, cfg, oops_on_status=["500"])
+        oopses.update_source_version_buckets(src_package, version, crash_signature)
 
 
 def retraceable_release(release):
@@ -264,31 +193,7 @@ def blocklisted_device(system_token):
     Used for devices that have repeatedly failed to submit a crash.
     """
 
-    blocklist = [
-        # 20150814 - OOPS count was at 43
-        "2f175cea621bda810f267f1da46409a111f58011435f410aa198362e9372da78b6fafe6827ff26e025a5ab7d2859346de6b188f0622118c15a119c58ca538acb",
-        # 20150826 - OOPS count was at 18
-        "81b75a0bdd531a5c02a4455b05674ea45fbb65324bcae5fe51659bce850aa40bcd1388e3eed4d46ce9abb4e56d1dd7dde45ded473995feb0ac2c01518a841efe",
-        # 20150903 - OOPS count was at 27
-        "b5329547bdab8adea4245399ff9656ca608e825425fbb0ad2c68e182b75ce80c13f9186e4e9b8e7a17dd15dd196b12a65e1b7f513184296320dad50c587754f5",
-    ]
+    blocklist = []
     if system_token in blocklist:
         return True
     return False
-
-
-# From oops-amqp
-def is_amqplib_ioerror(e):
-    """Returns True if e is an amqplib internal exception."""
-    # Raised by amqplib rather than socket.error on ssl issues and short reads.
-    if type(e) is not IOError:
-        return False
-    if e.args == ("Socket error",) or e.args == ("Socket closed",):
-        return True
-    return False
-
-
-# From oops-amqp
-def is_amqplib_connection_error(e):
-    """Return True if e was (probably) raised due to a connection issue."""
-    return isinstance(e, amqplib_connection_errors) or is_amqplib_ioerror(e)

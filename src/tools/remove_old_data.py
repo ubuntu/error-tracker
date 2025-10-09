@@ -6,23 +6,16 @@ from datetime import datetime, timedelta
 from time import sleep
 
 from cassandra import OperationTimedOut
-from cassandra.auth import PlainTextAuthProvider
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra.cluster import NoHostAvailable
 
-from daisy import config
+from errortracker import cassandra
 
-auth_provider = PlainTextAuthProvider(
-    username=config.cassandra_username, password=config.cassandra_password
-)
-cluster = Cluster(config.cassandra_hosts, auth_provider=auth_provider)
-session = cluster.connect(config.cassandra_keyspace)
+session = cassandra.cassandra_session()
 
 # use a prepared statement which is less resource intensive
 oops_lookup_stmt = session.prepare('SELECT * FROM "OOPS" WHERE key = ?')
 oops_delete_stmt = session.prepare('DELETE FROM "OOPS" WHERE key = ?')
-dayoops_delete_stmt = session.prepare(
-    'DELETE FROM "DayOOPS" WHERE key = ? AND column1 = ?'
-)
+dayoops_delete_stmt = session.prepare('DELETE FROM "DayOOPS" WHERE key = ? AND column1 = ?')
 
 URL = "https://errors.ubuntu.com/oops/"
 
@@ -79,9 +72,7 @@ if __name__ == "__main__":
         sys.argv.remove("--no-dry-run")
     else:
         dry_run = True
-        print(
-            "Running by default in dry-run mode. Pass --no-dry-run to really delete stuff."
-        )
+        print("Running by default in dry-run mode. Pass --no-dry-run to really delete stuff.")
 
     # Range of dates for which all OOPSes
     start_date = datetime.strptime(sys.argv[1], "%Y-%m-%d").date()
@@ -107,9 +98,7 @@ if __name__ == "__main__":
                     % (URL, oops_id.value.decode(), start_date),
                     end="",
                 )
-                if remove_oops(oops_id.value) and remove_dayoops(
-                    start_date, oops_id.column1
-                ):
+                if remove_oops(oops_id.value) and remove_dayoops(start_date, oops_id.column1):
                     print(" SUCCESS")
                     count_success += 1
                 else:
@@ -118,6 +107,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     print(
-        "Finishing cleaning OOPSes: %s successes and %s failures"
-        % (count_success, count_failure)
+        "Finishing cleaning OOPSes: %s successes and %s failures" % (count_success, count_failure)
     )
