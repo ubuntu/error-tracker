@@ -1,12 +1,37 @@
 # error-tracker
 Code behind https://errors.ubuntu.com
 
-## Dependencies
 
+## Running the tests locally with spread
+
+This avoids having to install all the Python dependencies and runs everything
+isolated in a LXD VM, but is a bit slower for development.
+This is also how the CI runs the tests, so if it breaks, that's likely to be the
+first step to reproduce locally.
 ```
-sudo apt install python3-amqp python3-cassandra apport-retrace ubuntu-dbgsym-keyring
+sudo snap install lxd --classic
+sudo snap install charmcraft --classic
+charmcraft.spread -v -reuse -resend
 ```
 
+## Running the tests locally for development
+
+
+Start with the Python dependencies
+```
+sudo apt install  apport-retrace python3-amqp python3-bson python3-cassandra python3-flask python3-mock python3-pygit2 python3-pytest python3-pytest-cov python3-swiftclient ubuntu-dbgsym-keyring
+```
+
+Then by having a local Cassandra and RabbitMQ:
+```
+docker run --name cassandra --network host --rm -d docker.io/cassandra
+docker run --name rabbitmq --network host --rm -d docker.io/rabbitmq
+```
+And then run the tests with `pytest`:
+```
+cd src
+pytest -o log_cli=1 -vv --log-level=INFO tests/
+```
 
 ## Documentation
 

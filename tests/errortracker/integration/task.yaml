@@ -1,0 +1,9 @@
+# XXX: this task is directly depending on the ddebs archive for Noble. This can
+# make the test flaky, but it's still best to have it than not.
+summary: Run daisy + retracer whole end-to-end scenario
+execute: |
+  chmod a+rx /root
+  # Work around https://bugs.launchpad.net/ubuntu/+source/gdb/+bug/1818918
+  # Apport will not be run as root, thus the included workaround here will hit ENOPERM
+  mkdir -p /usr/lib/debug/.dwz
+  sudo -u spread --preserve-env=SPREAD_PATH ./task.sh
