@@ -1,0 +1,13 @@
+deb http://ports.ubuntu.com/ resolute main restricted universe multiverse
+deb http://ports.ubuntu.com/ resolute-updates main restricted universe multiverse
+#deb http://ports.ubuntu.com/ resolute-proposed main restricted universe multiverse
+deb http://ports.ubuntu.com/ resolute-security main restricted universe multiverse
+
+deb-src http://ports.ubuntu.com/ resolute main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ resolute-updates main restricted universe multiverse
+#deb-src http://ports.ubuntu.com/ resolute-proposed main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ resolute-security main restricted universe multiverse
+
+deb http://ddebs.ubuntu.com resolute main restricted universe multiverse
+deb http://ddebs.ubuntu.com resolute-updates main restricted universe multiverse
+deb http://ddebs.ubuntu.com resolute-proposed main restricted universe multiverse
