@@ -1,0 +1,12 @@
+summary: Run charm integration tests
+execute: |
+  # Workaround apparmor denying Juju access to the charm
+  sed '/^profile/a /root/ ixr,' /var/lib/snapd/apparmor/profiles/snap.juju.juju | apparmor_parser -r
+  sed '/^profile/a /root/** ixr,' /var/lib/snapd/apparmor/profiles/snap.juju.juju | apparmor_parser -r
+
+  args=""
+  if [[ -f "$SPREAD_PATH/error-tracker_ubuntu@24.04-amd64.charm" ]]; then
+    args="--charm-path=$SPREAD_PATH/error-tracker_ubuntu@24.04-amd64.charm"
+  fi
+
+  uv run --all-extras pytest . -vv --log-level=INFO -o log_cli=1 $args

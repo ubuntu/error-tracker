@@ -105,7 +105,7 @@ jobs:
         working-directory: charms/${{ matrix.charm }}
 
       - name: Test charm
-        run: uv run pytest tests/ -vv --log-level=INFO
+        run: uv run --all-extras pytest tests/ -vv --log-level=INFO
         working-directory: charms/${{ matrix.charm }}
 
       - name: Upload charm artifact

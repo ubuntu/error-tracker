@@ -7,6 +7,8 @@ dynamic = ["version"]
 dev = [
     "jubilant",
     "pytest",
+    "requests",
+    "tenacity",
 ]
 
 [tool.setuptools.dynamic]
