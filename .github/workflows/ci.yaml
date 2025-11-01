@@ -1,9 +1,13 @@
 ---
 name: CI
 
-on:  # yamllint disable-line rule:truthy
-  - push
-  - pull_request
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
 
 env:
   DEBIAN_FRONTEND: noninteractive
@@ -27,36 +31,25 @@ jobs:
   # TODO: reenable that after cleaning everything. Those tests are nowhere
   # near ready to be run again, and will likely just get replaced once bigger
   # refactoring will have occured.
-  # tests:
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       container:
-  #         - ubuntu:latest
-  #         - ubuntu:rolling
-  #   container:
-  #     image: ${{ matrix.container }}
-  #   steps:
-  #     - name: Sanitize container name (for artifact name)
-  #       run: |
-  #         container=$(echo "${{ matrix.container }}" | sed 's/:/-/')
-  #         echo "JOB=${GITHUB_JOB}-${container}" >> "$GITHUB_ENV"
-  #     - name: Install dependencies
-  #       run: >
-  #         apt-get update
-  #         && apt-get install --no-install-recommends --yes
-  #         apport-retrace git python3-amqp python3-cassandra python3-pygit2
-  #         python3-swiftclient ubuntu-dbgsym-keyring
-  #     - name: Run unit and integration tests
-  #       run: >
-  #         python3 -m pytest -ra --cov=$(pwd) --cov-branch --cov-report=xml
-  #         --durations=0 src/test
-  #     - name: Upload coverage
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: coverage-${{ env.JOB }}
-  #         path: ./coverage*.xml
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup LXD
+        uses: canonical/setup-lxd@a3c85fc6fb7fff43fcfeae87659e41a8f635b7dd
+      - name: Install ~~charmcraft~~spread
+        run: sudo snap install charmcraft --classic
+      - name: Run Error Tracker tests
+        run: |
+          charmcraft.spread -v tests/errortracker/
+      # spread artifacts need to work to re-enable this
+      # - name: Upload coverage
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: coverage-${{ env.JOB }}
+      #     path: ./coverage.xml
 
   woke:
     name: woke

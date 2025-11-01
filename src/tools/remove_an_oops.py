@@ -5,18 +5,12 @@
 import sys
 from time import sleep
 
-from cassandra import ConsistencyLevel, OperationTimedOut
-from cassandra.auth import PlainTextAuthProvider
-from cassandra.cluster import Cluster, NoHostAvailable
+from cassandra import OperationTimedOut
+from cassandra.cluster import NoHostAvailable
 
-from daisy import config
+from errortracker import cassandra
 
-auth_provider = PlainTextAuthProvider(
-    username=config.cassandra_username, password=config.cassandra_password
-)
-cluster = Cluster(config.cassandra_hosts, auth_provider=auth_provider)
-session = cluster.connect(config.cassandra_keyspace)
-session.default_consistency_level = ConsistencyLevel.LOCAL_ONE
+session = cassandra.cassandra_session()
 
 URL = "https://errors.ubuntu.com/oops/"
 
@@ -33,9 +27,7 @@ if __name__ == "__main__":
 
     oops_lookup_stmt = session.prepare('SELECT * FROM "OOPS" WHERE key=?')
     oops_delete_stmt = session.prepare('DELETE FROM "OOPS" WHERE key=?')
-    useroops_delete_stmt = session.prepare(
-        'DELETE FROM "UserOOPS" WHERE key=? AND column1=?'
-    )
+    useroops_delete_stmt = session.prepare('DELETE FROM "UserOOPS" WHERE key=? AND column1=?')
 
     max_retries = 5
     for i in range(max_retries):

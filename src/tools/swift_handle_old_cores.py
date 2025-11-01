@@ -6,56 +6,28 @@
 
 import atexit
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import amqp
 import swiftclient
-from cassandra import ConsistencyLevel
-from cassandra.auth import PlainTextAuthProvider
-from cassandra.cluster import Cluster
 
-from daisy import config, utils
+from errortracker import amqp_utils, cassandra, config, swift_utils, utils
 
 limit = None
 if len(sys.argv) == 2:
     limit = int(sys.argv[1])
 
-cs = getattr(config, "core_storage", "")
-if not cs:
-    print("core_storage not set.")
-    sys.exit(1)
+swift_client = swift_utils.get_swift_client()
+bucket = config.swift_bucket
 
-provider_data = cs["swift"]
-opts = {
-    "tenant_name": provider_data["os_tenant_name"],
-    "region_name": provider_data["os_region_name"],
-}
-_cached_swift = swiftclient.client.Connection(
-    provider_data["os_auth_url"],
-    provider_data["os_username"],
-    provider_data["os_password"],
-    os_options=opts,
-    auth_version="3.0",
-)
-bucket = provider_data["bucket"]
+session = cassandra.cassandra_session()
 
-auth_provider = PlainTextAuthProvider(
-    username=config.cassandra_username, password=config.cassandra_password
-)
-cluster = Cluster(config.cassandra_hosts, auth_provider=auth_provider)
-session = cluster.connect(config.cassandra_keyspace)
-session.default_consistency_level = ConsistencyLevel.LOCAL_ONE
-
-_cached_swift.http_conn = None
-connection = amqp.Connection(
-    host=config.amqp_host, userid=config.amqp_username, password=config.amqp_password
-)
-connection.connect()
+connection = amqp_utils.get_connection()
 channel = connection.channel()
 atexit.register(connection.close)
 atexit.register(channel.close)
 
-now = datetime.now(UTC)
+now = datetime.now(timezone.utc)
 abitago = now - timedelta(7)
 count = 0
 queued_count = 0
@@ -65,7 +37,7 @@ removed_count = 0
 def remove_core(bucket, core):
     global removed_count
     try:
-        _cached_swift.delete_object(bucket, core)
+        swift_client.delete_object(bucket, core)
         removed_count += 1
         print("removed %s from swift" % core, file=sys.stderr)
     except swiftclient.client.ClientException as e:
@@ -74,7 +46,7 @@ def remove_core(bucket, core):
             print("%s not found in swift" % core, file=sys.stderr)
 
 
-for container in _cached_swift.get_container(container=bucket, limit=limit):
+for container in swift_client.get_container(container=bucket, limit=limit):
     # the dict is the metadata for the container
     if isinstance(container, dict):
         continue
@@ -83,9 +55,7 @@ for container in _cached_swift.get_container(container=bucket, limit=limit):
         uuid = core["name"]
         count += 1
         try:
-            arch = session.execute(oops_lookup, [uuid.encode(), "Architecture"]).one()[
-                0
-            ]
+            arch = session.execute(oops_lookup, [uuid.encode(), "Architecture"]).one()[0]
         except (IndexError, TypeError):
             arch = ""
         if not arch:
@@ -93,9 +63,7 @@ for container in _cached_swift.get_container(container=bucket, limit=limit):
             remove_core(bucket, uuid)
             continue
         try:
-            release = session.execute(
-                oops_lookup, [uuid.encode(), "DistroRelease"]
-            ).one()[0]
+            release = session.execute(oops_lookup, [uuid.encode(), "DistroRelease"]).one()[0]
         except (IndexError, TypeError):
             release = ""
         if not release:

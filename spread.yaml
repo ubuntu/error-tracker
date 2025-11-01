@@ -1,0 +1,93 @@
+project: error-tracker
+kill-timeout: 90m
+workers: 1
+
+environment:
+  CI: "$(HOST: echo $CI)"
+
+backends:
+  lxd:
+    type: adhoc
+    # This allocate block can be removed once the LXD VM support is landed in
+    # spread: https://github.com/canonical/spread/pull/185
+    allocate: |
+      CONTAINER_NAME="error-tracker-${SPREAD_SYSTEM/./-}-${RANDOM}"
+      DISK="${DISK:-20}"
+      CPU="${CPU:-4}"
+      MEM="${MEM:-5}"
+
+      lxc launch --vm -e \
+        "${SPREAD_SYSTEM/-/:}" \
+        "${CONTAINER_NAME}" \
+        -c user.user-data="$(sed "s|SPREAD_PASSWORD|$SPREAD_PASSWORD|g" src/tests/cloud-config.yaml)" \
+        -c limits.cpu="${CPU}" \
+        -c limits.memory="${MEM}GiB" \
+        -d root,size="${DISK}GiB"
+
+      # Wait for the spread user
+      while ! lxc exec "${CONTAINER_NAME}" -- id -u spread &>/dev/null; do sleep 0.5; done
+
+      # Set the instance address for spread
+      ADDRESS "$(lxc ls -f csv | grep "${CONTAINER_NAME}" | cut -d"," -f3 | cut -d" " -f1)"
+    discard: |
+      instance_name="$(lxc ls -f csv | grep -B1 -A1 $SPREAD_SYSTEM_ADDRESS | grep error-tracker | cut -f1 -d",")"
+      lxc delete -f $instance_name
+
+    systems:
+      - ubuntu-24.04:
+          username: spread
+          workers: 1
+
+suites:
+  tests/errortracker/:
+    summary: Spread tests - error tracker tests
+    prepare: |
+      apt-get update
+      apt-get install -y --no-install-recommends docker.io
+      apt-get install -y --no-install-recommends linux-modules-extra-$(uname -r) zram-tools
+      apt-get install -y --no-install-recommends \
+          apport-retrace \
+          git \
+          python3-amqp \
+          python3-bson \
+          python3-cassandra \
+          python3-flask \
+          python3-pygit2 \
+          python3-pytest \
+          python3-pytest-cov \
+          python3-swiftclient \
+          ubuntu-dbgsym-keyring \
+          whoopsie
+      docker run --name cassandra --network host --rm -d -e HEAP_NEWSIZE=10M -e MAX_HEAP_SIZE=200M docker.io/cassandra
+      docker run --name rabbitmq --network host --rm -d docker.io/rabbitmq
+      docker run --name swift --network host --rm -d docker.io/openstackswift/saio
+      bash -c 'while ! echo "Hello there, still waiting for Cassandra" >/dev/tcp/localhost/9042; do sleep 5; done'
+      bash -c 'while ! echo "Hello there, still waiting for RabbitMQ" >/dev/tcp/localhost/5672; do sleep 5; done'
+      bash -c 'while ! echo "Hello there, still waiting for swift" >/dev/tcp/localhost/8080; do sleep 5; done'
+    restore: |
+      docker stop cassandra
+      docker stop rabbitmq
+      docker stop swift
+  charm/tests/:
+    summary: Spread tests - charm tests
+    prepare: |
+      snap install astral-uv --classic
+      snap install concierge --classic
+      concierge prepare \
+          --juju-channel=3/stable \
+          --charmcraft-channel=3.x/stable \
+          --preset machine
+
+exclude:
+  - .coverage
+  - .git
+  - .github
+  - .pytest_cache
+  - .ruff_cache
+  - .tox
+  - .venv
+
+# this needs to be under /root because spread executes the test scripts
+# as root, which means that all snaps can only see files in root's
+# home directory due to snap confinement.
+path: /root/proj

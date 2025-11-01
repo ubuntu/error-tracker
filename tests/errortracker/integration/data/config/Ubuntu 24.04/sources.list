@@ -1,0 +1,13 @@
+deb [trusted=yes] http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse
+deb [trusted=yes] http://archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse
+deb [trusted=yes] http://archive.ubuntu.com/ubuntu/ noble-proposed main restricted universe multiverse
+deb [trusted=yes] http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse
+
+deb-src [trusted=yes] http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse
+deb-src [trusted=yes] http://archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse
+deb-src [trusted=yes] http://archive.ubuntu.com/ubuntu/ noble-proposed main restricted universe multiverse
+deb-src [trusted=yes] http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse
+
+deb [trusted=yes] http://ddebs.ubuntu.com noble main restricted universe multiverse
+deb [trusted=yes] http://ddebs.ubuntu.com noble-updates main restricted universe multiverse
+deb [trusted=yes] http://ddebs.ubuntu.com noble-proposed main restricted universe multiverse

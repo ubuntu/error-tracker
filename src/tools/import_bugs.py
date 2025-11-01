@@ -3,20 +3,10 @@
 import sqlite3
 from urllib.request import urlretrieve
 
-from cassandra import ConsistencyLevel
-from cassandra.auth import PlainTextAuthProvider
-from cassandra.cluster import Cluster
+from errortracker import cassandra
 
-from daisy import config
+session = cassandra.cassandra_session()
 
-auth_provider = PlainTextAuthProvider(
-    username=config.cassandra_username, password=config.cassandra_password
-)
-cluster = Cluster(config.cassandra_hosts, auth_provider=auth_provider)
-session = cluster.connect(config.cassandra_keyspace)
-session.default_consistency_level = (
-    ConsistencyLevel.LOCAL_ONE
-)  # TODO: do something about that deprecation warning
 bm_table_insert = session.prepare(
     "INSERT INTO \"BucketMetadata\" (key, column1, value) VALUES (?, 'LaunchpadBug', ?)"
 )

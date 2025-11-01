@@ -4,17 +4,11 @@ import datetime
 import sys
 
 import distro_info
-from cassandra.auth import PlainTextAuthProvider
-from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
 
-from daisy import config
+from errortracker import cassandra
 
-auth_provider = PlainTextAuthProvider(
-    username=config.cassandra_username, password=config.cassandra_password
-)
-cluster = Cluster(config.cassandra_hosts, auth_provider=auth_provider)
-session = cluster.connect(config.cassandra_keyspace)
+session = cassandra.cassandra_session()
 
 d = distro_info.UbuntuDistroInfo()
 
@@ -38,9 +32,7 @@ if __name__ == "__main__":
 
     releases = [
         "Ubuntu " + r.replace(" LTS", "")
-        for r in sorted(
-            set(d.supported(result="release") + d.supported_esm(result="release"))
-        )
+        for r in sorted(set(d.supported(result="release") + d.supported_esm(result="release")))
     ]
     try:
         releases.append("Ubuntu " + d.devel(result="release"))
@@ -71,9 +63,7 @@ if __name__ == "__main__":
             print(f"found {user_count} users")
         # value is the number of users
         uu_results = session.execute(
-            SimpleStatement(
-                'SELECT value from "UniqueUsers90Days" WHERE key=%s and column1=%s'
-            ),
+            SimpleStatement('SELECT value from "UniqueUsers90Days" WHERE key=%s and column1=%s'),
             [release, formatted],
         )
         try:

@@ -39,16 +39,14 @@ import amqp
 
 # external libs
 from apport import Report
-from cassandra.auth import PlainTextAuthProvider
-from cassandra.cqlengine import connection
-from cassandra.policies import RoundRobinPolicy
+from problem_report import CompressedValue, _base64_decoder
 
-from daisy import cassandra_schema, config, utils
+from daisy.metrics import get_metrics
 
 # internal libs
-from daisy.metrics import get_metrics, record_revno
-from daisy.version import version_info as daisy_version_info
-from oopsrepository import config as oopsconfig
+from errortracker import amqp_utils, cassandra_schema, config, utils
+from errortracker.cassandra import setup_cassandra
+from errortracker.swift_utils import get_swift_client
 
 apport_version_info = {}
 try:
@@ -57,15 +55,10 @@ except:  # noqa: E722
     pass
 
 
-LOGGING_FORMAT = (
-    "%(asctime)s:%(process)d:%(thread)d" ":%(levelname)s:%(name)s:%(message)s"
-)
-
-_cached_swift = None
-_cached_s3 = None
-_swift_auth_failure = False
+LOGGING_FORMAT = "%(asctime)s:%(process)d:%(thread)d:%(levelname)s:%(name)s:%(message)s"
 
 metrics = get_metrics("retracer.%s" % socket.gethostname())
+logger = logging.getLogger("retracer")
 
 
 def ensure_str(var):
@@ -75,7 +68,7 @@ def ensure_str(var):
 
 
 def log(message, level=logging.INFO):
-    logging.log(level, message)
+    logger.log(level, message)
 
 
 def rm_eff(path):
@@ -110,12 +103,15 @@ def shutdown():
 def prefix_log_with_amqp_message(func):
     def wrapped(obj, msg):
         try:
+            amqp_msg = msg.body
+            if type(amqp_msg) is bytes:
+                amqp_msg = amqp_msg.decode()
             # This is a terrible hack to include the UUID for the core file and
             # OOPS report as well as the storage provider name with the log
             # message.
             format_string = (
                 "%(asctime)s:%(process)d:%(thread)d:%(levelname)s"
-                ":%(name)s:" + str(msg.body) + ":%(message)s"
+                ":%(name)s:" + amqp_msg + ":%(message)s"
             )
             formatter = logging.Formatter(format_string)
             logging.getLogger().handlers[0].setFormatter(formatter)
@@ -139,18 +135,19 @@ class Retracer:
         config_dir,
         sandbox_dir,
         architecture,
-        verbose,
-        cache_debs,
-        use_sandbox,
-        cleanup_sandbox,
-        cleanup_debs,
-        stacktrace_source,
+        verbose=False,
+        cache_debs=False,
+        use_sandbox=False,
+        cleanup_sandbox=False,
+        cleanup_debs=False,
+        stacktrace_source=False,
         failed=False,
     ):
         signal.signal(signal.SIGTERM, self.exit_gracefully)
+        setup_cassandra()
+        self.swift = get_swift_client()
         self._stop_now = False
         self._processing_callback = False
-        self.setup_cassandra()
         self.config_dir = config_dir
         self.sandbox_dir = sandbox_dir
         self.verbose = verbose
@@ -189,54 +186,19 @@ class Retracer:
         # I think we'd need to make msg and oops_ids globals
         self._stop_now = True
         if not self._processing_callback:
-            if self.connection:
-                self.connection.close()
             if self.channel:
                 self.channel.close()
+            if self.connection:
+                self.connection.close()
             sys.exit()
 
-    def setup_cassandra(self):
-        os.environ["OOPS_KEYSPACE"] = config.cassandra_keyspace
-        self.oops_config = oopsconfig.get_config()
-        auth_provider = PlainTextAuthProvider(
-            username=config.cassandra_username, password=config.cassandra_password
-        )
-        connection.setup(
-            config.cassandra_hosts,
-            "crashdb",
-            auth_provider=auth_provider,
-            load_balancing_policy=RoundRobinPolicy(),
-            protocol_version=4,
-        )
-        self.oops_config["host"] = config.cassandra_hosts
-        self.oops_config["username"] = config.cassandra_username
-        self.oops_config["password"] = config.cassandra_password
-
-    def listen(self):
+    def run_forever(self):
         if self.failed:
-            retrace = "failed_retrace_%s"
+            queue = f"failed_retrace_{self.architecture}"
         else:
-            retrace = "retrace_%s"
-        retrace = retrace % self.architecture
+            queue = f"retrace_{self.architecture}"
         try:
-            if config.amqp_username and config.amqp_password:
-                self.connection = amqp.Connection(
-                    host=config.amqp_host,
-                    userid=config.amqp_username,
-                    password=config.amqp_password,
-                )
-            else:
-                self.connection = amqp.Connection(host=config.amqp_host)
-            self.run_forever(queue=retrace)
-        finally:
-            if self.connection:
-                self.connection.close()
-            if self.channel:
-                self.channel.close()
-
-    def run_forever(self, queue):
-        try:
-            self.connection.connect()
+            self.connection = amqp_utils.get_connection()
             self.channel = self.connection.channel()
             self.channel.queue_declare(queue=queue, durable=True, auto_delete=False)
             self.channel.basic_qos(0, 1, False)
@@ -246,6 +208,10 @@ class Retracer:
                 self.connection.drain_events()
         except KeyboardInterrupt:
             log("Keyboard interrupt received, exiting properly")
+            self._stop_now = True
+        finally:
+            self.channel.close()
+            self.connection.close()
         if self.channel and self.channel.is_open:
             self.channel.basic_cancel(tag)
 
@@ -258,7 +224,10 @@ class Retracer:
         """
         # This is kept around for legacy reasons. The integration tests
         # currently depend on this being exposed in the API.
-        status = result
+        if result:
+            status = "success"
+        else:
+            status = "failure"
         # Increment the counters. This will create the rows if they don't exist yet.
         cassandra_schema.RetraceStats(
             key=day_key.encode(), column1="%s:%s" % (release, status)
@@ -279,13 +248,7 @@ class Retracer:
                     count_key,
                 ],
             )
-            # keep those two hex values to display in logging when something goes wrong
-            mean[mean_key + "_hex"] = mean[mean_key]
-            mean[count_key + "_hex"] = mean[count_key]
-
-            mean[mean_key] = struct.unpack("!f", mean[mean_key])[0]
-            mean[count_key] = int.from_bytes(mean[count_key])
-        except (cassandra_schema.DoesNotExist, KeyError):
+        except cassandra_schema.DoesNotExist:
             mean = {mean_key: 0.0, count_key: 0}
 
         new_mean = float(
@@ -368,10 +331,8 @@ class Retracer:
 
     def failed_to_process(self, msg, oops_id, old=False):
         # Try to remove the core file from the storage provider
-        parts = self.msg_body.split(":", 1)
-        oops_id = None
-        oops_id, provider = parts
-        removed = self.remove(*parts)
+        oops_id, provider = self.msg_body.split(":", 1)
+        removed = self.remove(oops_id)
         if removed:
             # We've processed this. Delete it off the MQ.
             msg.channel.basic_ack(msg.delivery_tag)
@@ -391,222 +352,62 @@ class Retracer:
             addr_sig = cassandra_schema.OOPS.objects.get(
                 key=oops_id.encode(), column1="StacktraceAddressSignature"
             )["value"]
-            cassandra_schema.Indexes.objects.filter(
-                key=b"retracing", column1=addr_sig
-            ).delete()
+            cassandra_schema.Indexes.objects.filter(key=b"retracing", column1=addr_sig).delete()
         except cassandra_schema.DoesNotExist as e:
-            log(
-                "Could not remove from the retracing row (%s) (%s):"
-                % (oops_id, repr(e))
-            )
+            log("Could not remove from the retracing row (%s) (%s):" % (oops_id, repr(e)))
 
-    def write_swift_bucket_to_disk(self, key, provider_data):
-        global _cached_swift
-        global _swift_auth_failure
-        import swiftclient
-
-        opts = {
-            "tenant_name": provider_data["os_tenant_name"],
-            "region_name": provider_data["os_region_name"],
-        }
-        if not _cached_swift:
-            _cached_swift = swiftclient.client.Connection(
-                provider_data["os_auth_url"],
-                provider_data["os_username"],
-                provider_data["os_password"],
-                os_options=opts,
-                auth_version="3.0",
-            )
-        if self.verbose:
-            log("swift token: %s" % str(_cached_swift.token))
-        fmt = "-{}.{}.oopsid".format(provider_data["type"], key)
+    def write_swift_bucket_to_disk(self, key):
+        fmt = f"-swift.{key}.oopsid"
         fd, path = tempfile.mkstemp(fmt)
         os.close(fd)
-        bucket = provider_data["bucket"]
         try:
-            _cached_swift.http_conn = None
-            headers, body = _cached_swift.get_object(bucket, key, resp_chunk_size=65536)
+            _, body = self.swift.get_object(config.swift_bucket, key, resp_chunk_size=65536)
             with open(path, "wb") as fp:
                 for chunk in body:
                     fp.write(chunk)
             return path
-        except swiftclient.client.ClientException as e:
-            if "Unauthorized" in str(e):
-                metrics.meter("swift_client_exception.auth_failure")
-                log("Authorization failure connecting to swift.")
-                _swift_auth_failure = True
-            elif "404 Not Found" in str(e):
-                return "Missing"
-            else:
-                metrics.meter("swift_client_exception")
-                log("Could not retrieve %s (swift):" % key)
+        except Exception as e:
+            log("Could not get %s from swift: %s" % (key, e))
             log(traceback.format_exc())
             # This will still exist if we were partway through a write.
             rm_eff(path)
             return None
 
-    def remove_from_swift(self, key, provider_data):
-        global _cached_swift
-        global _swift_auth_failure
-        import swiftclient
-
-        opts = {
-            "tenant_name": provider_data["os_tenant_name"],
-            "region_name": provider_data["os_region_name"],
-        }
-        # test that the connection to swift still works
-        if _cached_swift:
-            try:
-                _cached_swift.get_account()
-            except swiftclient.client.ClientException as e:
-                if "Unauthorized" in str(e):
-                    log("Authorization failure getting account info")
-                    _cached_swift = ""
-        if not _cached_swift:
-            _cached_swift = swiftclient.client.Connection(
-                provider_data["os_auth_url"],
-                provider_data["os_username"],
-                provider_data["os_password"],
-                os_options=opts,
-                auth_version="3.0",
-            )
-        if self.verbose:
-            log("swift token: %s" % str(_cached_swift.token))
-        bucket = provider_data["bucket"]
+    def remove_from_swift(self, key):
+        log("Removing core from swift")
         try:
-            _cached_swift.http_conn = None
-            _cached_swift.delete_object(bucket, key)
+            self.swift.delete_object(config.swift_bucket, key)
         # 404s are handled when we write the bucket to disk
-        except swiftclient.client.ClientException as e:
-            if "Unauthorized" in str(e):
-                metrics.meter("swift_client_exception.auth_failure")
-                log("Authorization failure connecting to swift.")
-                log(traceback.format_exc())
-                # if there is a failure to receive and a failure to delete
-                # stop the retracing process
-                if _swift_auth_failure:
-                    log("Two swift auth failures, stopping.")
-                    sys.exit(1)
-                _swift_auth_failure = True
-            else:
-                log("Could not remove %s (swift):" % key)
-                log(traceback.format_exc())
-                metrics.meter("swift_delete_error")
-                return False
-        return True
-
-    def write_s3_bucket_to_disk(self, key, provider_data):
-        global _cached_s3
-        from boto.exception import S3ResponseError
-        from boto.s3.connection import S3Connection
-
-        if not _cached_s3:
-            _cached_s3 = S3Connection(
-                aws_access_key_id=provider_data["aws_access_key"],
-                aws_secret_access_key=provider_data["aws_secret_key"],
-                host=provider_data["host"],
-            )
-        try:
-            bucket = _cached_s3.get_bucket(provider_data["bucket"])
-            key = bucket.get_key(key)
-        except S3ResponseError:
-            log("Could not retrieve %s (s3):" % key)
-            log(traceback.format_exc())
-            return None
-        fmt = "-{}.{}.oopsid".format(provider_data["type"], key)
-        fd, path = tempfile.mkstemp(fmt)
-        os.close(fd)
-        with open(path, "wb") as fp:
-            for data in key:
-                # 8K at a time.
-                fp.write(data)
-        return path
-
-    def remove_from_s3(self, key, provider_data):
-        global _cached_s3
-        from boto.exception import S3ResponseError
-        from boto.s3.connection import S3Connection
-
-        try:
-            if not _cached_s3:
-                _cached_s3 = S3Connection(
-                    aws_access_key_id=provider_data["aws_access_key"],
-                    aws_secret_access_key=provider_data["aws_secret_key"],
-                    host=provider_data["host"],
-                )
-            bucket = _cached_s3.get_bucket(provider_data["bucket"])
-            key = bucket.get_key(key)
-            key.delete()
-        except S3ResponseError:
-            log("Could not remove %s (s3):" % key)
+        except Exception as e:
+            log("Could not remove %s from swift: %s" % (key, e))
+            if "404 Not Found" in str(e):
+                return True
+            log("Could not remove %s from swift: %s" % (key, e))
             log(traceback.format_exc())
             return False
         return True
 
-    def write_local_to_disk(self, key, provider_data):
-        path = os.path.join(provider_data["path"], key)
-        fmt = "-{}.{}.oopsid".format(provider_data["type"], key)
-        fd, new_path = tempfile.mkstemp(fmt)
-        os.close(fd)
-        if not os.path.exists(path):
-            return None
-        else:
-            shutil.copyfile(path, new_path)
-            return new_path
+    def write_bucket_to_disk(self, oops_id):
+        return self.write_swift_bucket_to_disk(oops_id)
 
-    def remove_from_local(self, key, provider_data):
-        path = os.path.join(provider_data["path"], key)
-        rm_eff(path)
-        return True
+    def remove(self, oops_id):
+        return self.remove_from_swift(oops_id)
 
-    def write_bucket_to_disk(self, oops_id, provider):
-        path = ""
-        cs = getattr(config, "core_storage", "")
-        if not cs:
-            log("core_storage not set.")
-            sys.exit(1)
-        provider_data = cs[provider]
-        t = provider_data["type"]
-        if t == "swift":
-            path = self.write_swift_bucket_to_disk(oops_id, provider_data)
-        elif t == "s3":
-            path = self.write_s3_bucket_to_disk(oops_id, provider_data)
-        elif t == "local":
-            path = self.write_local_to_disk(oops_id, provider_data)
-        return path
-
-    def remove(self, oops_id, provider):
-        cs = getattr(config, "core_storage", "")
-        if not cs:
-            log("core_storage not set.")
-            sys.exit(1)
-        provider_data = cs[provider]
-        t = provider_data["type"]
-        if t == "swift":
-            removed = self.remove_from_swift(oops_id, provider_data)
-        elif t == "s3":
-            removed = self.remove_from_s3(oops_id, provider_data)
-        elif t == "local":
-            removed = self.remove_from_local(oops_id, provider_data)
-        if removed:
-            return True
-        return False
-
-    def save_crash(self, failure_storage, report, oops_id, core_file):
-        log("Saved OOPS %s for manual investigation." % oops_id)
-        # create a new crash with the CoreDump for investigation
-        report["CoreDump"] = (core_file,)
-        failed_crash = "%s/%s.crash" % (failure_storage, oops_id)
-        with open(failed_crash, "wb") as fp:
-            report.write(fp)
+    def save_crash(self, report, oops_id, core_file):
+        if config.failure_storage:
+            log("Saved OOPS %s for manual investigation." % oops_id)
+            # create a new crash with the CoreDump for investigation
+            report["CoreDump"] = (core_file,)
+            failed_crash = "%s/%s.crash" % (config.failure_storage, oops_id)
+            with open(failed_crash, "wb") as fp:
+                report.write(fp)
 
     @prefix_log_with_amqp_message
     def callback(self, msg):
         self._processing_callback = True
         log("Processing.")
         self.msg_body = ensure_str(msg.body)
-        parts = self.msg_body.split(":", 1)
-        oops_id, provider = parts
+        oops_id, provider = self.msg_body.split(":", 1)
         try:
             col = cassandra_schema.OOPS.get_as_dict(key=oops_id.encode())
         except cassandra_schema.DoesNotExist:
@@ -623,9 +424,9 @@ class Retracer:
         # retraced, check for this and ack the message.
         # N.B.: This only works in some cases because we don't mark a report as
         # having been retraced e.g. there is no Retrace column in keys
-        if "RetraceFailureReason" in list(
+        if "RetraceFailureReason" in list(col.keys()) or "RetraceOutdatedPackages" in list(
             col.keys()
-        ) or "RetraceOutdatedPackages" in list(col.keys()):
+        ):
             log("Ack'ing already retraced OOPS.")
             msg.channel.basic_ack(msg.delivery_tag)
             # 2016-05-19 - this failed to delete cores and ack'ing of msgs
@@ -639,7 +440,7 @@ class Retracer:
         if "UnreportableReason" in list(col.keys()):
             unreportable_reason = col["UnreportableReason"]
 
-        path = self.write_bucket_to_disk(*parts)
+        path = self.write_bucket_to_disk(oops_id)
 
         if path == "Missing":
             log("Ack'ing OOPS with missing core file.")
@@ -651,21 +452,17 @@ class Retracer:
             return
 
         core_file = "%s.core" % path
-        with open(core_file, "wb") as fp:
-            log("Decompressing to %s" % core_file)
-            p1 = Popen(["base64", "-d", path], stdout=PIPE)
-            # Set stderr to PIPE so we get output in the result tuple.
-            p2 = Popen(["zcat"], stdin=p1.stdout, stdout=fp, stderr=PIPE)
-            ret = p2.communicate()
-        rm_eff(path)
-
-        if p2.returncode != 0:
-            log("Error processing %s:" % path)
-            if unreportable_reason:
-                log("UnreportableReason is: %s" % unreportable_reason)
-            if ret[1]:
-                for line in ret[1].splitlines():
-                    log(line)
+        try:
+            with open(core_file, "wb") as fp:
+                log("Decompressing to %s" % core_file)
+                with open(path) as path_fp:
+                    for block in CompressedValue.decode_compressed_stream(
+                        _base64_decoder(path_fp)
+                    ):
+                        fp.write(block)
+            rm_eff(path)
+        except Exception as e:
+            log("Failed to decompress core: %s" % str(e))
             # We couldn't decompress this, so there's no value in trying again.
             self.processed(msg)
             # probably incomplete cores from armhf?
@@ -675,11 +472,10 @@ class Retracer:
             metrics.meter("retrace.failure.decompression.%s" % self.architecture)
             rm_eff(core_file)
             return
+
         # confirm that gdb thinks the core file is good
         gdb_cmd = [self.gdb_path, "--batch", "--ex", "target core %s" % core_file]
-        proc = Popen(
-            gdb_cmd, stdout=PIPE, stderr=PIPE, universal_newlines=True, errors="ignore"
-        )
+        proc = Popen(gdb_cmd, stdout=PIPE, stderr=PIPE, universal_newlines=True, errors="ignore")
         (out, err) = proc.communicate()
         if "is truncated: expected core file size" in err or "not a core dump" in err:
             # Not a core file, there's no value in trying again.
@@ -836,28 +632,19 @@ class Retracer:
                                 give_up = True
                                 retrace_result = "missing_execpath"
                                 break
-                            if (
-                                "Cannot find package which ships InterpreterPath"
-                                in line
-                            ):
+                            if "Cannot find package which ships InterpreterPath" in line:
                                 give_up = True
                                 retrace_result = "missing_intpath"
                                 break
                             if "failed with exit code -9" in line:
                                 metrics.meter("retrace.failed.gdb_failure.minus_nine")
-                                if failure_storage:
-                                    self.save_crash(
-                                        failure_storage, report, oops_id, core_file
-                                    )
+                                self.save_crash(report, oops_id, core_file)
                                 give_up = True
                                 retrace_result = "gdb_crash"
                                 break
                             if "failed with exit code -11" in line:
                                 metrics.meter("retrace.failed.gdb_failure.minus_eleven")
-                                if failure_storage:
-                                    self.save_crash(
-                                        failure_storage, report, oops_id, core_file
-                                    )
+                                self.save_crash(report, oops_id, core_file)
                                 give_up = True
                                 retrace_result = "gdb_crash"
                                 break
@@ -942,9 +729,7 @@ class Retracer:
                     metrics.meter("retrace.failed.invalid_core")
                     metrics.meter("retrace.failed.invalid_core.%s" % release)
                     metrics.meter("retrace.failed.invalid_core.%s" % architecture)
-                    metrics.meter(
-                        "retrace.failed.invalid_core.%s.%s" % (release, architecture)
-                    )
+                    metrics.meter("retrace.failed.invalid_core.%s.%s" % (release, architecture))
                     if apport_vers:
                         metrics.meter(
                             "retrace.failed.invalid_core.%s.%s"
@@ -955,18 +740,13 @@ class Retracer:
                 # another core
                 sas = report.get("StacktraceAddressSignature", "")
                 if sas:
-                    cassandra_schema.Indexes.objects.filter(
-                        key=b"retracing", column1=sas
-                    ).delete()
-                self.update_retrace_stats(
-                    release, day_key, retracing_time, result=retrace_result
-                )
+                    cassandra_schema.Indexes.objects.filter(key=b"retracing", column1=sas).delete()
+                self.update_retrace_stats(release, day_key, retracing_time, result=retrace_result)
                 metrics.meter("retrace.failed")
                 metrics.meter("retrace.failed.%s" % release)
                 metrics.meter("retrace.failed.%s" % architecture)
                 metrics.meter("retrace.failed.%s.%s" % (release, architecture))
-                if failure_storage:
-                    self.save_crash(failure_storage, report, oops_id, core_file)
+                self.save_crash(report, oops_id, core_file)
                 rm_eff("%s.new" % report_path)
                 # TODO 2024-12-16: Skia: let's see what to do with that later,
                 # but for now we don't want the retracer to choke on this.
@@ -1012,9 +792,7 @@ class Retracer:
                 metrics.meter("retrace.missing.crash_signature")
                 metrics.meter("retrace.missing.%s.crash_signature" % architecture)
                 metrics.meter("retrace.missing.%s.crash_signature" % release)
-                metrics.meter(
-                    "retrace.missing.%s.%s.crash_signature" % (release, architecture)
-                )
+                metrics.meter("retrace.missing.%s.%s.crash_signature" % (release, architecture))
                 if missing_dbgsym_pkg:
                     metrics.meter(
                         "retrace.missing.crash_signature. \
@@ -1062,8 +840,7 @@ class Retracer:
                         else:
                             log("Gave up requeueing after %s attempts." % count)
                 if architecture == "armhf" and "RetraceOutdatedPackages" not in report:
-                    if failure_storage:
-                        self.save_crash(failure_storage, report, oops_id, core_file)
+                    self.save_crash(report, oops_id, core_file)
 
             if stacktrace_addr_sig and not original_sas:
                 # if the OOPS doesn't already have a SAS add one
@@ -1077,15 +854,10 @@ class Retracer:
                 )
             else:
                 metrics.meter("retrace.missing.stacktrace_address_signature")
+                metrics.meter("retrace.missing.%s.stacktrace_address_signature" % architecture)
+                metrics.meter("retrace.missing.%s.stacktrace_address_signature" % release)
                 metrics.meter(
-                    "retrace.missing.%s.stacktrace_address_signature" % architecture
-                )
-                metrics.meter(
-                    "retrace.missing.%s.stacktrace_address_signature" % release
-                )
-                metrics.meter(
-                    "retrace.missing.%s.%s.stacktrace_address_signature"
-                    % (release, architecture)
+                    "retrace.missing.%s.%s.stacktrace_address_signature" % (release, architecture)
                 )
                 cassandra_schema.OOPS.objects.create(
                     key=oops_id.encode(), column1="RetraceStatus", value="Failure"
@@ -1137,11 +909,8 @@ class Retracer:
                     metrics.meter("retrace.missing.stacktrace")
                     metrics.meter("retrace.missing.%s.stacktrace" % architecture)
                     metrics.meter("retrace.missing.%s.stacktrace" % release)
-                    metrics.meter(
-                        "retrace.missing.%s.%s.stacktrace" % (release, architecture)
-                    )
-                    if failure_storage:
-                        self.save_crash(failure_storage, report, oops_id, core_file)
+                    metrics.meter("retrace.missing.%s.%s.stacktrace" % (release, architecture))
+                    self.save_crash(report, oops_id, core_file)
 
                 cassandra_schema.OOPS.objects.create(
                     key=oops_id.encode(), column1="RetraceStatus", value="Failure"
@@ -1162,16 +931,12 @@ class Retracer:
                     if unreportable_reason:
                         log("UnreportableReason is: %s" % unreportable_reason)
                     metrics.meter("retrace.missing.stacktrace_addr_sig")
-                    metrics.meter(
-                        "retrace.missing.%s.stacktrace_addr_sig" % architecture
-                    )
+                    metrics.meter("retrace.missing.%s.stacktrace_addr_sig" % architecture)
                     metrics.meter("retrace.missing.%s.stacktrace_addr_sig" % release)
                     metrics.meter(
-                        "retrace.missing.%s.%s.stacktrace_addr_sig"
-                        % (release, architecture)
+                        "retrace.missing.%s.%s.stacktrace_addr_sig" % (release, architecture)
                     )
-                    if failure_storage:
-                        self.save_crash(failure_storage, report, oops_id, core_file)
+                    self.save_crash(report, oops_id, core_file)
 
                 if "Stacktrace" not in report:
                     failure_reason = "No stacktrace after retracing"
@@ -1199,8 +964,7 @@ class Retracer:
                             missing_ddebs.append(line.split(" ")[-1])
                         log("%s (%s)" % (line, release))
                     if architecture == "armhf" and missing_ddebs and not outdated_pkgs:
-                        if failure_storage:
-                            self.save_crash(failure_storage, report, oops_id, core_file)
+                        self.save_crash(report, oops_id, core_file)
                     if not outdated_pkgs:
                         failure_reason += " and missing ddebs."
                     else:
@@ -1234,21 +998,15 @@ class Retracer:
                         missing_ddeb_count = 0
                     if crash_signature:
                         try:
-                            rf_reason = (
-                                cassandra_schema.BucketRetraceFailureReason.get_as_dict(
-                                    key=crash_signature.encode()
-                                )
+                            rf_reason = cassandra_schema.BucketRetraceFailureReason.get_as_dict(
+                                key=crash_signature.encode()
                             )
                             if "missing_ddeb_count" in rf_reason:
-                                least_missing_ddeb_count = int(
-                                    rf_reason["missing_ddeb_count"]
-                                )
+                                least_missing_ddeb_count = int(rf_reason["missing_ddeb_count"])
                             else:
                                 least_missing_ddeb_count = 9999
                             if "outdated_pkg_count" in rf_reason:
-                                least_outdated_pkg_count = int(
-                                    rf_reason["outdated_pkg_count"]
-                                )
+                                least_outdated_pkg_count = int(rf_reason["outdated_pkg_count"])
                             else:
                                 least_outdated_pkg_count = 9999
                         except cassandra_schema.DoesNotExist:
@@ -1271,12 +1029,9 @@ class Retracer:
                                 )
                         metrics.meter("retrace.failure.outdated_packages")
                         metrics.meter("retrace.failure.%s.outdated_packages" % release)
+                        metrics.meter("retrace.failure.%s.outdated_packages" % architecture)
                         metrics.meter(
-                            "retrace.failure.%s.outdated_packages" % architecture
-                        )
-                        metrics.meter(
-                            "retrace.failure.%s.%s.outdated_packages"
-                            % (release, architecture)
+                            "retrace.failure.%s.%s.outdated_packages" % (release, architecture)
                         )
                     else:
                         pass
@@ -1317,9 +1072,9 @@ class Retracer:
                 # This will contain the OOPS ID we're currently processing as
                 # well.
                 ids = list(
-                    cassandra_schema.AwaitingRetrace.objects.filter(
-                        key=original_sas
-                    ).values_list("column1", flat=True)
+                    cassandra_schema.AwaitingRetrace.objects.filter(key=original_sas).values_list(
+                        "column1", flat=True
+                    )
                 )
                 oops_ids = ids
             else:
@@ -1343,7 +1098,14 @@ class Retracer:
                 except cassandra_schema.DoesNotExist:
                     # An oops may not exist in awaiting_retrace if the initial
                     # report didn't have a SAS
-                    pass
+                    # Still make sure all others are cleared the slow way
+                    for id in oops_ids:
+                        try:
+                            cassandra_schema.AwaitingRetrace.objects.filter(
+                                key=original_sas, column1=id
+                            ).delete()
+                        except cassandra_schema.DoesNotExist:
+                            pass
 
             if crash_signature:
                 self.bucket(oops_ids, crash_signature)
@@ -1367,21 +1129,13 @@ class Retracer:
             sys.exit()
 
     def processed(self, msg):
-        parts = self.msg_body.split(":", 1)
-        oops_id = None
-        oops_id, provider = parts
-        removed = self.remove(*parts)
+        oops_id, provider = self.msg_body.split(":", 1)
+        removed = self.remove(oops_id)
         if removed:
             # We've processed this. Delete it off the MQ.
             msg.channel.basic_ack(msg.delivery_tag)
             self.update_time_to_retrace(msg)
             return True
-        # 2016-05-18 This was added due to intermittent issues removing core
-        # files from swift. Requeue the oops_id and on the second pass we will
-        # try to remove the core again or just retrace it.
-        else:
-            log("Requeued an OOPS (%s) whose core file was not removed." % oops_id)
-            self.requeue(msg, oops_id)
         return False
 
     def requeue(self, msg, oops_id):
@@ -1423,7 +1177,7 @@ class Retracer:
         if not timestamp:
             return
 
-        time_taken = int(datetime.datetime.now(datetime.UTC).timestamp()) - timestamp
+        time_taken = int(datetime.datetime.now(datetime.timezone.utc).timestamp()) - timestamp
         # This needs to be at a global level since it's dealing with the time
         # items have been sitting on a queue shared by all retracers.
         m = get_metrics("retracer.all")
@@ -1437,9 +1191,9 @@ class Retracer:
         failed_key = "failed:" + crash_signature
         ids = [
             str(id).encode()
-            for id in cassandra_schema.Bucket.objects.filter(
-                key=failed_key
-            ).values_list("column1", flat=True)
+            for id in cassandra_schema.Bucket.objects.filter(key=failed_key).values_list(
+                "column1", flat=True
+            )
         ]
 
         if not ids:
@@ -1470,7 +1224,7 @@ class Retracer:
             except cassandra_schema.DoesNotExist:
                 log("Could not find %s for %s." % (oops_id, crash_signature))
                 o = {}
-            utils.bucket(self.oops_config, oops_id, crash_signature, o)
+            utils.bucket(oops_id, crash_signature, o)
             metrics.meter("success.binary_bucketed")
             if not crash_signature.startswith("failed:") and o:
                 self.cleanup_oops(oops_id)
@@ -1533,7 +1287,7 @@ def parse_options():
     )
     parser.add_argument(
         "--core-storage",
-        help="Directory in which to store cores for manual " "investigation.",
+        help="Directory in which to store cores for manual investigation.",
     )
     parser.add_argument("-o", "--output", help="Log messages to a file.")
     parser.add_argument(
@@ -1542,21 +1296,12 @@ def parse_options():
         dest="stacktrace_source",
         help="Do not have apport create a StacktraceSource.",
     )
-    parser.add_argument(
-        "--retrieve-core",
-        help=(
-            "Debug processing a single uuid:provider_id."
-            "This does not touch Cassandra or the queue."
-        ),
-    )
     return parser.parse_args()
 
 
 def main():
     global log_output
     global root_handler
-    # should move to a configuration option
-    global failure_storage
 
     options = parse_options()
     if options.output:
@@ -1566,19 +1311,10 @@ def main():
         sys.stderr.close()
         sys.stderr = sys.stdout
 
-    failure_storage = ""
-    if options.core_storage:
-        if os.path.exists(options.core_storage):
-            failure_storage = options.core_storage
-
     logging.basicConfig(format=LOGGING_FORMAT, level=logging.INFO)
 
     try:
         msg = "Running"
-        if "revno" in daisy_version_info:
-            revno = daisy_version_info["revno"]
-            msg += " daisy revision number: %s" % revno
-            record_revno()
         if "revno" in apport_version_info:
             revno = apport_version_info["revno"]
             msg += " apport_revision number: %s" % revno
@@ -1600,12 +1336,7 @@ def main():
             options.stacktrace_source,
             failed=options.failed,
         )
-        if options.retrieve_core:
-            parts = options.one_off.split(":", 1)
-            path, oops_id = retracer.write_bucket_to_disk(parts[0], parts[1])
-            log("Wrote %s to %s. Exiting." % (path, oops_id))
-        else:
-            retracer.listen()
+        retracer.run_forever()
     except:
         # log if you want
         raise

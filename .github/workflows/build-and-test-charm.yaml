@@ -1,0 +1,103 @@
+name: Build and test charm
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - name: Install dependencies
+        run: sudo snap install ruff --classic
+      - name: Run linters
+        run: ruff check --preview .
+        working-directory: charm
+
+  lib-check:
+    name: Check libraries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          # fetch-depth: 0 # TODO optimize that for speed
+          persist-credentials: false
+      - name: Check libs
+        uses: canonical/charming-actions/check-libraries@1753e0803f70445132e92acd45c905aba6473225 # 2.7.0
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          charm-path: .
+
+  pack-charm:
+    name: Build charm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggressive cleanup to regain disk space
+        run: |
+          # Remove Java (JDKs)
+          sudo rm -rf /usr/lib/jvm
+          # Remove .NET SDKs
+          sudo rm -rf /usr/share/dotnet
+          # Remove Swift toolchain
+          sudo rm -rf /usr/share/swift
+          # Remove Haskell (GHC)
+          sudo rm -rf /usr/local/.ghcup
+          # Remove Julia
+          sudo rm -rf /usr/local/julia*
+          # Remove Android SDKs
+          sudo rm -rf /usr/local/lib/android
+          # Remove Chromium (optional if not using for browser tests)
+          sudo rm -rf /usr/local/share/chromium
+          # Remove Microsoft/Edge and Google Chrome builds
+          sudo rm -rf /opt/microsoft /opt/google
+
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+
+      - name: Setup LXD
+        uses: canonical/setup-lxd@a3c85fc6fb7fff43fcfeae87659e41a8f635b7dd
+
+      - name: Install ~~charmcraft~~spread
+        run: sudo snap install charmcraft --classic
+
+      - name: Pack charm
+        run: charmcraft pack -v
+
+      - name: Run charm tests
+        run: |
+          charmcraft.spread -v charm/tests/
+
+      - name: Upload charm artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: error-tracker.charm
+          path: "*.charm"
+
+      - name: Upload charm to charmhub
+        uses: canonical/charming-actions/upload-charm@1753e0803f70445132e92acd45c905aba6473225 # 2.7.0
+        with:
+          credentials: '${{ secrets.CHARMHUB_TOKEN }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          tag-prefix: ${{ matrix.charm }}
+          built-charm-path: error-tracker_ubuntu@24.04-amd64.charm
+        if: github.ref == 'refs/heads/main'

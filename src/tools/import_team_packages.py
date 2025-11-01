@@ -3,24 +3,16 @@
 from contextlib import suppress
 
 import requests
-from cassandra import ConsistencyLevel
-from cassandra.auth import PlainTextAuthProvider
-from cassandra.cluster import Cluster
 from launchpadlib.errors import ResponseError
 from launchpadlib.launchpad import Launchpad
 
-from daisy import config
+from errortracker import cassandra
 
-SRC_PACKAGE_TEAM_MAPPING = (
-    "https://ubuntu-archive-team.ubuntu.com/package-team-mapping.json"
-)
+SRC_PACKAGE_TEAM_MAPPING = "https://ubuntu-archive-team.ubuntu.com/package-team-mapping.json"
 
-auth_provider = PlainTextAuthProvider(
-    username=config.cassandra_username, password=config.cassandra_password
-)
-cluster = Cluster(config.cassandra_hosts, auth_provider=auth_provider)
-session = cluster.connect(config.cassandra_keyspace)
-session.default_consistency_level = ConsistencyLevel.LOCAL_ONE
+
+session = cassandra.cassandra_session()
+
 user_binary_packages_insert = session.prepare(
     'INSERT INTO "UserBinaryPackages" (key, column1, value) VALUES (?, ?, 0x)'
 )
@@ -52,9 +44,7 @@ def import_user_binary_packages(team_name, src_pkgs):
         with suppress(IndexError, ResponseError):
             binary_packages = get_binary_packages(src_pkg)
             for binary_package in binary_packages:
-                session.execute(
-                    user_binary_packages_insert, [team_name, binary_package]
-                )
+                session.execute(user_binary_packages_insert, [team_name, binary_package])
 
 
 if __name__ == "__main__":

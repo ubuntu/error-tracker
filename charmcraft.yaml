@@ -1,0 +1,72 @@
+name: error-tracker
+type: charm
+title: Error Tracker
+summary: The whole infrastructure collecting and processing crashes for Ubuntu
+description: |
+  The Error Tracker is made of the following components:
+    * daisy - receiving crashes
+    * web UI - displaying and visualizing data for developers
+    * timers - for processing and housekeeping tasks
+    * retracer - to get symbolic stacktraces out of coredumps
+
+  This charm can deploy either of those components depending on the
+  configuration. Default to deploying everything.
+links:
+  source:
+    - https://github.com/ubuntu/error-tracker/
+
+platforms:
+  ubuntu@24.04:amd64:
+
+parts:
+  error-tracker:
+    source: .
+    plugin: dump
+  charm:
+    source: .
+    plugin: charm
+    charm-entrypoint: charm/charm.py
+    charm-requirements: [charm_requirements.txt]
+
+charm-libs:
+  - lib: haproxy.haproxy_route
+    version: "1"
+
+config:
+  options:
+    enable_daisy:
+      description: |
+        Whether to enable the 'daisy' component of the Error Tracker
+      default: true
+      type: boolean
+    enable_retracer:
+      description: |
+        Whether to enable the 'retracer' component of the Error Tracker
+      default: true
+      type: boolean
+    enable_timers:
+      description: |
+        Whether to enable the 'timers' component of the Error Tracker
+      default: true
+      type: boolean
+    enable_web:
+      description: |
+        Whether to enable the 'web' component of the Error Tracker
+      default: true
+      type: boolean
+    configuration:
+      description: |
+        Full configuration file. Must be valid Python, will be imported directly by the errortracker.
+      default: ""
+      type: string
+    retracer_failed_queue:
+      description: |
+        Whether the retracer will listen on the "failed_retrace_<arch>" queue
+      default: false
+      type: boolean
+
+requires:
+  route_daisy:
+    interface: haproxy-route
+    limit: 1
+    optional: true

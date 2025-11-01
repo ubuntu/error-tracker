@@ -1,0 +1,6 @@
+summary: Run error tracker tests
+execute: |
+  pushd "$SPREAD_PATH"/src
+  python3 -m pytest -ra --cov=$(pwd) --cov-branch --cov-report=xml --durations=0 tests
+# artifacts:
+#   - coverage.xml
