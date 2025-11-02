@@ -1,7 +1,7 @@
 import logging
-import time
 
 import jubilant
+from tenacity import Retrying, stop_after_attempt, wait_exponential
 from utils import check_config
 
 logger = logging.getLogger()
@@ -72,18 +72,21 @@ def test_deploy(
         "00000000-1111-4222-3333-444444444444:swift",
         unit="rabbitmq-server/0",
     )
-    # Give some arbitrary time to process.
-    # For now I'm taking that cursed path, and depending on how flaky this
-    # becomes, I'll see later to implement a wait loop.
-    time.sleep(4)
-
-    # Verify that the retracer didn't Traceback and processed the sent crash
-    task = juju.exec("journalctl", "-u", "retracer@amd64.service", unit="retracer/0")
-    retracer_logs = task.stdout
-    assert "Waiting for messages in `retrace_amd64`" in retracer_logs, (
-        "retracer didn't reach waiting on amqp"
-    )
-    assert (
-        "00000000-1111-4222-3333-444444444444:swift:Failed to decompress core: Error -3 while decompressing data: incorrect header check"
-        in retracer_logs
-    ), "retracer didn't try to decompress the core. Either `swift` or `amqp` is broken."
+    # Let give this test a few chances to succeed, as it can sometimes be a bit
+    # slow to process the crash
+    for attempt in Retrying(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(min=5, max=30),
+        reraise=True,
+    ):
+        with attempt:
+            # Verify that the retracer didn't Traceback and processed the sent crash
+            task = juju.exec("journalctl", "-u", "retracer@amd64.service", unit="retracer/0")
+            retracer_logs = task.stdout
+            assert "Waiting for messages in `retrace_amd64`" in retracer_logs, (
+                "retracer didn't reach waiting on amqp"
+            )
+            assert (
+                "00000000-1111-4222-3333-444444444444:swift:Failed to decompress core: Error -3 while decompressing data: incorrect header check"
+                in retracer_logs
+            ), "retracer didn't try to decompress the core. Either `swift` or `amqp` is broken."
