@@ -75,11 +75,12 @@ def test_deploy(
     # Let give this test a few chances to succeed, as it can sometimes be a bit
     # slow to process the crash
     for attempt in Retrying(
-        stop=stop_after_attempt(5),
+        stop=stop_after_attempt(10),
         wait=wait_exponential(min=5, max=30),
         reraise=True,
     ):
         with attempt:
+            logger.warning(attempt.retry_state)
             # Verify that the retracer didn't Traceback and processed the sent crash
             task = juju.exec("journalctl", "-u", "retracer@amd64.service", unit="retracer/0")
             retracer_logs = task.stdout
