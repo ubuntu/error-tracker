@@ -83,6 +83,15 @@ if some sort of unattended upgrades are configured, but better double check as
 all is currently under change, and still has a lot of legacy.
 
 
+#### Refreshing the `CHARMCRAFT_TOKEN`
+
+The `CHARMCRAFT_TOKEN` is what allows the CI to push the charm to charmhub. If it expires, you can refresh it with the following:
+```
+charmcraft login --export=secrets.auth --charm=error-tracker  --permission=package-manage --permission=package-view --ttl=$((3600*24*365))
+cat secrets.auth
+```
+
+
 ### Archives and design
 
 Here is some archive documentation for you. New and up-to-date one hasn't
