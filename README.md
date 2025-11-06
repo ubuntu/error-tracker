@@ -56,6 +56,9 @@ CRASH_DB_URL=http://127.0.0.1:5000 APPORT_REPORT_DIR=$(pwd) CRASH_DB_IDENTIFIER=
 This will create a corresponding `.uploaded` file containing the OOPS ID, that
 you need to delete if you want to upload the crash again.
 
+If you don't know where to find crashes, have a look here:
+https://code.launchpad.net/~daisy-pluckers/+recipe/apport-test-crashes
+A sample is also available in `./tests/errortracker/integration/data/crash/`.
 
 ## More documentation
 
