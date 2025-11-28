@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_problem_for_hash
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get problem bucket for a hash
 hashed = "abc123def456"

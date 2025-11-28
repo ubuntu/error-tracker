@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_crash_count
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get crash count for Ubuntu 22.04
 start = 0

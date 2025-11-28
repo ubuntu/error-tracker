@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_package_new_buckets
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get new buckets for a package version
 src_pkg = "firefox"

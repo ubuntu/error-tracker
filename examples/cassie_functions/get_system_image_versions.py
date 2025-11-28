@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_system_image_versions
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get versions for a system image type
 image_type = "ubuntu-touch"

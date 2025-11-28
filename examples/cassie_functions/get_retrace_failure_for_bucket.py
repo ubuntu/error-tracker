@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_retrace_failure_for_bucket
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get retrace failure information
 bucketid = "example_bucket_id_12345"

@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_binary_packages_for_user
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get binary packages for a user
 user = "example_user_12345"

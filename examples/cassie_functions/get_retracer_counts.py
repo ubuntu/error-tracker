@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_retracer_counts
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get retracer counts for a date range
 start = 0
