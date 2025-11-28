@@ -31,8 +31,9 @@ class Indexes(ErrorTrackerTable):
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Blob(db_field="value")
 
-    def get_as_dict(*args, **kwargs) -> dict:
-        query = Indexes.objects.filter(*args, **kwargs)
+    @classmethod
+    def get_as_dict(cls, *args, **kwargs) -> dict:
+        query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
             # XXX: cassandra should be able to deserialize more properly by itself
@@ -43,7 +44,7 @@ class Indexes(ErrorTrackerTable):
             else:
                 d[result.column1] = result.value
         if not d:
-            raise Indexes.DoesNotExist
+            raise cls.DoesNotExist
         return d
 
 
@@ -81,11 +82,12 @@ class OOPS(ErrorTrackerTable):
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Text(db_field="value")
 
-    def get_as_dict(*args, **kwargs) -> dict:
-        query = OOPS.objects.filter(*args, **kwargs)
+    @classmethod
+    def get_as_dict(cls, *args, **kwargs) -> dict:
+        query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
-            d[result["column1"]] = result["value"]
+            d[result.column1] = result.value
         return d
 
 
@@ -109,11 +111,12 @@ class BucketMetadata(ErrorTrackerTable):
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Text(db_field="value")
 
-    def get_as_dict(*args, **kwargs) -> dict:
-        query = BucketMetadata.objects.filter(*args, **kwargs)
+    @classmethod
+    def get_as_dict(cls, *args, **kwargs) -> dict:
+        query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
-            d[result["column1"]] = result["value"]
+            d[result.column1] = result.value
         return d
 
 
@@ -130,11 +133,12 @@ class RetraceStats(ErrorTrackerTable):
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Counter(db_field="value")
 
-    def get_as_dict(*args, **kwargs) -> dict:
-        query = RetraceStats.objects.filter(*args, **kwargs)
+    @classmethod
+    def get_as_dict(cls, *args, **kwargs) -> dict:
+        query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
-            d[result["column1"]] = result["value"]
+            d[result.column1] = result.value
         return d
 
 
@@ -182,11 +186,12 @@ class BucketRetraceFailureReason(ErrorTrackerTable):
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Text(db_field="value")
 
-    def get_as_dict(*args, **kwargs) -> dict:
-        query = BucketRetraceFailureReason.objects.filter(*args, **kwargs)
+    @classmethod
+    def get_as_dict(cls, *args, **kwargs) -> dict:
+        query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
-            d[result["column1"]] = result["value"]
+            d[result.column1] = result.value
         return d
 
 
@@ -195,3 +200,45 @@ class AwaitingRetrace(ErrorTrackerTable):
     key = columns.Text(db_field="key", primary_key=True)
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Text(db_field="value")
+
+
+class ErrorsByRelease(ErrorTrackerTable):
+    __table_name__ = "ErrorsByRelease"
+    key = columns.Blob(db_field="key", primary_key=True)
+    column1 = columns.TimeUUID(db_field="column1", primary_key=True)
+    value = columns.Blob(db_field="value")
+
+
+class BucketVersionsCount(ErrorTrackerTable):
+    __table_name__ = "BucketVersionsCount"
+    key = columns.Blob(db_field="key", primary_key=True)
+    column1 = columns.Text(db_field="column1", primary_key=True)
+    value = columns.Counter(db_field="value")
+
+
+class BugToCrashSignatures(ErrorTrackerTable):
+    __table_name__ = "BugToCrashSignatures"
+    key = columns.Blob(db_field="key", primary_key=True)
+    column1 = columns.Text(db_field="column1", primary_key=True)
+    value = columns.Blob(db_field="value")
+
+
+class SystemImages(ErrorTrackerTable):
+    __table_name__ = "SystemImages"
+    key = columns.Blob(db_field="key", primary_key=True)
+    column1 = columns.Text(db_field="column1", primary_key=True)
+    value = columns.Blob(db_field="value")
+
+
+class UniqueUsers90Days(ErrorTrackerTable):
+    __table_name__ = "UniqueUsers90Days"
+    key = columns.Blob(db_field="key", primary_key=True)
+    column1 = columns.Text(db_field="column1", primary_key=True)
+    value = columns.Counter(db_field="value")
+
+
+class UserBinaryPackages(ErrorTrackerTable):
+    __table_name__ = "UserBinaryPackages"
+    key = columns.Blob(db_field="key", primary_key=True)
+    column1 = columns.Text(db_field="column1", primary_key=True)
+    value = columns.Blob(db_field="value")
