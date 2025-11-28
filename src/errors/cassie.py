@@ -800,34 +800,38 @@ def get_package_crash_rate(
 
 def get_package_new_buckets(src_pkg, previous_version, new_version):
     results = []
+    
+    # Ensure src_pkg and versions are strings for Ascii fields
+    src_pkg_str = src_pkg if isinstance(src_pkg, str) else src_pkg.decode("utf-8")
+    new_version_str = new_version if isinstance(new_version, str) else new_version.decode("utf-8")
+    previous_version_str = previous_version if isinstance(previous_version, str) else previous_version.decode("utf-8")
+    
     # new version has no buckets
     try:
-        new_rows = SourceVersionBuckets.objects.filter(key=src_pkg, key2=new_version).all()
+        new_rows = SourceVersionBuckets.objects.filter(key=src_pkg_str, key2=new_version_str).all()
         n_data = [row.column1 for row in new_rows]
     except (KeyError, DoesNotExist):
         return results
     
     # if previous version has no buckets return an empty list
     try:
-        prev_rows = SourceVersionBuckets.objects.filter(key=src_pkg, key2=previous_version).all()
+        prev_rows = SourceVersionBuckets.objects.filter(key=src_pkg_str, key2=previous_version_str).all()
         p_data = [row.column1 for row in prev_rows]
     except (KeyError, DoesNotExist):
         p_data = []
 
     new_buckets = set(n_data).difference(set(p_data))
     for bucket in new_buckets:
-        if isinstance(bucket, str):
-            bucket_bytes = bucket.encode("utf-8")
-        else:
-            bucket_bytes = bucket
         # do not return buckets that failed to retrace
-        if bucket_bytes.startswith(b"failed:") if isinstance(bucket_bytes, bytes) else bucket.startswith("failed:"):
+        bucket_str = bucket if isinstance(bucket, str) else bucket.decode("utf-8") if isinstance(bucket, bytes) else str(bucket)
+        if bucket_str.startswith("failed:"):
             continue
         
-        new_version_str = new_version if isinstance(new_version, str) else new_version.decode("utf-8")
+        # BucketVersionSystems2 expects key as Text (string)
+        bucket_key = bucket if isinstance(bucket, str) else bucket.decode("utf-8") if isinstance(bucket, bytes) else str(bucket)
         try:
             count_rows = BucketVersionSystems2.objects.filter(
-                key=bucket, key2=new_version_str
+                key=bucket_key, key2=new_version_str
             ).limit(4).all()
             count = len(list(count_rows))
         except DoesNotExist:
