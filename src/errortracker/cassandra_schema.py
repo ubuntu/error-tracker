@@ -30,8 +30,9 @@ class Indexes(ErrorTrackerTable):
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Blob(db_field="value")
 
-    def get_as_dict(*args, **kwargs) -> dict:
-        query = Indexes.objects.filter(*args, **kwargs)
+    @classmethod
+    def get_as_dict(cls, *args, **kwargs) -> dict:
+        query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
             if result.key == b"mean_retracing_time" and not result.column1.endswith("count"):
@@ -41,7 +42,7 @@ class Indexes(ErrorTrackerTable):
             else:
                 d[result.column1] = result.value
         if not d:
-            raise Indexes.DoesNotExist
+            raise cls.DoesNotExist
         return d
 
 
@@ -79,8 +80,9 @@ class OOPS(ErrorTrackerTable):
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Text(db_field="value")
 
-    def get_as_dict(*args, **kwargs) -> dict:
-        query = OOPS.objects.filter(*args, **kwargs)
+    @classmethod
+    def get_as_dict(cls, *args, **kwargs) -> dict:
+        query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
             d[result["column1"]] = result["value"]
@@ -107,8 +109,9 @@ class BucketMetadata(ErrorTrackerTable):
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Text(db_field="value")
 
-    def get_as_dict(*args, **kwargs) -> dict:
-        query = BucketMetadata.objects.filter(*args, **kwargs)
+    @classmethod
+    def get_as_dict(cls, *args, **kwargs) -> dict:
+        query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
             d[result["column1"]] = result["value"]
@@ -128,8 +131,9 @@ class RetraceStats(ErrorTrackerTable):
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Counter(db_field="value")
 
-    def get_as_dict(*args, **kwargs) -> dict:
-        query = RetraceStats.objects.filter(*args, **kwargs)
+    @classmethod
+    def get_as_dict(cls, *args, **kwargs) -> dict:
+        query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
             d[result["column1"]] = result["value"]
@@ -180,8 +184,9 @@ class BucketRetraceFailureReason(ErrorTrackerTable):
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Text(db_field="value")
 
-    def get_as_dict(*args, **kwargs) -> dict:
-        query = BucketRetraceFailureReason.objects.filter(*args, **kwargs)
+    @classmethod
+    def get_as_dict(cls, *args, **kwargs) -> dict:
+        query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
             d[result["column1"]] = result["value"]
