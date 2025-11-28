@@ -5,6 +5,7 @@ from daisy.submit import submit
 from daisy.submit_core import submit_core
 from errortracker import cassandra, config
 
+cassandra.setup_cassandra()
 config.logger.addHandler(default_handler)
 app = Flask(__name__)
 
@@ -20,7 +21,6 @@ def handle_submit_core(oopsid, architecture, system_token):
 
 
 def __main__():
-    cassandra.setup_cassandra()
     app.run(host="0.0.0.0", debug=True)
 
 
