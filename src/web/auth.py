@@ -1,4 +1,4 @@
-from django.contrib.auth.decorators import user_passes_test, login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 
 groups = [
     "daisy-pluckers",
@@ -13,6 +13,7 @@ groups = [
 
 
 def can_see_stacktraces(func):
-    in_groups = lambda u: u.groups.filter(name__in=groups).count() > 0
+    def in_groups(u):
+        return u.groups.filter(name__in=groups).count() > 0
     l = "/login-failed"
     return login_required(user_passes_test(in_groups, login_url=l)(func))

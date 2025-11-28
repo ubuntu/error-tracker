@@ -1,5 +1,6 @@
 # Django settings for errors project.
 import os
+
 from daisy import config
 
 ALLOWED_HOSTS = config.allowed_hosts

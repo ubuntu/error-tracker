@@ -1,6 +1,7 @@
 #!/usr/bin/python
-from functools import wraps
 import time
+from functools import wraps
+
 from daisy import metrics as daisy_metrics
 
 
@@ -63,8 +64,9 @@ def measure_view(view):
 
 
 def revno(namespace="errors"):
-    from errors.version import version_info
     import socket
+
+    from errors.version import version_info
 
     if "revno" in version_info:
         m = "%s.version.errors" % socket.gethostname()

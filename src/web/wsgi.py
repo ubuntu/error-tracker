@@ -1,16 +1,15 @@
 import os
+
+import oops_dictconfig
+from errors import metrics
+from errors.version_middleware import VersionMiddleware
 from oops_wsgi import install_hooks, make_app
 from oops_wsgi.django import OOPSWSGIHandler
-import oops_dictconfig
 
 from daisy import config
-from errors.version_middleware import VersionMiddleware
-from errors import metrics
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "errors.settings")
 import django.core.handlers.wsgi
-from django.conf import settings
-
 from django.template.loader import render_to_string
 
 

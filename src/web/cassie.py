@@ -1,23 +1,24 @@
 import datetime
-import numpy
 import operator
-import pycassa
 import sys
 import time
-import urllib.request, urllib.parse, urllib.error
+import urllib.error
+import urllib.parse
+import urllib.request
+from functools import cmp_to_key
+
+import numpy
+import pycassa
 from pycassa.cassandra.ttypes import NotFoundException
 from pycassa.util import OrderedDict
 
 from daisy import config
 from daisy import metrics as daisy_metrics
-from functools import cmp_to_key
 
 pool = daisy_metrics.wrapped_connection_pool("errors")
 
-from cassandra import ConsistencyLevel
-from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
-from cassandra.query import SimpleStatement
+from cassandra.cluster import Cluster
 
 auth_provider = PlainTextAuthProvider(
     username=config.cassandra_username, password=config.cassandra_password

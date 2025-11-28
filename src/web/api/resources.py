@@ -1,34 +1,35 @@
 # Treat strings as UTF-8 instead of ASCII
+import importlib
 import sys
 from functools import cmp_to_key
-import importlib
 
 importlib.reload(sys)
 sys.setdefaultencoding("UTF8")
 
-from tastypie.resources import Resource
-from tastypie.exceptions import NotFound
-from tastypie import fields
-from tastypie.authentication import SessionAuthentication, Authentication
-from tastypie.authorization import DjangoAuthorization, Authorization
 from errors import cassie
+from tastypie import fields
+from tastypie.authentication import Authentication, SessionAuthentication
+from tastypie.authorization import Authorization, DjangoAuthorization
+from tastypie.exceptions import NotFound
+from tastypie.resources import Resource
 
 TASTYPIE_FULL_DEBUG = True
 
-from django.core.serializers import json
-from tastypie.serializers import Serializer
-from ..metrics import measure_view
-from daisy import launchpad, config
-from operator import itemgetter
-import apt
 import datetime
 import json as simplejson
-from hashlib import sha1
-from urllib.parse import quote
-from urllib.parse import unquote
-
-from urllib.error import HTTPError
 from collections import OrderedDict
+from hashlib import sha1
+from operator import itemgetter
+from urllib.error import HTTPError
+from urllib.parse import quote, unquote
+
+import apt
+from django.core.serializers import json
+from tastypie.serializers import Serializer
+
+from daisy import config, launchpad
+
+from ..metrics import measure_view
 
 release_color_mapping = OrderedDict()
 
@@ -871,7 +872,7 @@ class ReportsStateResource(ErrorsResource):
         release = bundle.data.get("release", None)
         result = {}
         for report in reports:
-            report_fixed = launchpad.bug_is_fixed(report, release)
+            launchpad.bug_is_fixed(report, release)
             result[report] = (
                 launchpad.bug_is_fixed(report, release),
                 launchpad.bug_get_master_id(report),
@@ -1067,7 +1068,6 @@ class VersionsResource(ErrorsResource):
                 bucketid = bundle.request.GET.get("id", None)
                 vers = cassie.get_versions_for_bucket(bucketid)
                 src_pkg = cassie.get_source_package_for_bucket(bucketid)
-                total_total = 0
                 results = {}
                 # store package versions for later sorting
                 versions = []

@@ -4,11 +4,13 @@ function that begins with 'check_' will automatically be called as part of the
 '/status' URL.
 """
 
-from django.test.client import Client
-from json import loads
-from daisy import config
-import os
 import datetime
+import os
+from json import loads
+
+from django.test.client import Client
+
+from daisy import config
 
 c = Client()
 
@@ -83,6 +85,7 @@ def check_average_crashes():
 def check_buckets():
     from django.contrib.auth.models import Group
     from django.test.client import RequestFactory
+
     from .views import bucket
 
     b = (
