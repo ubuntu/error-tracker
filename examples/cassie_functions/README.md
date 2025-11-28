@@ -12,9 +12,14 @@ These scripts provide:
 ## Important Notes
 
 ⚠️ **These are example scripts only** - They demonstrate the API but won't run successfully without:
-- A properly configured Cassandra database connection
+- A properly configured Cassandra database connection (configured via `errortracker.config`)
 - Valid data in the database
 - Required dependencies installed (cassandra-driver, numpy, etc.)
+
+Each script includes a call to `setup_cassandra()` which initializes the Cassandra connection before using any functions. This function:
+- Sets up the database connection using credentials from the configuration
+- Synchronizes the database schema
+- Ensures the connection is ready for queries
 
 ## Structure
 

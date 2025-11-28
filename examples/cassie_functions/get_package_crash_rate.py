@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_package_crash_rate
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get crash rate for a package update
 release = "Ubuntu 22.04"

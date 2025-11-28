@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_signatures_for_bug
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get crash signatures for a bug
 bug = 123456  # Launchpad bug number

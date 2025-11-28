@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_crash
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get crash details
 oopsid = "example_oops_id_12345"

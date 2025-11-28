@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_user_crashes
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get crashes for a specific user
 user_token = "example_user_token_12345"

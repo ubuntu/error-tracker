@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_metadata_for_buckets
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get metadata for multiple buckets
 bucketids = ["bucket_1", "bucket_2", "bucket_3"]

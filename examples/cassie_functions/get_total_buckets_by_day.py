@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_total_buckets_by_day
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get bucket counts for the past 7 days
 start = 0

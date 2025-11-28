@@ -4,7 +4,11 @@
 import sys
 sys.path.insert(0, '../../src')
 
+from errortracker.cassandra import setup_cassandra
 from errors.cassie import get_average_crashes
+
+# Setup Cassandra connection
+setup_cassandra()
 
 # Example: Get average crashes per user
 field = "Ubuntu 22.04"
