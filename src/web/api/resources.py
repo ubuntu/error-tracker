@@ -1,6 +1,8 @@
 # Treat strings as UTF-8 instead of ASCII
 import sys
-reload(sys)
+from functools import cmp_to_key
+import importlib
+importlib.reload(sys)
 sys.setdefaultencoding('UTF8')
 
 from tastypie.resources import Resource
@@ -21,10 +23,10 @@ import apt
 import datetime
 import json as simplejson
 from hashlib import sha1
-from urllib import quote
-from urllib import unquote
+from urllib.parse import quote
+from urllib.parse import unquote
 
-from urllib2 import HTTPError
+from urllib.error import HTTPError
 from collections import OrderedDict
 
 release_color_mapping = OrderedDict()
@@ -426,7 +428,7 @@ class MostCommonProblemsResource(ErrorsResource):
             if first_appearance:
                 if m.get('FirstSeen', '') != version:
                     continue
-            if isinstance(bucket, unicode):
+            if isinstance(bucket, str):
                 bucket = bucket.encode('utf-8')
             hashed = sha1(bucket).hexdigest()
             if cassie.get_problem_for_hash(hashed):
@@ -627,7 +629,7 @@ class PackageVersionNewBuckets(ErrorsResource):
         buckets = cassie.get_package_new_buckets(src_package,
                     previous_version, new_version)
         for bucket in buckets:
-            if isinstance(bucket, unicode):
+            if isinstance(bucket, str):
                 bucket = bucket.encode('utf-8')
             hashed = sha1(bucket).hexdigest()
             if cassie.get_problem_for_hash(hashed):
@@ -720,7 +722,7 @@ class AverageCrashesResource(ErrorsResource):
                         for item in recoverables:
                             if item[0] in results:
                                 results[item[0]] -= item[1]
-                        results = sorted(results.items(), cmp=lambda x,y: cmp(x[0], y[0]))
+                        results = sorted(list(results.items()), key=cmp_to_key(lambda x,y: cmp(x[0], y[0])))
 
                         res = [{'x': result[0] * 1000, 'y': result[1]} for result in results]
                         d = {'key' : '%s (by 12.04 standards)' % release,
@@ -747,7 +749,7 @@ class AverageInstancesResource(ErrorsResource):
         class wrapped(list):
             def __getslice__(klass, start, finish):
                 bucketid = unquote(bundle.request.GET.get('id', None))
-                for release, color in release_color_mapping.iteritems():
+                for release, color in release_color_mapping.items():
                     r = cassie.get_average_instances(bucketid, release, 360)
                     values = [{'x': i[0] * 1000, 'y': i[1]} for i in r]
                     d = {'key': release, 'values': values, 'color': color}
@@ -806,7 +808,7 @@ class PackageVersionIsMostRecent(ErrorsResource):
         result = {}
         def map_results(p, state):
             result[p['package'] + ' ' + p['last_seen']] = state
-        map(map_results, packages, most_recent)
+        list(map(map_results, packages, most_recent))
         bundle.obj.packages = result
         return bundle
 
@@ -834,7 +836,7 @@ class ReleasePackageVersionPockets(ErrorsResource):
         result = {}
         def map_results(p, location):
             result[p['package'] + ' ' + p['seen'] + ' ' + p['release']] = location
-        map(map_results, packages_data, pocket)
+        list(map(map_results, packages_data, pocket))
         bundle.obj.packages_data = result
         return bundle
 
@@ -874,7 +876,7 @@ class InstancesResource(ErrorsResource):
                 cols = ['DistroRelease', 'Package', 'Architecture']
                 gen = cassie.get_crashes_for_bucket(bucketid, start=start)
                 for oops in gen:
-                    ts = (oops.time - 0x01b21dd213814000L)*100/1e9
+                    ts = (oops.time - 0x01b21dd213814000)*100/1e9
                     ts = datetime.datetime.utcfromtimestamp(ts)
                     d = cassie.get_crash(str(oops), columns=cols)
                     ver = split_package_and_version(d.get('Package', ''))[1]
@@ -969,13 +971,13 @@ class VersionsResource(ErrorsResource):
                     self.update(results, version, release, codename, total, src_pkg)
                     # Produce totals for all Ubuntu releases as the last row.
                     self.update(results, 'All versions', release, codename, total)
-                versions.sort(cmp=apt.apt_pkg.version_compare)
+                versions.sort(key=cmp_to_key(apt.apt_pkg.version_compare))
                 if vers:
                     versions.append('All versions')
                     oresults = OrderedDict()
                     for version in versions:
                         oresults[version] = results[version]
-                    return oresults.values()
+                    return list(oresults.values())
                 else:
                     return {}
 

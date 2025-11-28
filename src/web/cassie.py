@@ -4,12 +4,13 @@ import operator
 import pycassa
 import sys
 import time
-import urllib
+import urllib.request, urllib.parse, urllib.error
 from pycassa.cassandra.ttypes import NotFoundException
 from pycassa.util import OrderedDict
 
 from daisy import config
 from daisy import metrics as daisy_metrics
+from functools import cmp_to_key
 pool = daisy_metrics.wrapped_connection_pool('errors')
 
 from cassandra import ConsistencyLevel
@@ -141,7 +142,7 @@ def get_bucket_counts (release=None, package=None, version=None, pkg_arch=None,
             except NotFoundException:
                 break
 
-            for column, count in result.iteritems():
+            for column, count in result.items():
                 if not show_failed and column.startswith('failed'):
                     continue
                 column = column.encode('utf-8')
@@ -154,7 +155,7 @@ def get_bucket_counts (release=None, package=None, version=None, pkg_arch=None,
             start = column + '0'
             if len(result) < batch_size:
                 break
-    return sorted(results.items(), cmp=lambda x, y: cmp(x[1], y[1]), reverse=True)
+    return sorted(list(results.items()), key=cmp_to_key(lambda x, y: cmp(x[1], y[1])), reverse=True)
 
 def get_crashes_for_bucket (bucketid, limit=100, start=None):
     '''
@@ -167,13 +168,13 @@ def get_crashes_for_bucket (bucketid, limit=100, start=None):
     try:
         if start:
             start = pycassa.util.uuid.UUID(start)
-            return bucket_cf.get(bucketid,
+            return list(bucket_cf.get(bucketid,
                                  column_start=start,
                                  column_count=limit,
-                                 column_reversed=True).keys()[1:]
+                                 column_reversed=True).keys())[1:]
         else:
-            return bucket_cf.get(bucketid, column_count=limit,
-                                 column_reversed=True).keys()
+            return list(bucket_cf.get(bucketid, column_count=limit,
+                                 column_reversed=True).keys())
     except NotFoundException:
         return []
 
@@ -184,7 +185,7 @@ def get_package_for_bucket (bucketid):
     oops_cf = pycassa.ColumnFamily(pool, 'OOPS')
     # Grab 5 OOPS IDs, just in case the first one doesn't have a Package field.
     try:
-        oopsids = bucket_cf.get(bucketid, column_count=5).keys()
+        oopsids = list(bucket_cf.get(bucketid, column_count=5).keys())
     except NotFoundException:
         return ('', '')
     for oopsid in oopsids:
@@ -272,7 +273,7 @@ def get_retracer_count(date):
 
 def get_retracer_counts(start, finish):
     retracestats_cf = pycassa.ColumnFamily(pool, 'RetraceStats')
-    if finish == sys.maxint:
+    if finish == sys.maxsize:
         start = datetime.date.today() - datetime.timedelta(days=start)
         start = start.strftime('%Y%m%d')
         results = retracestats_cf.get_range()
@@ -313,7 +314,7 @@ def get_retracer_means(start, finish):
                     branch[part] = to_float(timings[timing])
                 else:
                     branch = branch.setdefault(part, {})
-    return result.iteritems()
+    return iter(result.items())
 
 def get_crash_count(start, finish, release=None):
     counters_cf = pycassa.ColumnFamily(pool, 'Counters')
@@ -349,7 +350,7 @@ def chunks(l, n):
     # http://stackoverflow.com/a/312464/190597
     """ Yield successive n-sized chunks from l.
     """
-    for i in xrange(0, len(l), n):
+    for i in range(0, len(l), n):
         yield l[i:i+n]
 
 def get_metadata_for_buckets(bucketids, release=None):
@@ -392,10 +393,10 @@ def get_user_crashes(user_token, limit=50, start=None):
                                      include_timestamp=True)
         for r in result:
             results[r] = {'submitted': result[r]}
-        start = result.keys()[-1] + '0'
+        start = list(result.keys())[-1] + '0'
     except NotFoundException:
         return []
-    return [(k[0], k[1]) for k in sorted(results.iteritems(), key=operator.itemgetter(1),
+    return [(k[0], k[1]) for k in sorted(iter(results.items()), key=operator.itemgetter(1),
             reverse=True)]
 
 def get_average_crashes(field, release, days=7):
@@ -460,7 +461,7 @@ def get_versions_for_bucket(bucketid):
 def get_source_package_for_bucket(bucketid):
     oops_cf = pycassa.ColumnFamily(pool, 'OOPS')
     bucket_cf = pycassa.ColumnFamily(pool, 'Bucket')
-    oopsids = bucket_cf.get(bucketid, column_count=10).keys()
+    oopsids = list(bucket_cf.get(bucketid, column_count=10).keys())
     for oopsid in oopsids:
         try:
             oops = oops_cf.get(str(oopsid), columns=['SourcePackage'])
@@ -497,7 +498,7 @@ def get_binary_packages_for_user(user):
     for result in results:
         if results[result] == 0:
             del results[result]
-    return [k[0:-7] for k in results.keys()]
+    return [k[0:-7] for k in list(results.keys())]
 
 def get_package_crash_rate(release, src_package, old_version, new_version,
                            pup, date, absolute_uri, exclude_proposed=False):
@@ -562,12 +563,12 @@ def get_package_crash_rate(release, src_package, old_version, new_version,
         # no previous version data so the diff is today's amount
         results['difference'] = today_crashes
         web_link = '?release=%s&package=%s&version=%s' % \
-            (urllib.quote(release), urllib.quote(src_package),
-             urllib.quote(new_version))
+            (urllib.parse.quote(release), urllib.parse.quote(src_package),
+             urllib.parse.quote(new_version))
         results['web_link'] = absolute_uri + web_link
         return results
     first_date = date
-    oldest_date = old_vers_data.keys()[-1]
+    oldest_date = list(old_vers_data.keys())[-1]
     dates = [x for x in _date_range_iterator(oldest_date, first_date)]
     previous_vers_crashes = []
     previous_days = len(dates[:-1])
@@ -612,8 +613,8 @@ def get_package_crash_rate(release, src_package, old_version, new_version,
         results['increase'] = True
         results['difference'] = difference
         web_link = '?release=%s&package=%s&version=%s' % \
-            (urllib.quote(release), urllib.quote(src_package),
-             urllib.quote(new_version))
+            (urllib.parse.quote(release), urllib.parse.quote(src_package),
+             urllib.parse.quote(new_version))
         results['web_link'] = absolute_uri + web_link
         results['previous_period_in_days'] = previous_days
         results['previous_average'] = standard_crashes
@@ -636,12 +637,12 @@ def get_package_new_buckets(src_pkg, previous_version, new_version):
 
     new_buckets = set(n_data).difference(set(p_data))
     for bucket in new_buckets:
-        if isinstance(bucket, unicode):
+        if isinstance(bucket, str):
             bucket = bucket.encode('utf-8')
         # do not return buckets that failed to retrace
         if bucket.startswith('failed:'):
             continue
-        if isinstance(new_version, unicode):
+        if isinstance(new_version, str):
             new_version = new_version.encode('utf-8')
         try:
             count = len(bucketversionsystems_cf.get((bucket, new_version), column_count=4))

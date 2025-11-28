@@ -7,7 +7,7 @@ from daisy.launchpad import bug_get_master_id
 from errors.metrics import measure_view
 from pycassa.util import OrderedDict
 from errors.auth import can_see_stacktraces
-from urllib import quote
+from urllib.parse import quote
 
 
 def common_c():
@@ -118,7 +118,7 @@ def login_failed(request):
     return HttpResponseRedirect('/?login-failed=true')
 
 def status(request):
-    import status
+    from . import status
     from types import FunctionType
     funcs = [getattr(status, x, None) for x in dir(status)
                 if isinstance(getattr(status, x, None), FunctionType)
@@ -128,7 +128,7 @@ def status(request):
         if not x():
             if not failed_msg:
                 failed_msg = 'HELP ME!\n\nfailing:\n'
-            failed_msg = '%s%s\n' % (failed_msg, str(x.func_name))
+            failed_msg = '%s%s\n' % (failed_msg, str(x.__name__))
     if failed_msg:
         return HttpResponse(failed_msg, status=400, content_type='text/plain')
     return HttpResponse('OK')

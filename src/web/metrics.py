@@ -28,7 +28,7 @@ def measure_view(view):
         if 'resource_name' in kwargs:
             name = kwargs['resource_name']
         else:
-            name = view.func_name
+            name = view.__name__
 
         if len(args) > 2 and hasattr(args[2], 'user'):
             user = 'users.%s.' % str(args[2].user)

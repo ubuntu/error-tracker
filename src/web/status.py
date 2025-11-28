@@ -81,7 +81,7 @@ def check_average_crashes():
 def check_buckets():
     from django.contrib.auth.models import Group
     from django.test.client import RequestFactory
-    from views import bucket
+    from .views import bucket
 
     b = ('/usr/bin/lsb_release:IOError:<module>:main:'
          'check_modules_installed:getoutput:getstatusoutput')
