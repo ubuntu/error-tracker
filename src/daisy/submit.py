@@ -401,7 +401,7 @@ def bucket(oops_id, data, day_key):
                     "StacktraceTop",
                 )
                 for unneeded_column in unneeded_columns:
-                    cassandra_schema.OOPS.delete(key=oops_id.encode(), column1=unneeded_column)
+                    cassandra_schema.OOPS.filter(key=oops_id.encode(), column1=unneeded_column).delete()
             # We have already retraced for this address signature, so this
             # crash can be immediately bucketed.
             utils.bucket(oops_id, crash_sig, data)
