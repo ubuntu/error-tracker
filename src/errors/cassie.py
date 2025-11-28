@@ -846,15 +846,18 @@ def record_bug_for_bucket(bucketid, bug):
     # We don't insert bugs into the database if we're using Launchpad staging,
     # as those will disappear in Launchpad but our copy would persist.
     if config.lp_use_staging == "False":
+        # Prepare keys with proper encoding
         bucket_key = bucketid.encode() if isinstance(bucketid, str) else bucketid
         bug_key = str(int(bug)).encode()
-        bucketid_encoded = bucketid.encode() if isinstance(bucketid, str) else bucketid
+        
+        # BugToCrashSignatures expects column1 as Text (string)
+        bucketid_str = bucketid if isinstance(bucketid, str) else bucketid.decode("utf-8")
         
         # Insert into BucketMetadata
         BucketMetadata.create(key=bucket_key, column1="CreatedBug", value=bug)
         
         # Insert into BugToCrashSignatures
-        BugToCrashSignatures.create(key=bug_key, column1=bucketid_encoded.decode() if isinstance(bucketid_encoded, bytes) else bucketid_encoded, value=b"")
+        BugToCrashSignatures.create(key=bug_key, column1=bucketid_str, value=b"")
 
 
 def get_signatures_for_bug(bug):
