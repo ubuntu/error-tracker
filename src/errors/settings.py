@@ -1,11 +1,13 @@
 # Django settings for errors project.
 import os
 
-from daisy import config
+from errortracker import config, cassandra
 
-ALLOWED_HOSTS = config.allowed_hosts
+cassandra.setup_cassandra()
 
-DATABASES = config.django_databases
+ALLOWED_HOSTS = ["*"]
+
+# DATABASES = config.django_databases
 
 PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 
@@ -37,7 +39,7 @@ STATIC_ROOT = "%s" % os.path.join(PROJECT_ROOT, "../static")
 
 # URL prefix for static files.
 # Example: "http://media.lawrence.com/static/"
-STATIC_URL = config.errors_static_url
+STATIC_URL = "/static/"
 
 # URL prefix for admin static files -- CSS, JavaScript and images.
 # Make sure to use a trailing slash.
@@ -116,7 +118,7 @@ INSTALLED_APPS = (
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
     "errors",
-    "django_openid_auth",
+    # "django_openid_auth",
 )
 
 # Force HTTPS when the X-Forwarded-Proto header is set to https

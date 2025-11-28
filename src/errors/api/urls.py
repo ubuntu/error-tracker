@@ -1,4 +1,5 @@
-from django.conf.urls import include, url
+from django.conf.urls import include
+from django.urls import re_path
 from tastypie.api import Api
 
 from .resources import (
@@ -49,5 +50,5 @@ v1_api.register(SystemImageVersionsResource())
 v1_api.register(ReleasePackageVersionPockets())
 
 urlpatterns = [
-    url(r"^", include(v1_api.urls)),
+    re_path(r"^", include(v1_api.urls)),
 ]

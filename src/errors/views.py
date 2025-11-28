@@ -1,13 +1,14 @@
 from urllib.parse import quote
 
-from daisy.launchpad import bug_get_master_id
 from django.conf import settings
 from django.contrib.auth import logout
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
+
 from errors import cassie, version
 from errors.auth import can_see_stacktraces
 from errors.metrics import measure_view
+from errortracker.launchpad import bug_get_master_id
 
 
 def common_c():

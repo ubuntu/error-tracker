@@ -4,14 +4,14 @@ import sys
 from functools import cmp_to_key
 
 importlib.reload(sys)
-sys.setdefaultencoding("UTF8")
 
-from errors import cassie
 from tastypie import fields
 from tastypie.authentication import Authentication, SessionAuthentication
 from tastypie.authorization import Authorization, DjangoAuthorization
 from tastypie.exceptions import NotFound
 from tastypie.resources import Resource
+
+from errors import cassie
 
 TASTYPIE_FULL_DEBUG = True
 
@@ -27,7 +27,7 @@ import apt
 from django.core.serializers import json
 from tastypie.serializers import Serializer
 
-from daisy import config, launchpad
+from errortracker import config, launchpad
 
 from ..metrics import measure_view
 

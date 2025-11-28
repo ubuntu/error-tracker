@@ -8,23 +8,14 @@ import urllib.request
 from functools import cmp_to_key
 
 import numpy
-import pycassa
-from pycassa.cassandra.ttypes import NotFoundException
-from pycassa.util import OrderedDict
 
-from daisy import config
-from daisy import metrics as daisy_metrics
+# TODO: port that to the cassandra module
+# import pycassa
+# from pycassa.cassandra.ttypes import NotFoundException
+# from pycassa.util import OrderedDict
+from errortracker import cassandra, config
 
-pool = daisy_metrics.wrapped_connection_pool("errors")
-
-from cassandra.auth import PlainTextAuthProvider
-from cassandra.cluster import Cluster
-
-auth_provider = PlainTextAuthProvider(
-    username=config.cassandra_username, password=config.cassandra_password
-)
-cluster = Cluster(config.cassandra_hosts, auth_provider=auth_provider)
-session = cluster.connect(config.cassandra_keyspace)
+session = cassandra.cassandra_session()
 
 
 def _split_into_dictionaries(original):

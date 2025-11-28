@@ -8,9 +8,8 @@ from functools import cmp_to_key
 import apt
 import httplib2
 from lazr.restfulclient._browser import AtomicFileCache
-from oauth import oauth
 
-from daisy import config
+from errortracker import config
 
 if (
     not hasattr(config, "lp_oauth_token")
@@ -547,6 +546,8 @@ def _generate_operation(title, description, target=_ubuntu_target, tags=[""]):
 
 
 def _generate_headers(oauth_token, oauth_secret):
+    from oauth import oauth
+
     a = (
         'OAuth realm="%s", '
         'oauth_consumer_key="testing", '
