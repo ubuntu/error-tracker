@@ -1,5 +1,6 @@
 import datetime
 import operator
+import struct
 import sys
 import time
 import urllib.error
@@ -188,7 +189,7 @@ def get_bucket_counts(
             continue
     
     return sorted(
-        list(results.items()), key=cmp_to_key(lambda x, y: (x[1] > y[1]) - (x[1] < y[1])), reverse=True
+        list(results.items()), key=lambda x: x[1], reverse=True
     )
 
 
@@ -235,7 +236,10 @@ def get_package_for_bucket(bucketid):
         try:
             oops_rows = OOPS.objects.filter(key=str(oopsid).encode(), column1="Package").all()
             for row in oops_rows:
-                package_and_version = row.value.split()[:2]
+                value = row.value
+                if isinstance(value, bytes):
+                    value = value.decode('utf-8')
+                package_and_version = value.split()[:2]
                 if len(package_and_version) == 1:
                     return (package_and_version[0], "")
                 else:
@@ -274,8 +278,8 @@ def get_crash(oopsid, columns=None):
         return oops
     
     try:
-        idx = b"crash_signature_for_stacktrace_address_signature"
-        index_rows = Indexes.objects.filter(key=idx, column1=SAS).all()
+        index_key = b"crash_signature_for_stacktrace_address_signature"
+        index_rows = Indexes.objects.filter(key=index_key, column1=SAS).all()
         for row in index_rows:
             oops["SAS"] = row.value.decode() if isinstance(row.value, bytes) else row.value
             break
@@ -371,8 +375,6 @@ def get_retracer_counts(start, finish):
 
 
 def get_retracer_means(start, finish):
-    import struct
-    
     start_date = datetime.date.today() - datetime.timedelta(days=start)
     start_str = start_date.strftime("%Y%m%d")
     finish_date = datetime.date.today() - datetime.timedelta(days=finish)
@@ -842,12 +844,13 @@ def record_bug_for_bucket(bucketid, bug):
     if config.lp_use_staging == "False":
         bucket_key = bucketid.encode() if isinstance(bucketid, str) else bucketid
         bug_key = str(int(bug)).encode()
+        bucketid_encoded = bucketid.encode() if isinstance(bucketid, str) else bucketid
         
         # Insert into BucketMetadata
         BucketMetadata.create(key=bucket_key, column1="CreatedBug", value=bug)
         
         # Insert into BugToCrashSignatures
-        BugToCrashSignatures.create(key=bug_key, column1=bucketid, value=b"")
+        BugToCrashSignatures.create(key=bug_key, column1=bucketid_encoded.decode() if isinstance(bucketid_encoded, bytes) else bucketid_encoded, value=b"")
 
 
 def get_signatures_for_bug(bug):
