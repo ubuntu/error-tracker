@@ -5,15 +5,35 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import OrderedDict
 from functools import cmp_to_key
+from uuid import UUID
 
 import numpy
 
-# TODO: port that to the cassandra module
-# import pycassa
-# from pycassa.cassandra.ttypes import NotFoundException
-# from pycassa.util import OrderedDict
 from errortracker import cassandra, config
+from errortracker.cassandra_schema import (
+    Bucket,
+    BucketMetadata,
+    BucketRetraceFailureReason,
+    BucketVersionsCount,
+    BucketVersionSystems2,
+    BugToCrashSignatures,
+    Counters,
+    CountersForProposed,
+    DayBucketsCount,
+    DoesNotExist,
+    Hashes,
+    Indexes,
+    OOPS,
+    RetraceStats,
+    SourceVersionBuckets,
+    Stacktrace,
+    SystemImages,
+    UniqueUsers90Days,
+    UserBinaryPackages,
+    UserOOPS,
+)
 
 session = cassandra.cassandra_session()
 
@@ -59,10 +79,10 @@ def get_oopses_by_release(release, limit=1000):
 
 def get_total_buckets_by_day(start, finish):
     """All of the buckets added to for the past seven days."""
-    daybucketscount_cf = pycassa.ColumnFamily(pool, "DayBucketsCount")
     dates = _get_range_of_dates(start, finish)
     for date in dates:
-        yield (date, daybucketscount_cf.get_count(date))
+        count = DayBucketsCount.objects.filter(key=date.encode()).count()
+        yield (date, count)
 
 
 def _date_range_iterator(start, finish):
@@ -93,7 +113,6 @@ def get_bucket_counts(
     """The number of times each bucket has been added to today, this month, or
     this year."""
 
-    daybucketscount_cf = pycassa.ColumnFamily(pool, "DayBucketsCount")
     periods = ""
     if period:
         if period == "today" or period == "day":
@@ -150,30 +169,26 @@ def get_bucket_counts(
             keys.append(key)
 
     results = {}
-    batch_size = 500
     for key in keys:
-        start = ""
-        while True:
-            try:
-                result = daybucketscount_cf.get(key, column_start=start, column_count=batch_size)
-            except NotFoundException:
-                break
-
-            for column, count in result.items():
+        try:
+            rows = DayBucketsCount.objects.filter(key=key.encode()).all()
+            for row in rows:
+                column = row.column1
+                count = row.value
                 if not show_failed and column.startswith("failed"):
                     continue
-                column = column.encode("utf-8")
+                if isinstance(column, str):
+                    column = column.encode("utf-8")
                 try:
                     existing = results[column]
                 except KeyError:
                     existing = 0
                 results[column] = count + existing
-            # We do not want to include the end of the previous batch.
-            start = column + "0"
-            if len(result) < batch_size:
-                break
+        except DoesNotExist:
+            continue
+    
     return sorted(
-        list(results.items()), key=cmp_to_key(lambda x, y: cmp(x[1], y[1])), reverse=True
+        list(results.items()), key=cmp_to_key(lambda x, y: (x[1] > y[1]) - (x[1] < y[1])), reverse=True
     )
 
 
@@ -184,50 +199,68 @@ def get_crashes_for_bucket(bucketid, limit=100, start=None):
     We show the most recent crashes first, since they'll be the most
     relevant to the current state of the problem.
     """
-    bucket_cf = pycassa.ColumnFamily(pool, "Bucket")
     try:
+        query = Bucket.objects.filter(key=bucketid)
         if start:
-            start = pycassa.util.uuid.UUID(start)
-            return list(
-                bucket_cf.get(
-                    bucketid, column_start=start, column_count=limit, column_reversed=True
-                ).keys()
-            )[1:]
+            start_uuid = UUID(start)
+            # Filter to get items less than start (for reversed ordering)
+            query = query.filter(column1__lt=start_uuid)
+        
+        # Order by column1 descending (most recent first)
+        rows = list(query.limit(limit + (1 if start else 0)).all())
+        
+        # Sort by column1 descending (TimeUUID orders chronologically)
+        rows.sort(key=lambda x: x.column1, reverse=True)
+        
+        if start:
+            # Skip the first item (which is the start value)
+            return [row.column1 for row in rows[1:limit+1]]
         else:
-            return list(bucket_cf.get(bucketid, column_count=limit, column_reversed=True).keys())
-    except NotFoundException:
+            return [row.column1 for row in rows[:limit]]
+    except DoesNotExist:
         return []
 
 
 def get_package_for_bucket(bucketid):
     """Returns the package and version for a given bucket."""
 
-    bucket_cf = pycassa.ColumnFamily(pool, "Bucket")
-    oops_cf = pycassa.ColumnFamily(pool, "OOPS")
     # Grab 5 OOPS IDs, just in case the first one doesn't have a Package field.
     try:
-        oopsids = list(bucket_cf.get(bucketid, column_count=5).keys())
-    except NotFoundException:
+        rows = Bucket.objects.filter(key=bucketid).limit(5).all()
+        oopsids = [row.column1 for row in rows]
+    except DoesNotExist:
         return ("", "")
+    
     for oopsid in oopsids:
         try:
-            oops = oops_cf.get(str(oopsid), columns=["Package"])
-            package_and_version = oops["Package"].split()[:2]
-            if len(package_and_version) == 1:
-                return (package_and_version[0], "")
-            else:
-                return package_and_version
-        except (KeyError, NotFoundException):
+            oops_rows = OOPS.objects.filter(key=str(oopsid).encode(), column1="Package").all()
+            for row in oops_rows:
+                package_and_version = row.value.split()[:2]
+                if len(package_and_version) == 1:
+                    return (package_and_version[0], "")
+                else:
+                    return tuple(package_and_version)
+        except (KeyError, DoesNotExist):
             continue
     return ("", "")
 
 
 def get_crash(oopsid, columns=None):
-    oops_cf = pycassa.ColumnFamily(pool, "OOPS")
     try:
-        oops = oops_cf.get(oopsid, columns=columns)
-    except NotFoundException:
+        query = OOPS.objects.filter(key=oopsid.encode() if isinstance(oopsid, str) else oopsid)
+        if columns:
+            # Filter by specific columns
+            query = query.filter(column1__in=columns)
+        
+        oops = {}
+        for row in query.all():
+            oops[row.column1] = row.value
+            
+        if not oops:
+            return {}
+    except DoesNotExist:
         return {}
+    
     if "StacktraceAddressSignature" in oops:
         SAS = oops["StacktraceAddressSignature"]
         if not SAS:
@@ -239,49 +272,59 @@ def get_crash(oopsid, columns=None):
         return oops
     else:
         return oops
+    
     try:
-        indexes_cf = pycassa.ColumnFamily(pool, "Indexes")
-        idx = "crash_signature_for_stacktrace_address_signature"
-        bucket = indexes_cf.get(idx, [SAS])
-        oops["SAS"] = bucket[SAS]
+        idx = b"crash_signature_for_stacktrace_address_signature"
+        index_rows = Indexes.objects.filter(key=idx, column1=SAS).all()
+        for row in index_rows:
+            oops["SAS"] = row.value.decode() if isinstance(row.value, bytes) else row.value
+            break
         return oops
-    except NotFoundException:
+    except DoesNotExist:
         return oops
-    return oops
 
 
 def get_traceback_for_bucket(bucketid):
-    oops_cf = pycassa.ColumnFamily(pool, "OOPS")
     # TODO fetching a crash ID twice, once here and once in get_stacktrace, is
     # a bit rubbish, but we'll write the stacktrace into the bucket at some
     # point and get rid of the contents of both of these functions.
-    if len(get_crashes_for_bucket(bucketid, 1)) == 0:
+    crashes = get_crashes_for_bucket(bucketid, 1)
+    if len(crashes) == 0:
         return None
-    crash = str(get_crashes_for_bucket(bucketid, 1)[0])
+    crash = str(crashes[0])
     try:
-        return oops_cf.get(crash, columns=["Traceback"])["Traceback"]
-    except NotFoundException:
+        rows = OOPS.objects.filter(key=crash.encode(), column1="Traceback").all()
+        for row in rows:
+            return row.value
+        return None
+    except DoesNotExist:
         return None
 
 
 def get_stacktrace_for_bucket(bucketid):
-    stacktrace_cf = pycassa.ColumnFamily(pool, "Stacktrace")
-    oops_cf = pycassa.ColumnFamily(pool, "OOPS")
     # TODO: we should build some sort of index for this.
     SAS = "StacktraceAddressSignature"
     cols = ["Stacktrace", "ThreadStacktrace"]
     for crash in get_crashes_for_bucket(bucketid, 10):
         sas = None
         try:
-            sas = oops_cf.get(str(crash), columns=[SAS])[SAS]
-        except NotFoundException:
+            rows = OOPS.objects.filter(key=str(crash).encode(), column1=SAS).all()
+            for row in rows:
+                sas = row.value
+                break
+        except DoesNotExist:
             pass
         if not sas:
             continue
         try:
-            traces = stacktrace_cf.get(sas, columns=cols)
+            traces = {}
+            sas_key = sas.encode() if isinstance(sas, str) else sas
+            for col in cols:
+                trace_rows = Stacktrace.objects.filter(key=sas_key, column1=col).all()
+                for row in trace_rows:
+                    traces[col] = row.value
             return (traces.get("Stacktrace", None), traces.get("ThreadStacktrace", None))
-        except NotFoundException:
+        except DoesNotExist:
             pass
     # We didn't have a stack trace for any of the signatures in this set of
     # crashes.
@@ -292,44 +335,60 @@ def get_stacktrace_for_bucket(bucketid):
 
 
 def get_retracer_count(date):
-    retracestats_cf = pycassa.ColumnFamily(pool, "RetraceStats")
-    result = retracestats_cf.get(date)
-    return _split_into_dictionaries(result)
+    try:
+        result = RetraceStats.get_as_dict(key=date.encode() if isinstance(date, str) else date)
+        return _split_into_dictionaries(result)
+    except DoesNotExist:
+        return {}
 
 
 def get_retracer_counts(start, finish):
-    retracestats_cf = pycassa.ColumnFamily(pool, "RetraceStats")
     if finish == sys.maxsize:
-        start = datetime.date.today() - datetime.timedelta(days=start)
-        start = start.strftime("%Y%m%d")
-        results = retracestats_cf.get_range()
+        start_date = datetime.date.today() - datetime.timedelta(days=start)
+        start_str = start_date.strftime("%Y%m%d")
+        # Get all dates from RetraceStats
+        all_rows = RetraceStats.objects.all()
+        results_dict = {}
+        for row in all_rows:
+            date_key = row.key.decode() if isinstance(row.key, bytes) else row.key
+            if date_key < start_str:
+                if date_key not in results_dict:
+                    results_dict[date_key] = {}
+                results_dict[date_key][row.column1] = row.value
         return (
-            (date, _split_into_dictionaries(result)) for date, result in results if date < start
+            (date, _split_into_dictionaries(result)) for date, result in results_dict.items()
         )
     else:
         dates = _get_range_of_dates(start, finish)
-        results = retracestats_cf.multiget(dates)
+        results = {}
+        for date in dates:
+            try:
+                result = RetraceStats.get_as_dict(key=date.encode())
+                results[date] = result
+            except DoesNotExist:
+                pass
         return ((date, _split_into_dictionaries(results[date])) for date in results)
 
 
 def get_retracer_means(start, finish):
-    indexes_cf = pycassa.ColumnFamily(pool, "Indexes")
-    start = datetime.date.today() - datetime.timedelta(days=start)
-    start = start.strftime("%Y%m%d")
-    finish = datetime.date.today() - datetime.timedelta(days=finish)
-    finish = finish.strftime("%Y%m%d")
+    import struct
+    
+    start_date = datetime.date.today() - datetime.timedelta(days=start)
+    start_str = start_date.strftime("%Y%m%d")
+    finish_date = datetime.date.today() - datetime.timedelta(days=finish)
+    finish_str = finish_date.strftime("%Y%m%d")
 
     # FIXME: We shouldn't be specifying a maximum number of columns
-    timings = indexes_cf.get(
-        "mean_retracing_time",
-        column_start=start,
-        column_finish=finish,
-        column_count=1000,
-        column_reversed=True,
-    )
-    to_float = pycassa.marshal.unpacker_for("FloatType")
+    try:
+        timings = Indexes.get_as_dict(key=b"mean_retracing_time")
+    except DoesNotExist:
+        return iter([])
+    
     result = OrderedDict()
     for timing in timings:
+        # Filter by date range
+        if timing < start_str or timing > finish_str:
+            continue
         if not timing.endswith(":count"):
             branch = result
             parts = timing.split(":")
@@ -342,14 +401,13 @@ def get_retracer_means(start, finish):
             end = parts[-1]
             for part in parts:
                 if part is end:
-                    branch[part] = to_float(timings[timing])
+                    branch[part] = timings[timing]
                 else:
                     branch = branch.setdefault(part, {})
     return iter(result.items())
 
 
 def get_crash_count(start, finish, release=None):
-    counters_cf = pycassa.ColumnFamily(pool, "Counters")
     dates = _get_range_of_dates(start, finish)
     for date in dates:
         try:
@@ -357,26 +415,36 @@ def get_crash_count(start, finish, release=None):
                 key = "oopses:%s" % release
             else:
                 key = "oopses"
-            oopses = int(counters_cf.get(key, columns=[date])[date])
-            yield (date, oopses)
-        except NotFoundException:
+            rows = Counters.objects.filter(key=key.encode(), column1=date).all()
+            for row in rows:
+                oopses = int(row.value)
+                yield (date, oopses)
+                break
+        except DoesNotExist:
             pass
 
 
 def get_metadata_for_bucket(bucketid, release=None):
-    bucketmetadata_cf = pycassa.ColumnFamily(pool, "BucketMetadata")
     try:
+        bucket_key = bucketid.encode() if isinstance(bucketid, str) else bucketid
         if not release:
-            return bucketmetadata_cf.get(bucketid, column_finish="~")
+            # Get all columns up to "~" (non-inclusive)
+            rows = BucketMetadata.objects.filter(key=bucket_key, column1__lt="~").all()
         else:
-            ret = bucketmetadata_cf.get(bucketid)
+            rows = BucketMetadata.objects.filter(key=bucket_key).all()
+        
+        ret = {}
+        for row in rows:
+            ret[row.column1] = row.value
+        
+        if release and ret:
             try:
                 ret["FirstSeen"] = ret["~%s:FirstSeen" % release]
                 ret["LastSeen"] = ret["~%s:LastSeen" % release]
             except KeyError:
                 pass
-            return ret
-    except NotFoundException:
+        return ret
+    except DoesNotExist:
         return {}
 
 
@@ -388,16 +456,27 @@ def chunks(l, n):
 
 
 def get_metadata_for_buckets(bucketids, release=None):
-    bucketmetadata_cf = pycassa.ColumnFamily(pool, "BucketMetadata")
     ret = OrderedDict()
-    for buckets in chunks(bucketids, 5):
-        if not release:
-            ret.update(bucketmetadata_cf.multiget(buckets, column_finish="~"))
-        else:
-            ret.update(bucketmetadata_cf.multiget(buckets))
+    for bucketid in bucketids:
+        bucket_key = bucketid.encode() if isinstance(bucketid, str) else bucketid
+        try:
+            if not release:
+                rows = BucketMetadata.objects.filter(key=bucket_key, column1__lt="~").all()
+            else:
+                rows = BucketMetadata.objects.filter(key=bucket_key).all()
+            
+            bucket_data = {}
+            for row in rows:
+                bucket_data[row.column1] = row.value
+            
+            if bucket_data:
+                ret[bucketid] = bucket_data
+        except DoesNotExist:
+            pass
+    
     if release:
-        for bucket in ret:
-            bucket = ret[bucket]
+        for bucket_id in ret:
+            bucket = ret[bucket_id]
             try:
                 bucket["FirstSeen"] = bucket["~%s:FirstSeen" % release]
                 bucket["LastSeen"] = bucket["~%s:LastSeen" % release]
@@ -414,40 +493,51 @@ def get_metadata_for_buckets(bucketids, release=None):
 
 
 def get_user_crashes(user_token, limit=50, start=None):
-    useroops_cf = pycassa.ColumnFamily(pool, "UserOOPS")
     results = {}
     try:
+        user_key = user_token.encode() if isinstance(user_token, str) else user_token
+        query = UserOOPS.objects.filter(key=user_key)
+        
         if start:
-            start = pycassa.util.uuid.UUID(start)
-            result = useroops_cf.get(
-                user_token, column_start=start, column_count=limit, include_timestamp=True
-            )
-        else:
-            result = useroops_cf.get(user_token, column_count=limit, include_timestamp=True)
-        for r in result:
-            results[r] = {"submitted": result[r]}
-        start = list(result.keys())[-1] + "0"
-    except NotFoundException:
+            # Filter to get items greater than start
+            query = query.filter(column1__gt=start)
+        
+        rows = list(query.limit(limit).all())
+        
+        for row in rows:
+            # Since we don't have timestamp directly, we'll use the column1 as a proxy
+            results[row.column1] = {"submitted": row.column1}
+    except DoesNotExist:
         return []
+    
     return [
-        (k[0], k[1])
-        for k in sorted(iter(results.items()), key=operator.itemgetter(1), reverse=True)
+        (k, results[k]["submitted"])
+        for k in sorted(results.keys(), key=lambda x: results[x]["submitted"], reverse=True)
     ]
 
 
 def get_average_crashes(field, release, days=7):
-    uniqueusers_cf = pycassa.ColumnFamily(pool, "UniqueUsers90Days")
-    counters_cf = pycassa.ColumnFamily(pool, "Counters")
     dates = _get_range_of_dates(0, days)
     start = dates[-1]
     end = dates[0]
+    
     try:
         key = "oopses:%s" % field
-        g = counters_cf.xget(key, column_start=start, column_finish=end)
-        oopses = pycassa.util.OrderedDict(x for x in g)
-        g = uniqueusers_cf.xget(release, column_start=start, column_finish=end)
-        users = pycassa.util.OrderedDict(x for x in g)
-    except NotFoundException:
+        oopses = OrderedDict()
+        oops_rows = Counters.objects.filter(
+            key=key.encode(), column1__gte=start, column1__lte=end
+        ).all()
+        for row in oops_rows:
+            oopses[row.column1] = row.value
+        
+        users = OrderedDict()
+        release_key = release.encode() if isinstance(release, str) else release
+        user_rows = UniqueUsers90Days.objects.filter(
+            key=release_key, column1__gte=start, column1__lte=end
+        ).all()
+        for row in user_rows:
+            users[row.column1] = row.value
+    except DoesNotExist:
         return []
 
     return_data = []
@@ -462,8 +552,6 @@ def get_average_crashes(field, release, days=7):
 
 
 def get_average_instances(bucketid, release, days=7):
-    uniqueusers_cf = pycassa.ColumnFamily(pool, "UniqueUsers90Days")
-    daybucketscount_cf = pycassa.ColumnFamily(pool, "DayBucketsCount")
     # FIXME Why oh why did we do things this way around? It makes it impossible
     # to do a quick range scan. We should create DayBucketsCount2, replacing
     # this with a CF that's keyed on the bucket ID and has counter columns
@@ -471,12 +559,26 @@ def get_average_instances(bucketid, release, days=7):
     dates = _get_range_of_dates(0, days)
     start = dates[-1]
     end = dates[0]
-    gen = uniqueusers_cf.xget(release, column_start=start, column_finish=end)
-    users = dict(x for x in gen)
+    
+    release_key = release.encode() if isinstance(release, str) else release
+    user_rows = UniqueUsers90Days.objects.filter(
+        key=release_key, column1__gte=start, column1__lte=end
+    ).all()
+    users = {row.column1: row.value for row in user_rows}
+    
     for date in dates:
         try:
-            count = daybucketscount_cf.get("%s:%s" % (release, date), columns=[bucketid])[bucketid]
-        except NotFoundException:
+            key = "%s:%s" % (release, date)
+            count_rows = DayBucketsCount.objects.filter(
+                key=key.encode(), column1=bucketid
+            ).all()
+            count = None
+            for row in count_rows:
+                count = row.value
+                break
+            if count is None:
+                continue
+        except DoesNotExist:
             continue
         try:
             avg = float(count) / float(users[date])
@@ -490,54 +592,64 @@ def get_versions_for_bucket(bucketid):
     """Get the dictionary of (release, version) tuples for the given bucket
     with values of their instance counts. If the bucket does not exist,
     return an empty dict."""
-    bv_count_cf = pycassa.ColumnFamily(pool, "BucketVersionsCount")
     try:
-        return bv_count_cf.get(bucketid)
-    except NotFoundException:
+        bucket_key = bucketid.encode() if isinstance(bucketid, str) else bucketid
+        rows = BucketVersionsCount.objects.filter(key=bucket_key).all()
+        result = {}
+        for row in rows:
+            result[row.column1] = row.value
+        return result
+    except DoesNotExist:
         return {}
 
 
 def get_source_package_for_bucket(bucketid):
-    oops_cf = pycassa.ColumnFamily(pool, "OOPS")
-    bucket_cf = pycassa.ColumnFamily(pool, "Bucket")
-    oopsids = list(bucket_cf.get(bucketid, column_count=10).keys())
+    bucket_rows = Bucket.objects.filter(key=bucketid).limit(10).all()
+    oopsids = [row.column1 for row in bucket_rows]
     for oopsid in oopsids:
         try:
-            oops = oops_cf.get(str(oopsid), columns=["SourcePackage"])
-            return oops["SourcePackage"]
-        except (KeyError, NotFoundException):
+            oops_rows = OOPS.objects.filter(key=str(oopsid).encode(), column1="SourcePackage").all()
+            for row in oops_rows:
+                return row.value
+        except (KeyError, DoesNotExist):
             continue
     return ""
 
 
 def get_retrace_failure_for_bucket(bucketid):
-    bucketretracefail_fam = pycassa.ColumnFamily(pool, "BucketRetraceFailureReason")
     try:
-        failuredata = bucketretracefail_fam.get(bucketid)
+        failuredata = BucketRetraceFailureReason.get_as_dict(
+            key=bucketid.encode() if isinstance(bucketid, str) else bucketid
+        )
         return failuredata
-    except NotFoundException:
+    except DoesNotExist:
         return {}
 
 
 def get_binary_packages_for_user(user):
     # query DayBucketsCount to ensure the package has crashes reported about
     # it rather than returning packages for which there will be no data.
-    daybucketscount_cf = pycassa.ColumnFamily(pool, "DayBucketsCount")
-    userbinpkgs_cf = pycassa.ColumnFamily(pool, "UserBinaryPackages")
     # if a package's last crash was reported more than a month ago then it
     # won't be returned here, however the package isn't likely to appear in
     # the most-common-problems.
     period = (datetime.date.today() - datetime.timedelta(30)).strftime("%Y%m")
     try:
-        binary_packages = [pkg[0] + ":%s" % period for pkg in userbinpkgs_cf.xget(user)]
-    except NotFoundException:
+        user_key = user.encode() if isinstance(user, str) else user
+        pkg_rows = UserBinaryPackages.objects.filter(key=user_key).all()
+        binary_packages = [row.column1 + ":%s" % period for row in pkg_rows]
+    except DoesNotExist:
         return None
     if len(binary_packages) == 0:
         return None
-    results = daybucketscount_cf.multiget_count(binary_packages, max_count=1)
-    for result in results:
-        if results[result] == 0:
-            del results[result]
+    
+    results = {}
+    for pkg in binary_packages:
+        count = DayBucketsCount.objects.filter(key=pkg.encode()).limit(1).count()
+        if count > 0:
+            results[pkg] = count
+    
+    # Remove entries with 0 count
+    results = {k: v for k, v in results.items() if v > 0}
     return [k[0:-7] for k in list(results.keys())]
 
 
@@ -546,43 +658,54 @@ def get_package_crash_rate(
 ):
     """Find the rate of Crashes, not other problems, about a package."""
 
-    counters_cf = pycassa.ColumnFamily(pool, "Counters")
-    proposed_counters_cf = pycassa.ColumnFamily(pool, "CountersForProposed")
     # the generic counter only includes Crashes for packages from official
     # Ubuntu sources and from systems not under auto testing
     old_vers_column = "%s:%s:%s" % (release, src_package, old_version)
     new_vers_column = "%s:%s:%s" % (release, src_package, new_version)
     results = {}
+    
     try:
         # The first thing done is the reversing of the order that's why it
-        # is column_start
-        old_vers_data = counters_cf.get(
-            old_vers_column, column_start=date, column_reversed=True, column_count=15
-        )
-    except NotFoundException:
+        # is column_start (get items <= date in reverse order)
+        old_rows = Counters.objects.filter(
+            key=old_vers_column.encode(), column1__lte=date
+        ).limit(15).all()
+        old_rows_sorted = sorted(old_rows, key=lambda x: x.column1, reverse=True)
+        old_vers_data = {row.column1: row.value for row in old_rows_sorted}
+    except DoesNotExist:
         old_vers_data = None
+    
     try:
         # this may be unnecessarily long since updates phase in ~3 days
-        new_vers_data = counters_cf.get(new_vers_column, column_reversed=True, column_count=15)
-    except NotFoundException:
+        new_rows = Counters.objects.filter(key=new_vers_column.encode()).limit(15).all()
+        new_rows_sorted = sorted(new_rows, key=lambda x: x.column1, reverse=True)
+        new_vers_data = {row.column1: row.value for row in new_rows_sorted}
+    except DoesNotExist:
         results["increase"] = False
         return results
+    
+    if not new_vers_data:
+        results["increase"] = False
+        return results
+    
     if exclude_proposed:
         try:
-            # The first thing done is the reversing of the order that's why it
-            # is column_start
-            proposed_old_vers_data = proposed_counters_cf.get(
-                old_vers_column, column_start=date, column_reversed=True, column_count=15
-            )
-        except NotFoundException:
+            proposed_old_rows = CountersForProposed.objects.filter(
+                key=old_vers_column.encode(), column1__lte=date
+            ).limit(15).all()
+            proposed_old_rows_sorted = sorted(proposed_old_rows, key=lambda x: x.column1, reverse=True)
+            proposed_old_vers_data = {row.column1: row.value for row in proposed_old_rows_sorted}
+        except DoesNotExist:
             proposed_old_vers_data = None
         try:
-            # this may be unnecessarily long since updates phase in ~3 days
-            proposed_new_vers_data = proposed_counters_cf.get(
-                new_vers_column, column_reversed=True, column_count=15
-            )
-        except NotFoundException:
+            proposed_new_rows = CountersForProposed.objects.filter(
+                key=new_vers_column.encode()
+            ).limit(15).all()
+            proposed_new_rows_sorted = sorted(proposed_new_rows, key=lambda x: x.column1, reverse=True)
+            proposed_new_vers_data = {row.column1: row.value for row in proposed_new_rows_sorted}
+        except DoesNotExist:
             proposed_new_vers_data = None
+    
     today = datetime.datetime.utcnow().strftime("%Y%m%d")
     try:
         today_crashes = new_vers_data[today]
@@ -590,6 +713,7 @@ def get_package_crash_rate(
         # no crashes today so not an increase
         results["increase"] = False
         return results
+    
     # subtract CountersForProposed data from today crashes
     if exclude_proposed and proposed_new_vers_data:
         try:
@@ -601,6 +725,7 @@ def get_package_crash_rate(
             # no crashes today so not an increase
             results["increase"] = False
             return results
+    
     if new_vers_data and not old_vers_data:
         results["increase"] = True
         results["previous_average"] = None
@@ -613,6 +738,7 @@ def get_package_crash_rate(
         )
         results["web_link"] = absolute_uri + web_link
         return results
+    
     first_date = date
     oldest_date = list(old_vers_data.keys())[-1]
     dates = [x for x in _date_range_iterator(oldest_date, first_date)]
@@ -633,10 +759,12 @@ def get_package_crash_rate(
         # the day doesn't exist so there were 0 errors
         except KeyError:
             previous_vers_crashes.append(0)
+    
     results["increase"] = False
     # 2 crashes may be a fluke
     if today_crashes < 3:
         return results
+    
     now = datetime.datetime.utcnow()
     hour = float(now.hour)
     minute = float(now.minute)
@@ -669,32 +797,38 @@ def get_package_crash_rate(
 
 
 def get_package_new_buckets(src_pkg, previous_version, new_version):
-    srcversionbuckets_cf = pycassa.ColumnFamily(pool, "SourceVersionBuckets")
-    bucketversionsystems_cf = pycassa.ColumnFamily(pool, "BucketVersionSystems2")
     results = []
     # new version has no buckets
     try:
-        n_data = [bucket[0] for bucket in srcversionbuckets_cf.xget((src_pkg, new_version))]
-    except KeyError:
+        new_rows = SourceVersionBuckets.objects.filter(key=src_pkg, key2=new_version).all()
+        n_data = [row.column1 for row in new_rows]
+    except (KeyError, DoesNotExist):
         return results
+    
     # if previous version has no buckets return an empty list
     try:
-        p_data = [bucket[0] for bucket in srcversionbuckets_cf.xget((src_pkg, previous_version))]
-    except KeyError:
+        prev_rows = SourceVersionBuckets.objects.filter(key=src_pkg, key2=previous_version).all()
+        p_data = [row.column1 for row in prev_rows]
+    except (KeyError, DoesNotExist):
         p_data = []
 
     new_buckets = set(n_data).difference(set(p_data))
     for bucket in new_buckets:
         if isinstance(bucket, str):
-            bucket = bucket.encode("utf-8")
+            bucket_bytes = bucket.encode("utf-8")
+        else:
+            bucket_bytes = bucket
         # do not return buckets that failed to retrace
-        if bucket.startswith("failed:"):
+        if bucket_bytes.startswith(b"failed:") if isinstance(bucket_bytes, bytes) else bucket.startswith("failed:"):
             continue
-        if isinstance(new_version, str):
-            new_version = new_version.encode("utf-8")
+        
+        new_version_str = new_version if isinstance(new_version, str) else new_version.decode("utf-8")
         try:
-            count = len(bucketversionsystems_cf.get((bucket, new_version), column_count=4))
-        except NotFoundException:
+            count_rows = BucketVersionSystems2.objects.filter(
+                key=bucket, key2=new_version_str
+            ).limit(4).all()
+            count = len(list(count_rows))
+        except DoesNotExist:
             continue
         if count <= 2:
             continue
@@ -703,51 +837,59 @@ def get_package_new_buckets(src_pkg, previous_version, new_version):
 
 
 def record_bug_for_bucket(bucketid, bug):
-    bucketmetadata_cf = pycassa.ColumnFamily(pool, "BucketMetadata")
-    bugtocrashsignatures_cf = pycassa.ColumnFamily(pool, "BugToCrashSignatures")
     # We don't insert bugs into the database if we're using Launchpad staging,
     # as those will disappear in Launchpad but our copy would persist.
     if config.lp_use_staging == "False":
-        bucketmetadata_cf.insert(bucketid, {"CreatedBug": bug})
-        bugtocrashsignatures_cf.insert(int(bug), {bucketid: ""})
+        bucket_key = bucketid.encode() if isinstance(bucketid, str) else bucketid
+        bug_key = str(int(bug)).encode()
+        
+        # Insert into BucketMetadata
+        BucketMetadata.create(key=bucket_key, column1="CreatedBug", value=bug)
+        
+        # Insert into BugToCrashSignatures
+        BugToCrashSignatures.create(key=bug_key, column1=bucketid, value=b"")
 
 
 def get_signatures_for_bug(bug):
     try:
-        bug = int(bug)
+        bug_int = int(bug)
     except ValueError:
         return []
 
-    bugtocrashsignatures_cf = pycassa.ColumnFamily(pool, "BugToCrashSignatures")
     try:
-        gen = bugtocrashsignatures_cf.xget(bug)
-        crashes = [crash for crash, unused in gen]
+        bug_key = str(bug_int).encode()
+        rows = BugToCrashSignatures.objects.filter(key=bug_key).all()
+        crashes = [row.column1 for row in rows]
         return crashes
-    except NotFoundException:
+    except DoesNotExist:
         return []
 
 
 def bucket_exists(bucketid):
-    bucket_cf = pycassa.ColumnFamily(pool, "Bucket")
     try:
-        bucket_cf.get(bucketid, column_count=1)
-        return True
-    except NotFoundException:
+        count = Bucket.objects.filter(key=bucketid).limit(1).count()
+        return count > 0
+    except DoesNotExist:
         return False
 
 
 def get_problem_for_hash(hashed):
-    hashes_cf = pycassa.ColumnFamily(pool, "Hashes")
     try:
-        return hashes_cf.get("bucket_%s" % hashed[0], columns=[hashed])[hashed]
-    except NotFoundException:
+        key = ("bucket_%s" % hashed[0]).encode()
+        hash_key = hashed.encode() if isinstance(hashed, str) else hashed
+        rows = Hashes.objects.filter(key=key, column1=hash_key).all()
+        for row in rows:
+            return row.value
+        return None
+    except DoesNotExist:
         return None
 
 
 def get_system_image_versions(image_type):
-    images_cf = pycassa.ColumnFamily(pool, "SystemImages")
     try:
-        versions = [version[0] for version in images_cf.xget(image_type)]
+        image_key = image_type.encode() if isinstance(image_type, str) else image_type
+        rows = SystemImages.objects.filter(key=image_key).all()
+        versions = [row.column1 for row in rows]
         return versions
-    except NotFoundException:
+    except DoesNotExist:
         return None
