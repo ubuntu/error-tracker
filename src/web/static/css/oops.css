@@ -1,0 +1,13 @@
+.treeCollapsed {
+    background-image: url(../img/treeCollapsed.png); /* sprite-ref: icon-sprites */
+    background-repeat: no-repeat;
+}
+.treeExpanded {
+    background-image: url(../img/treeExpanded.png); /* sprite-ref: icon-sprites */
+    background-repeat: no-repeat;
+}
+
+table#instance td {
+    vertical-align: top;
+    border: none;
+}

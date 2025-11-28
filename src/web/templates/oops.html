@@ -1,0 +1,69 @@
+{% extends "index.html" %}
+{% load static %}
+{% block head %}
+<script type="text/javascript" src="{% static '/js/yui/build/yui-base/yui-base-min.js' %}"></script>
+<script type="text/javascript" src="{% static '/js/effects.js' %}"></script>
+<script type="text/javascript" src="{% static '/js/expander.js' %}"></script>
+<link rel="stylesheet" type="text/css" href="{% static '/css/pygments.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static '/css/oops.css' %}">
+<script type="text/javascript">
+    YUI().use('event', 'node', 'lp.app.widgets.expander', function (Y) {
+    Y.on('load', function () {
+        var all_expanders = Y.all('.expandericon');
+        all_expanders.each(function(link) {
+            var base_id = link.get('id').replace('expander-', '');
+            var row_node = Y.one('#field-' + base_id);
+
+            var node_html = row_node.get('innerHTML');
+            if (node_html.indexOf('<br') == -1 && node_html.indexOf('<pre>') == -1) {
+                return;
+            }
+            var expander = new Y.lp.app.widgets.expander.Expander(link, row_node);
+            if (node_html.indexOf('<pre>') != -1) {
+                expander.setExpanded(true);
+            }
+            expander.setUp();
+        });
+        /* use js to format bucket since elif first appeared in django 1.4 */
+        if (Y.one('.SAS')) {
+            var SAS = '{{ oops.SAS }}';
+            var bucketurl = '<a id="problem-link" href="../bucket/?id=' + '{{ oops.SAS|urlencode }}' + '">' + SAS + '</a>';
+            Y.one('.SAS').setHTML(bucketurl);
+        }
+        if (Y.one('.SystemIdentifier')) {
+            var SysID = '{{ oops.SystemIdentifier }}';
+            var sysurl = '<a id="problem-link" href="../user/' + SysID + '">' + SysID + '</a>';
+            Y.one('.SystemIdentifier').setHTML(sysurl);
+        }
+    });
+    });
+</script>
+{% endblock %}
+{% load pygmentize %}
+{% block content %}
+<table id="instance">
+{% for key, value in oops.items %}
+<tr>
+    <td style="padding-top: 5px">
+        <span class="expandericon" id="expander-{{ forloop.counter }}" style="display: inline-block; width: 15px;">&nbsp;</span>
+    </td>
+    {% if key == "SAS" %}
+        <td>Problem</td>
+    {% else %}
+        <td>{{ key }}</td>
+    {% endif %}
+    <td>
+        <div id="field-{{ forloop.counter }}" class="{{ key }}">
+            {% if key == "Traceback" %}
+                {{ value|pygmentize:"pytb"|safe }}
+            {% elif key == "AptSolverDump" %}
+                <textarea readonly cols="80" rows="4">{{ value }}</textarea>
+            {% else %}
+                {{ value|linebreaksbr }}
+            {% endif %}
+        </div>
+    </td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

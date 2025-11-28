@@ -1,0 +1,388 @@
+{% extends "index.html" %}
+{% load static %}
+{% block head %}
+<link rel="stylesheet" type="text/css" href="{% static '/js/nvd3/src/nv.d3.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static '/css/mean_time_between_failures.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static '/css/pygments.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static '/css/bucket.css' %}">
+<script type="text/javascript" src="{% static '/js/yui/build/yui-base/yui-base-min.js' %}"></script>
+<script src="{% static '/js/js-cookie/js.cookie.min.js' %}"></script>
+<script src="{% static '/js/nvd3/lib/d3.v2.js' %}"></script>
+<script src="{% static '/js/nvd3/nv.d3.min.js' %}"></script>
+<script src="{% static '/js/mean_time_between_failures.js' %}"></script>
+<script src="{% static '/js/infinite-scroll.js' %}"></script>
+<script src="{% static '/js/utils.js' %}"></script>
+{% endblock %}
+{% load pygmentize %}
+{% block content %}
+<script type="text/javascript">
+    {% if authenticated %}
+    /* This is just a guide to the view. Do not /ever/ use this as an
+     * authentication check. */
+    var user_is_authenticated = true;
+    {% else %}
+    var user_is_authenticated = false;
+    {% endif %}
+
+    YUI().use('event', 'datatable', 'datatable-sort', 'datasource-get',
+              'datasource-jsonschema', 'datatable-datasource',
+              'datatable-message', 'datatype-date', 'io-queue',
+              'io-form', function (Y) {
+        Y.on('load', function () {
+            var bucket_id = '{{ bucket|urlencode }}';
+            var bucket = '{{ bucket|escapejs }}';
+            var report = '{{ report }}';
+            var src_pkg = '{{ source_package }}';
+            var rf_reason = '{{ retrace_failure_reason }}';
+            var rf_oops = '{{ retrace_failure_oops }}';
+            var rf_missing_ddebs = '{{ retrace_failure_missing_ddebs }}';
+
+            if (bucket.indexOf('failed:') == 0) {
+                Y.one('#notes').setStyle('display', 'block');
+                // only provide specific information if it is available
+                if (rf_reason) {
+                    var failure_msg = 'This problem failed to retrace because there was ';
+                    failure_msg += rf_reason.toLowerCase() + '<br><br>';
+                    if (rf_missing_ddebs) {
+                        failure_msg += 'The following packages are missing debug symbols: ';
+                        failure_msg += rf_missing_ddebs + '.<br><br>';
+                    }
+                    failure_msg += 'More information may be found in incident ';
+                    failure_msg += '<a href="/oops/' + rf_oops + '">' + rf_oops + '</a>';
+                    Y.one('#notes').setHTML(failure_msg);
+                }
+            }
+            /* use js to format bucket since elif first appeared in django 1.4 */
+            Y.one('.bucket').setHTML(formatSignature(bucket));
+            if (Y.one('#createbug') && {{ allow_bug_filing }}) {
+                Y.one('#createbug').setHTML(bugFormatter(report));
+            }
+
+            /* Set up the average instances per calendar day graph. */
+            var url = '/api/1.0/average-instances/?limit=0&id=' + bucket_id;
+            mean_time_between_failures_request(url);
+
+            function formatVers(o) {
+                o.className = 'series_' + o.column.key;
+
+                var val;
+                if (o.value < 0) {
+                    /* We set the value to -1 when we cannot determine what the
+                       count was for this version in each individual release.
+                     */
+                    val = '-';
+                } else {
+                    val = o.value;
+                }
+                if (o.column.key == 'total' || o.column.key == 'derivatives')
+                    return val;
+
+                if (o.data.version == 'All versions')
+                    return val;
+
+                if (val == '-')
+                    return val;
+                var pocket;
+                /* In the event the column key is not found in pockets set pocket to nothing */
+                if (typeof o.data.pockets[o.column.key] === 'undefined') {
+                    pocket = '';
+                } else {
+                    pocket = ' (' + o.data.pockets[o.column.key].substr(0,1) + ')';
+                }
+                /* if the pocket is unknown then the LP url won't work */
+                if (pocket == ' (?)') {
+                    return val + pocket;
+                } else {
+                    /* create a hyperlink to the LP source package and display count (pocket) */
+                    return '<a href="https://launchpad.net/ubuntu/' + o.column.key
+                        + '/+source/' + src_pkg + '/' + o.data.version
+                        + '">' + val + pocket + '</a>';
+                }
+            }
+
+            /* Set up versions this problem has been seen in table. */
+            var versions_table_columns = [
+                {key: "version", label: "Package versions with this error"},
+                {key: "precise",
+                 label: "12.04", formatter: formatVers, allowHTML: true},
+                {key: "quantal",
+                 label: "12.10", formatter: formatVers, allowHTML: true},
+                {key: "raring",
+                 label: "13.04", formatter: formatVers, allowHTML: true},
+                {key: "saucy",
+                 label: "13.10", formatter: formatVers, allowHTML: true},
+                {key: "trusty",
+                 label: "14.04", formatter: formatVers, allowHTML: true},
+                {key: "utopic",
+                 label: "14.10", formatter: formatVers, allowHTML: true},
+                {key: "rtm_1409",
+                 label: "RTM 14.09", formatter: formatVers, allowHTML: true},
+                {key: "vivid",
+                 label: "15.04", formatter: formatVers, allowHTML: true},
+                {key: "wily",
+                 label: "15.10", formatter: formatVers, allowHTML: true},
+                {key: "xenial",
+                 label: "16.04", formatter: formatVers, allowHTML: true},
+                {key: "yakkety",
+                 label: "16.10", formatter: formatVers, allowHTML: true},
+                {key: "zesty",
+                 label: "17.04", formatter: formatVers, allowHTML: true},
+                {key: "artful",
+                 label: "17.10", formatter: formatVers, allowHTML: true},
+                {key: "bionic",
+                 label: "18.04", formatter: formatVers, allowHTML: true},
+                {key: "cosmic",
+                 label: "18.10", formatter: formatVers, allowHTML: true},
+                {key: "disco",
+                 label: "19.04", formatter: formatVers, allowHTML: true},
+                {key: "eoan",
+                 label: "19.10", formatter: formatVers, allowHTML: true},
+                {key: "focal",
+                 label: "20.04", formatter: formatVers, allowHTML: true},
+                {key: "groovy",
+                 label: "20.10", formatter: formatVers, allowHTML: true},
+                {key: "hirsute",
+                 label: "21.04", formatter: formatVers, allowHTML: true},
+                {key: "impish",
+                 label: "21.10", formatter: formatVers, allowHTML: true},
+                {key: "jammy",
+                 label: "22.04", formatter: formatVers, allowHTML: true},
+                {key: "kinetic",
+                 label: "22.10", formatter: formatVers, allowHTML: true},
+                {key: "lunar",
+                 label: "23.04", formatter: formatVers, allowHTML: true},
+                {key: "mantic",
+                 label: "23.10", formatter: formatVers, allowHTML: true},
+                {key: "noble",
+                 label: "24.04", formatter: formatVers, allowHTML: true},
+                {key: "oracular",
+                 label: "oracular", formatter: formatVers, allowHTML: true},
+                {key: "plucky",
+                 label: "plucky", formatter: formatVers, allowHTML: true},
+                {key: "questing",
+                 label: "questing", formatter: formatVers, allowHTML: true},
+                {key: "resolute",
+                 label: "resolute", formatter: formatVers, allowHTML: true},
+                {key: "derivatives",
+                 label: "Derivatives", formatter: formatVers, allowHTML: true},
+                {key: "total",
+                 label: "Total", formatter: formatVers, allowHTML: true},
+            ];
+            var versions_ds = new Y.DataSource.Get({
+                source: '/api/1.0/versions',
+            });
+            versions_ds.plug(Y.Plugin.DataSourceJSONSchema, {
+                schema: {
+                    resultListLocator: "objects",
+                    resultFields: [{key: 'version'},
+                                   {key: 'pockets'},
+                                   {key: 'precise'},
+                                   {key: 'quantal'},
+                                   {key: 'raring'},
+                                   {key: 'saucy'},
+                                   {key: 'trusty'},
+                                   {key: 'utopic'},
+                                   {key: 'rtm_1409'},
+                                   {key: 'vivid'},
+                                   {key: 'wily'},
+                                   {key: 'xenial'},
+                                   {key: 'yakkety'},
+                                   {key: 'zesty'},
+                                   {key: 'artful'},
+                                   {key: 'bionic'},
+                                   {key: 'cosmic'},
+                                   {key: 'disco'},
+                                   {key: 'eoan'},
+                                   {key: 'focal'},
+                                   {key: 'groovy'},
+                                   {key: 'hirsute'},
+                                   {key: 'impish'},
+                                   {key: 'jammy'},
+                                   {key: 'kinetic'},
+                                   {key: 'lunar'},
+                                   {key: 'mantic'},
+                                   {key: 'noble'},
+                                   {key: 'oracular'},
+                                   {key: 'plucky'},
+                                   {key: 'questing'},
+                                   {key: 'derivatives'},
+                                   {key: 'total'}]
+                }
+            });
+            var versions_table = new Y.DataTable({
+                columnset: versions_table_columns,
+            });
+            versions_table.plug(Y.Plugin.DataTableDataSource, {
+                datasource: versions_ds,
+            });
+            versions_table.render('#versions');
+            versions_table.datasource.load({request: '/?limit=0&id=' + bucket_id});
+
+            /* Formatters */
+            function formatDates(o) {
+                return o.value &&
+                Y.DataType.Date.format(new Date(o.value), {
+                    format: '%A, %B %e, %Y %R UTC'
+                });
+            }
+            function formatIncident(o) {
+                return '<a href="/oops/' + o.value + '">' + o.value + '</a>';
+            }
+            function bugFormatter(report) {
+                var failed = bucket.indexOf('failed:') == 0;
+                /* don't show the create bug link for an unknown package */
+                if (src_pkg == 'unknown package') {
+                    failed = 1;
+                }
+                if (user_is_authenticated && !failed) {
+                    var guid = Y.guid();
+                    Y.on('click', createBug, '#' + guid, null, bucket);
+                    o = "<a href=\"javascript:void(0)\" id=\"" + guid + "\">Create</a>";
+                    return(o);
+                }
+            }
+            /* Bug Creator */
+            function createBug (e, signature) {
+                var newNode = Y.Node.create('<div>Creating</div>');
+                function complete (id, o, args) {
+                    if (o.responseText) {
+                        var json = JSON.parse(o.responseText);
+                        if (json.report != null) {
+                            newNode.set('innerHTML', '<div><a href="' + json.url + '">'
+                                        + json.report + '</a></div>');
+                            return;
+                        }
+                    }
+                    newNode.set('innerHTML', '<div>Error</div>');
+                }
+                var token = Cookies.get('csrftoken');
+                // encode any special characters in the signature
+                var sig_enc = encodeURIComponent(signature);
+                var cfg = {
+                    method: 'POST',
+                    data: '{"signature": "' + sig_enc + '" }',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': token
+                    },
+                    on: {
+                        complete: complete
+                    }
+                }
+                var request = Y.io("/api/1.0/create-bug-report/?format=json&", cfg);
+                e.target.replace(newNode);
+            }
+
+            /* Set up the examples table. */
+            var cols = [
+            {key: "timestamp", label: "Time", formatter: formatDates},
+            {key: "incident", label: "Incident", formatter: formatIncident, allowHTML: true},
+            {key: "package_version", label: "Package version"},
+            {key: "ubuntu_version", label: "Ubuntu release"},
+            {key: "architecture", label: "Architecture"},
+            ];
+            var dataSource = new Y.DataSource.Get({
+                source: '/api/1.0/instances',
+            });
+            dataSource.plug(Y.Plugin.DataSourceJSONSchema, {
+                schema: {
+                    resultListLocator: "objects",
+                    resultFields: [{key: 'timestamp'},
+                                   {key: 'incident'},
+                                   {key: 'package_version'},
+                                   {key: 'ubuntu_version'},
+                                   {key: 'architecture'}]
+                }
+            });
+            var table = new Y.DataTable({
+                columnset: cols,
+            });
+            table.plug(Y.Plugin.DataTableDataSource, {
+                datasource: dataSource,
+            });
+            table.render("#examples");
+
+            function load_more_results (done) {
+                var sz = table.data.size();
+                if (sz >= 100) {
+                    var start = table.data.item(sz-1).get('incident');
+                    var req = '/?limit=100&id=' + bucket_id + '&start=' + start;
+                } else if (sz > 0) {
+                    Y.one('#spinner').setStyle('display', 'none');
+                    return;
+                } else {
+                    var req = '/?limit=100&id=' + bucket_id;
+                }
+                table.datasource.load({
+                    request: req,
+                    callback: {
+                        success: Y.bind(function(e) {
+                            if (!e.response || e.response.results.length < 99) {
+                                Y.one('#spinner').setStyle('display', 'none');
+                            }
+                            r = (e.response && e.response.results) || [];
+                            if (this.get('data').size() == 0) {
+                                this.set('data', r);
+                            } else {
+                                this.get('data').add(r);
+                            }
+                            done && done();
+                        }, table),
+
+                        failure: Y.bind(function(e) {
+                            e.data && this._redirectIf(e.data.statusText);
+                            done && done();
+                        }, table),
+                    },
+                });
+            }
+
+            /* Set up infinite scrolling. */
+            var options = {
+                distance: 50,
+                callback: function (done) {
+                    load_more_results (done);
+                },
+            }
+            infiniteScroll(options);
+
+            table.showMessage('loadingMessage');
+            load_more_results ();
+        });
+    });
+</script>
+<div id="notes" style="display: none;">
+    <div class="note-message"><img src="{% static '/img/stop.png' %}"><span>This
+            problem failed to retrace. This is often caused by debug symbols no
+            longer being available for the package version and library version
+            dependencies installed at the time of the crash. Its instances
+            represent one portion of a larger problem. No stacktrace will be
+            available for this set.</span></div>
+</div>
+<h1></h1>
+<span id="problem-link">
+<h3>Problem in <a href="https://launchpad.net/ubuntu/+source/{{ source_package }}">{{ source_package }}</a> ({% if report %}<a href="https://launchpad.net/bugs/{{ report }}">{{ report }}</a>{% if report_master %}, duplicate of <a href="https://launchpad.net/bugs/{{ report_master }}">{{ report_master }}</a>{% endif %}{% else %}<div id="createbug" style="display: inline-block;"></div>{% endif %})</h3>
+</span>
+<div class="bucket"></div>
+<div id="mean"><svg></svg></div>
+<div id="versions"></div>
+{% if stacktrace %}
+    <h3>Stacktrace</h3>
+    {{ stacktrace|pygmentize:"c"|safe }}
+    {% if thread_stacktrace %}
+    <h3>Thread Stacktrace</h3>
+    {{ thread_stacktrace|pygmentize:"c"|safe }}
+    {% endif %}
+{% else %}
+    {% if traceback %}
+        <h3>Traceback</h3>
+        {{ traceback|pygmentize:"pytb"|safe }}
+    {% endif %}
+{% endif %}
+<h3>Occurrences</h3>
+<div id="examples_group">
+    <div id="examples"></div>
+    <div id="spinner"></div>
+</div>
+{% csrf_token %}
+{% endblock %}

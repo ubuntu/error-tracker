@@ -1,0 +1,194 @@
+{% extends "index.html" %}
+{% load static %}
+{% block head %}
+<link href="{% static '/js/nvd3/src/nv.d3.css' %}" rel="stylesheet" type="text/css">
+<link href="{% static '/css/mean_time_between_failures.css' %}" rel="stylesheet" type="text/css">
+
+<link rel="stylesheet" type="text/css" href="{% static '/css/main.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static '/css/most_common_problems.css' %}">
+
+<script type="text/javascript" src="{% static '/js/nvd3/lib/d3.v2.js' %}"></script>
+
+<!-- mean time between failures graph -->
+<script src="{% static '/js/nvd3/nv.d3.min.js' %}"></script>
+<script src="{% static '/js/legend.js' %}"></script>
+<script src="{% static '/js/mean_time_between_failures.js' %}"></script>
+
+<!-- most common problems table -->
+<script type="text/javascript" src="{% static '/js/utils.js' %}"></script>
+<script type="text/javascript" src="{% static '/js/yui/build/yui/yui-min.js' %}"></script>
+<script type="text/javascript" src="{% static '/js/yui/build/io-queue/io-queue-min.js' %}"></script>
+<script type="text/javascript" src="{% static '/js/most_common_problems.js' %}"></script>
+
+<script type="text/javascript">
+    {% if authenticated %}
+    /* This is just a guide to the view. Do not /ever/ use this as an
+     * authentication check. */
+    var user_is_authenticated = true;
+    var loggedin_user = '{{ username }}';
+    {% else %}
+    var user_is_authenticated = false;
+    var loggedin_user = '';
+    {% endif %}
+    /* used in most_common_problems.js */
+    var allow_bug_filing = {{ allow_bug_filing }};
+
+    var means = {
+        {% for release, m in means.items %}
+            '{{ release }}' : [
+                {% for period, count in m %}
+                    { x: {{ period }} * 1000, y: {{ count }} },
+                {% endfor %}
+            ],
+        {% endfor %}
+    };
+
+    YUI().use('event', 'querystring', 'node', function(Y) {
+        Y.on('load', function() {
+            var qs = Y.QueryString.parse (window.location.search.slice(1));
+            var msg = '';
+            if (qs['login-failed'] == 'true') {
+                msg = '<a href="https://forms.canonical.com/reports/">' +
+                      'Sorry, you are not a member of a group that is ' +
+                      'allowed to see the data from error reports. Please ' +
+                      'fill out this form to request access.</a>';
+            } else if (qs['bug-not-found'] == 'true') {
+                msg = 'That bug does not have a matching crash signature in ' +
+                      'this database yet.';
+            } else if (qs['problem-not-found'] != undefined) {
+                msg = 'The problem \'' + qs['problem-not-found'].replace(/[^a-fA-F0-9]/gim,'') +
+                      '\' could not be found.';
+            }
+            if (msg != '') {
+                msg = '<img src="{% static '/img/stop.png' %}"></img>' + msg;
+                Y.one('#notes').setStyle('display', 'block');
+                Y.one('#note-message').setHTML(msg);
+            }
+            mean_time_between_failures_graph(means);
+            most_common_problems_table(loggedin_user);
+        });
+    });
+</script>
+{% endblock %}
+{% block content %}
+    <div id="notes" style="display: none;">
+        <div id="note-message"></div>
+    </div>
+    <div id="introduction">We collect hundreds of thousands of error reports daily
+        from millions of machines. This helps measure reliability of …</div>
+    <div id="legend"><svg></svg></div>
+    <div id="mean"><svg style="height: 100%;"></svg></div>
+    <div id="problem_set">
+        <form autocomplete="off">
+            <span>
+                <table id="problem_controls">
+                    <tr>
+                        <td align="right">Showing error reports from </td>
+                        <td>
+                            <span id="release_type">
+                                <select>
+                                    <option>release</option>
+                                    <option>channel</option>
+                                    <option>rootfs build</option>
+                                    <option>device image</option>
+                                </select>
+                            </span>
+                            <span id="release_interval" style="display: inline">
+                                <select>
+                                    <option>all</option>
+                                    <option>Ubuntu 26.04</option>
+                                    <option>Ubuntu 25.10</option>
+                                    <option>Ubuntu 25.04</option>
+                                    <option>Ubuntu 24.04</option>
+                                    <option>Ubuntu 22.04</option>
+                                    <option>Ubuntu 20.04</option>
+                                </select>
+                            </span>
+                            <span id="channel" style="display: none">
+                                <select id="channel_versions">
+                                    <option>all channels</option>
+                                </select>
+                                <span id="device_name" style="display: none">
+                                    from
+                                    <select id="device_name_versions">
+                                        <option>all device</option>
+                                    </select>
+                                </span>
+                            </span>
+                            <span id="rootfs_build" style="display: none">
+                                <select id="rootfs_build_versions">
+                                    <option>all versions</option>
+                                </select>
+                            </span>
+                            <span id="device_image" style="display: none">
+                                <select id="device_image_versions">
+                                    <option>all versions</option>
+                                </select>
+                            </span>
+                            users of
+                            <span id="package_selection">
+                                <select>
+                                    <option>all debian packages</option>
+                                    <option>the package</option>
+                                    <option>the package set</option>
+                                    <option>packages subscribed to by</option>
+                                    <option>other binary packages</option>
+                                </select>
+                                <span id="package_name" style="display: none">
+                                    <input type="text" id="package"></input>
+                                </span>
+                                <span id="packageset_name" style="display: none">
+                                    <input type="text" id="packageset"></input>
+                                </span>
+                                <span id="subscriber_name" style="display: none">
+                                    <input type="text" id="user"></input>
+                                </span>
+                                <span id="snap_name" style="display: none">
+                                    <input type="text" id="snap"></input>
+                                </span>
+                            </span>
+                            <select id="package_versions" style="display: none">
+                                <option>all installed versions</option>
+                            </select>
+                            for
+                            <span id="package_architecture">
+                                <select>
+                                    <option>every</option>
+                                    <option>amd64</opton>
+                                    <option>i386</option>
+                                    <option>arm64</option>
+                                    <option>armhf</option>
+                                    <option>riscv64</option>
+                                </select>
+                            </span>
+                            architecture.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="right">Most common of these errors from</td>
+                        <td>
+                            <span id="problem_interval">
+                                <select>
+                                    <option>the past day</option>
+                                    <option>the past week</option>
+                                    <option>the past month</option>
+                                    <option>the past year</option>
+                                    <option>the date range</option>
+                                </select>
+                                <span id="date_selection" style="display: none">
+                                    from
+                                    <input type="date" id="from_date" placeholder="mm/dd/yyyy"></input>
+                                    to
+                                    <input type="date" id="to_date" placeholder="mm/dd/yyyy"></input>
+                                </span>:
+                            </span>
+                        </td>
+                    </tr>
+                </table>
+            </span>
+        </form>
+    </div>
+
+    <div id="problems"></div>
+    {% csrf_token %}
+{% endblock %}

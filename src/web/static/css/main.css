@@ -1,0 +1,289 @@
+body {
+    font-family:Ubuntu,'DejaVu Sans','Bitstream Vera Sans',Tahoma,sans-serif;
+    margin: 0;
+    background: url('../img/bg_dot.png');
+    font-size: 13px;
+}
+
+table {
+    font-size: 13px;
+}
+pre {
+    white-space: pre-wrap; /* css-3 */
+    white-space: -moz-pre-wrap !important; /* Mozilla, since 1999 */
+    white-space: -pre-wrap; /* Opera 4-6 */
+    white-space: -o-pre-wrap; /* Opera 7 */
+    word-wrap: break-word; /* Internet Explorer 5.5+ */
+}
+
+#container
+{
+    max-width:97%;
+    min-width:976px;
+    margin:0 auto 20px;
+    background: #f7f6f5;
+}
+#container-inner
+{
+    position:relative;
+    -moz-border-radius-bottomright:4px;
+    -moz-border-radius-bottomleft:4px;
+    border-bottom-left-radius:4px;
+    border-bottom-right-radius:4px;
+    -moz-box-shadow:0 3px 5px #ccc;
+    -webkit-box-shadow:0 3px 5px #ccc;
+    background-color: #fff;
+}
+
+#problem_set
+{
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+#problem_controls td
+{
+    vertical-align: middle;
+}
+
+#main
+{
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+}
+
+a:link {
+    color: #dd4814;
+    text-decoration: none;
+}
+
+a:visited {
+    color: #dd4814;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+#site-name
+{
+    font-size: 30px;
+    padding: 8px;
+}
+#site-name a
+{
+    text-decoration: none;
+    color: #000;
+}
+
+#header {
+    margin-left: 16px;
+    margin-bottom: 36px;
+}
+
+#navbar
+{
+    display: inline-block;
+    margin:0;
+    background:#dd4814 url('../img/light_stripes.png') repeat-x;
+    padding: 16px;
+    border-radius: 0 0 5px 5px;
+    box-shadow: 0 0 5px #555;
+    -moz-border-radius:0 0 5px 5px;
+    -webkit-border-radius:0 0 5px 5px;
+    -moz-box-shadow:0 0 5px #555;
+    -webkit-box-shadow:0 0 5px #555;
+}
+
+#header #ubuntuLink img
+{
+    border:none;
+}
+
+#login-link
+{
+    float: right;
+    padding: 16px;
+}
+#login-link a
+{
+    color: #000;
+}
+
+#problem-link a:link
+{
+    color: blue;
+    text-decoration: underline;
+}
+
+#problem_interval
+{
+    margin: 5px 0;
+}
+
+#date_selection
+{
+    visibility: hidden;
+}
+
+#package_name
+{
+    visibility: hidden;
+}
+
+#subscriber_name
+{
+    visibility: hidden;
+}
+
+#notes img
+{
+    padding-right: 5px;
+    vertical-align: text-top;
+    float: left;
+}
+#notes span
+{
+    display: block;
+    margin-left: 20px;
+}
+#notes
+{
+    background-color: #fdd;
+    padding: 5px;
+    border: 1px solid;
+    border-color: lightgrey;
+    margin-bottom: 15px;
+}
+#introduction
+{
+    font-size: 14px;
+    padding-bottom: 5px;
+}
+
+#copyright
+{
+    margin: 0 16px;
+    padding: 10px 0;
+    height: 48px;
+}
+#copyright p
+{
+    color: #aea79f;
+    font-size: 10px;
+    line-height: 16px;
+    margin: 2px 0;
+}
+#footer-logo {
+    margin: 24px 8px 0 0;
+    background-image: url(../img/footer_logo.png);
+    background-repeat: no-repeat;
+    float: right;
+}
+#footer-logo a {
+    display: block;
+    width: 118px;
+    height: 27px;
+}
+
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  width: 100%;
+  margin: 0 0 2.5em 0;
+  margin-bottom: 20px;
+}
+table td, table th {
+  padding: 8px 16px;
+  border: 1px dotted #aea79f;
+  border-left: none;
+  border-right: none;
+  vertical-align: middle;
+}
+table thead th {
+  border-collapse: separate;
+  border-spacing: 0 10px;
+  background: #aea79e;
+  color: #fff;
+  font-weight: normal;
+}
+table tbody th {
+  font-weight: 300;
+}
+table th[scope="col"] {
+  text-align: left;
+}
+table thead th:first-of-type {
+  text-align: left;
+}
+#problem_controls tr td {
+    border-spacing: 0px;
+    padding: 2px;
+    border: none;
+}
+#problem_set table {
+    width: 0;
+    margin: 20px 0;
+}
+/* Column header sort */
+.yui3-datatable-sortable-column
+{
+    z-index:1;
+}
+.yui3-datatable-sortable-column:focus,
+.yui3-datatable-sortable-column:active
+{
+    z-index:2;
+}
+.yui3-datatable-sortable-column
+{
+    cursor:pointer;
+}
+.yui3-datatable-sort-liner
+{
+    display:block;
+    height:100%;
+    position:relative;
+    padding-right:15px;
+    position:relative;
+    text-decoration: underline;
+}
+.yui3-datatable-sort-indicator
+{
+    position:absolute;
+    right:0;
+    bottom:.5ex;
+    width:7px;
+    height:10px;
+    background:url(../js/yui/build/assets/skins/sam/sort-arrow-sprite.png) no-repeat 0 0;
+    _background:url(../js/yui/build/assets/skins/sam/sort-arrow-sprite-ie.png) no-repeat 0 0;
+    overflow:hidden;
+}
+.yui3-datatable-sorted .yui3-datatable-sort-indicator
+{
+    background-position:0 -10px;
+}
+.yui3-datatable-sorted-desc .yui3-datatable-sort-indicator
+{
+    background-position:0 -20px;
+}
+#legend
+{
+    height: 45px;
+    margin: 5px 0;
+}
+
+svg text {
+    font-family:Ubuntu,'DejaVu Sans','Bitstream Vera Sans',Tahoma,sans-serif;
+}
+
+.nv-series text {
+    font-size: 14px;
+}
+
+/* Grey out EOL links */
+.series_eoan, .series_disco, .series_cosmic, .series_artful, .series_zesty, .series_yakkety, .series_wily, .series_vivid, .series_utopic, .series_trusty, .series_saucy, .series_raring, .series_quantal, .series_precise, .series_rtm_1409
+{
+    opacity: 0.5;
+}

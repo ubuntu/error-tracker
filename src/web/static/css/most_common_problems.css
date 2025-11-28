@@ -1,0 +1,98 @@
+th,td
+{
+    white-space: nowrap;
+    vertical-align: top;
+}
+#problems .yui3-datatable-table {
+    padding-top: 10px;
+    width: 100%;
+    border-collapse: collapse;
+}
+.yui3-datatable td.yui3-datatable-col-count {
+    font-size: 11px;
+    text-align: right;
+}
+.chart-wrap {
+    float: right;
+}
+.chart-text {
+    padding: 3px;
+    float: left;
+}
+.chart
+{
+    background-color: #aea7a0;
+    padding: 3px;
+    color: #000;
+    float: right;
+}
+div.outer {
+    position: relative;
+}
+.yui3-datatable .yui3-datatable-col-rank
+{
+    text-align: right;
+}
+.yui3-datatable .yui3-datatable-col-rank,
+.yui3-datatable .yui3-datatable-col-report,
+.yui3-datatable .yui3-datatable-col-count,
+.yui3-datatable .yui3-datatable-col-package,
+.yui3-datatable .yui3-datatable-col-first_seen,
+.yui3-datatable .yui3-datatable-col-last_seen
+{
+    width: 1px;
+}
+.yui3-datatable .yui3-datatable-col-report
+{
+    text-align: center;
+}
+.yui3-datatable .yui3-datatable-col-function
+{
+    width: 100%;
+}
+
+.inner
+{
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    position: absolute;
+    width: 100%;
+    padding: 5px;
+    /* Hack to center :-/ */
+    top: -13px;
+}
+
+.yui3-datatable .yui3-datatable-data .private
+{
+    background-image: url('../img/private.png');
+    background-repeat: no-repeat;
+    background-position: 5px center;
+}
+
+/* For unsuccessfully-fixed bugs, we highlight the contradictory cells:
+ * the bug report claiming the problem is fixed in a particular version,
+ * and the more recent version number where it isn't. */
+.yui3-datatable-col-last_seen.regression,
+.yui3-datatable-col-report.regression,
+.yui3-datatable-col-report.regression :link,
+.yui3-datatable-col-report.regression :visited
+ {
+    font-weight: bold;
+    color: red;
+}
+.yui3-datatable-col-report.regression {
+    text-decoration: line-through;
+}
+
+.yui3-datatable .yui3-datatable-data .disappeared,
+.yui3-datatable .yui3-datatable-data .disappeared a
+{
+    background-color: #ebe9e7;
+    color: #aea7a0;
+}
+.yui3-datatable .yui3-datatable-data .fixed,
+.yui3-datatable .yui3-datatable-data .fixed a
+{
+    text-decoration: line-through;
+}

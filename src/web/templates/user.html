@@ -1,0 +1,67 @@
+{% extends "index.html" %}
+{% load static %}
+{% block head %}
+<link rel="stylesheet" type="text/css" href="{% static '/css/user.css' %}">
+<script type="text/javascript" src="{% static '/js/yui/build/yui-base/yui-base-min.js' %}"></script>
+{% endblock %}
+{% block content %}
+{% if oopses %}
+    <script type="text/javascript">
+    YUI().use('event', 'datatable', 'datatable-sort', 'datasource-get',
+              'datasource-jsonschema', 'datatable-datasource',
+              'datatable-message', 'datatype-date', 'io-queue',
+              'io-form', function (Y) {
+        Y.on('load', function () {
+            var system_id = '{{ system_id }}';
+            var cols = [
+                {key: "occurred", label: "Occurred", formatter: formatDates},
+                {key: "instance", label: "Received", formatter: formatExample, allowHTML: true},
+                {key: "problemtype", label: "Problem Type"},
+                {key: "program", label: "Program"},
+            ];
+            var dataSource = new Y.DataSource.Get({
+                source: '/api/1.0/reports-for-system',
+            });
+
+            dataSource.plug(Y.Plugin.DataSourceJSONSchema, {
+                schema: {
+                    resultListLocator: "objects",
+                    resultFields: [{key: 'occurred'},
+                                   {key: 'timestamp'},
+                                   {key: 'instance'},
+                                   {key: 'problemtype'},
+                                   {key: 'program'}]
+                }
+            });
+
+            var table = new Y.DataTable({
+                columnset: cols,
+            });
+            table.plug(Y.Plugin.DataTableDataSource, {
+                datasource: dataSource,
+            });
+            table.render("#crashes");
+            table.datasource.load({request: '/?limit=50&system=' + system_id});
+            /* Formatters */
+            function formatDates(o) {
+                return o.value &&
+                Y.DataType.Date.format(new Date(o.value), {
+                    format: '%Y-%m-%d %H:%m'
+                });
+            }
+            function formatExample(o) {
+                var ts = o.data['timestamp'];
+                var reported = Y.DataType.Date.format(new Date(ts), { format: '%Y-%m-%d %H:%m UTC' });
+                return '<a href="/oops/' + o.value + '">' + reported + '</a>';
+            }
+        });
+    });
+    </script>
+    <h3>Error reports sent from this system</h3>
+    <div id="crashes_group">
+        <div id="crashes"></div>
+    </div>
+{% else %}
+    No errors have been reported from this system
+{% endif %}
+{% endblock %}
