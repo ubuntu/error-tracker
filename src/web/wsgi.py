@@ -12,18 +12,22 @@ import django.core.handlers.wsgi
 from django.conf import settings
 
 from django.template.loader import render_to_string
+
+
 def error_renderer(report):
-    return str(render_to_string('500.html', report))
+    return str(render_to_string("500.html", report))
+
 
 import django
+
 django.setup()
 
 cfg = oops_dictconfig.config_from_dict(config.oops_config)
 install_hooks(cfg)
-cfg.template['reporter'] = 'errors'
+cfg.template["reporter"] = "errors"
 kwargs = {
-    'oops_on_status': ['500'],
-    'error_render': error_renderer,
+    "oops_on_status": ["500"],
+    "error_render": error_renderer,
 }
 metrics.revno()
 application = VersionMiddleware(make_app(OOPSWSGIHandler(), cfg, **kwargs))

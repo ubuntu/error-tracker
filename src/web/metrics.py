@@ -20,20 +20,21 @@ def measure_view(view):
     <environ>.<app_name>.<module_path>.<func_name>.error
     if an exception was raised
     """
+
     @wraps(view)
     def wrapper(*args, **kwargs):
-        metrics = daisy_metrics.get_metrics('errors')
+        metrics = daisy_metrics.get_metrics("errors")
 
         # Views in tastypie do not have unique function names.
-        if 'resource_name' in kwargs:
-            name = kwargs['resource_name']
+        if "resource_name" in kwargs:
+            name = kwargs["resource_name"]
         else:
             name = view.__name__
 
-        if len(args) > 2 and hasattr(args[2], 'user'):
-            user = 'users.%s.' % str(args[2].user)
+        if len(args) > 2 and hasattr(args[2], "user"):
+            user = "users.%s." % str(args[2].user)
         else:
-            user = ''
+            user = ""
 
         start_time = time.time()
         try:
@@ -57,11 +58,14 @@ def measure_view(view):
                 if user:
                     metrics.timing(user + path, time.time() - start_time)
         return result
+
     return wrapper
 
-def revno(namespace='errors'):
+
+def revno(namespace="errors"):
     from errors.version import version_info
     import socket
-    if 'revno' in version_info:
-        m = '%s.version.errors' % socket.gethostname()
-        daisy_metrics.get_metrics(namespace).gauge(m, version_info['revno'])
+
+    if "revno" in version_info:
+        m = "%s.version.errors" % socket.gethostname()
+        daisy_metrics.get_metrics(namespace).gauge(m, version_info["revno"])

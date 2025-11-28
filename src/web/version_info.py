@@ -4,19 +4,21 @@ It uses the current working tree to determine the revision.
 So don't edit it. :)
 """
 
-version_info = {'branch_nick': 'bionic',
- 'build_date': '2021-01-20 08:19:48 -0800',
- 'clean': None,
- 'date': '2021-01-20 08:19:27 -0800',
- 'revision_id': b'brian@canonical.com-20210120161927-6nh8pbqt2zjwzvsl',
- 'revno': '640'}
+version_info = {
+    "branch_nick": "bionic",
+    "build_date": "2021-01-20 08:19:48 -0800",
+    "clean": None,
+    "date": "2021-01-20 08:19:27 -0800",
+    "revision_id": b"brian@canonical.com-20210120161927-6nh8pbqt2zjwzvsl",
+    "revno": "640",
+}
 
 revisions = {}
 
 file_revisions = {}
 
 
-if __name__ == '__main__':
-    print(('revision: %(revno)s' % version_info))
-    print(('nick: %(branch_nick)s' % version_info))
-    print(('revision id: %(revision_id)s' % version_info))
+if __name__ == "__main__":
+    print(("revision: %(revno)s" % version_info))
+    print(("nick: %(branch_nick)s" % version_info))
+    print(("revision id: %(revision_id)s" % version_info))

@@ -1,28 +1,30 @@
 from django.conf.urls import include, url
 from tastypie.api import Api
-from .resources import (RetraceResultResource,
-                        RetraceAverageProcessingTimeResource,
-                        InstanceCountResource,
-                        ProblemCountResource,
-                        DayOopsResource,
-                        MostCommonProblemsResource,
-                        CreateBugResource,
-                        BinaryPackageVersionsResource,
-                        SystemCrashesResource,
-                        RateOfCrashesResource,
-                        InstanceResource,
-                        AverageCrashesResource,
-                        ReportsStateResource,
-                        AverageInstancesResource,
-                        InstancesResource,
-                        VersionsResource,
-                        PackageVersionIsMostRecent,
-                        CrashSignaturesForBug,
-                        PackageVersionNewBuckets,
-                        SystemImageVersionsResource,
-                        ReleasePackageVersionPockets)
+from .resources import (
+    RetraceResultResource,
+    RetraceAverageProcessingTimeResource,
+    InstanceCountResource,
+    ProblemCountResource,
+    DayOopsResource,
+    MostCommonProblemsResource,
+    CreateBugResource,
+    BinaryPackageVersionsResource,
+    SystemCrashesResource,
+    RateOfCrashesResource,
+    InstanceResource,
+    AverageCrashesResource,
+    ReportsStateResource,
+    AverageInstancesResource,
+    InstancesResource,
+    VersionsResource,
+    PackageVersionIsMostRecent,
+    CrashSignaturesForBug,
+    PackageVersionNewBuckets,
+    SystemImageVersionsResource,
+    ReleasePackageVersionPockets,
+)
 
-v1_api = Api(api_name='1.0')
+v1_api = Api(api_name="1.0")
 v1_api.register(RetraceResultResource())
 v1_api.register(RetraceAverageProcessingTimeResource())
 v1_api.register(InstanceCountResource())
@@ -46,5 +48,5 @@ v1_api.register(SystemImageVersionsResource())
 v1_api.register(ReleasePackageVersionPockets())
 
 urlpatterns = [
-    url(r'^', include(v1_api.urls)),
+    url(r"^", include(v1_api.urls)),
 ]
