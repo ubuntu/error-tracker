@@ -87,7 +87,7 @@ class OOPS(ErrorTrackerTable):
         query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
-            d[result["column1"]] = result["value"]
+            d[result.column1] = result.value
         return d
 
 
@@ -116,7 +116,7 @@ class BucketMetadata(ErrorTrackerTable):
         query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
-            d[result["column1"]] = result["value"]
+            d[result.column1] = result.value
         return d
 
 
@@ -138,7 +138,7 @@ class RetraceStats(ErrorTrackerTable):
         query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
-            d[result["column1"]] = result["value"]
+            d[result.column1] = result.value
         return d
 
 
@@ -191,7 +191,7 @@ class BucketRetraceFailureReason(ErrorTrackerTable):
         query = cls.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
-            d[result["column1"]] = result["value"]
+            d[result.column1] = result.value
         return d
 
 
