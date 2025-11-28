@@ -1,0 +1,76 @@
+#mean {
+    height: 450px;
+    min-width: 100px;
+    min-height: 100px;
+}
+.bucket {
+    font-size: 2em;
+}
+pre {
+    font-family: 'Ubuntu Mono';
+    margin: 0;
+}
+
+.yui3-skin-sam .yui3-datatable table {
+    font-family: Ubuntu;
+    border: none;
+}
+
+.yui3-skin-sam .yui3-datatable td {
+    border-left: none;
+    border-right: none;
+}
+
+.yui3-skin-sam tr.yui3-datatable-odd td.yui3-datatable-cell,
+.yui3-skin-sam tr.yui3-datatable-even td.yui3-datatable-cell {
+    background-color: #fff;
+    border-bottom: 1px #ddd dotted;
+}
+
+.yui3-datatable-col-timestamp {
+    text-align: right;
+}
+/* Pad the package versions table */
+td.yui3-datatable-col-version.yui3-datatable-cell,
+/* Pad the examples table */
+td.yui3-datatable-col-timestamp.yui3-datatable-cell,
+td.yui3-datatable-col-incident.yui3-datatable-cell,
+td.yui3-datatable-col-package_version.yui3-datatable-cell,
+td.yui3-datatable-col-ubuntu_version.yui3-datatable-cell,
+td.yui3-datatable-col-architecture.yui3-datatable-cell
+{
+    padding: 10px;
+}
+td.yui3-datatable-col-precise.yui3-datatable-cell,
+td.yui3-datatable-col-quantal.yui3-datatable-cell,
+td.yui3-datatable-col-raring.yui3-datatable-cell,
+td.yui3-datatable-col-saucy.yui3-datatable-cell,
+td.yui3-datatable-col-trusty.yui3-datatable-cell,
+td.yui3-datatable-col-utopic.yui3-datatable-cell,
+td.yui3-datatable-col-vivid.yui3-datatable-cell,
+td.yui3-datatable-col-wily.yui3-datatable-cell,
+td.yui3-datatable-col-rtm_1409.yui3-datatable-cell,
+td.yui3-datatable-col-derivatives.yui3-datatable-cell,
+td.yui3-datatable-col-total.yui3-datatable-cell
+{
+    padding: 10px;
+    text-align: center;
+}
+#examples_group,
+#versions {
+    width: 1px;
+    white-space: nowrap;
+}
+#examples_group
+{
+    /* To center the spinner below. */
+    display: table;
+}
+
+#spinner {
+    background-position: center;
+    background-image: url('../img/spinner-big.gif');
+    background-repeat: no-repeat;
+    padding: 10px;
+    height: 32px;
+}

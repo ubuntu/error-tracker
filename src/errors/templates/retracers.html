@@ -1,0 +1,32 @@
+{% extends "index.html" %}
+{% load static %}
+{% block head %}
+<link href="{% static '/js/nvd3/src/nv.d3.css' %}" rel="stylesheet" type="text/css">
+<link href="{% static '/css/mean_time_between_failures.css' %}" rel="stylesheet" type="text/css">
+
+<link rel="stylesheet" type="text/css" href="{% static '/css/main.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static '/css/retracers.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static '/js/yui/build/assets/skins/sam/skin.css' %}">
+<link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Ubuntu:regular,bold&subset=Latin">
+
+<script type="text/javascript" src="{% static '/js/yui/build/yui-base/yui-base-min.js' %}"></script>
+<script type="text/javascript" src="{% static '/js/nvd3/lib/d3.v2.js' %}"></script>
+<script type="text/javascript" src="{% static '/js/nvd3/nv.d3.min.js' %}"></script>
+<script type="text/javascript" src="{% static '/js/retracers.js' %}"></script>
+<script type="text/javascript">
+    {% if graph_type == "results" %}
+        retracers_results_graph();
+    {% else %}
+        {% if graph_type == "average-processing-time" %}
+            retracers_graph();
+        {% else %}
+            {% if graph_type == "instances" %}
+                instances_graph();
+            {% endif %}
+        {% endif %}
+    {% endif %}
+</script>
+{% endblock %}
+{% block content %}
+<div id="retracers"><svg style="height: 100%;"></svg></div>
+{% endblock %}

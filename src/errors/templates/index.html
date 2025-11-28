@@ -1,0 +1,63 @@
+<!doctype html><!-- Importance of doctype http://code.google.com/p/chromium/issues/detail?id=2891 -->
+<html>
+<head>
+<script type="text/javascript">
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-39234199-1', 'ubuntu.com');
+  ga('send', 'pageview');
+
+</script>
+{% load static %}
+<link rel="stylesheet" type="text/css" href="{% static '/css/main.css' %}">
+<link href='https://fonts.googleapis.com/css?family=Ubuntu:400,300,300italic,400italic,700,700italic|Ubuntu+Mono' rel='stylesheet' type='text/css' />
+<link rel="shortcut icon" href="{% static '/img/favicon.ico' %}" type="image/x-icon" />
+{% block head %}{% endblock %}
+<title>{% if title %}{{ title }}{% else %}Error reports{% endif %}</title>
+</head>
+<body>
+    <div id="container">
+        <div id="container-inner">
+            <div id="header">
+                <div id="navbar">
+                    <a id="ubuntuLink" href="http://wiki.ubuntu.com"><img id="topLogo" src="{% static '/img/logo.png' %}"></img></a>
+                </div>
+                <span id="site-name"><a href="/">Error tracker</a></span>
+                {% if authenticated %}
+                    <span id="login-link">Logged in as 
+                        <a href="https://login.ubuntu.com/+edit">{{ username }}</a> • 
+                        <a href="/logout">Log out</a>
+                    </span>
+                {% else %}
+                    {% if 'login-failed=true' not in request_full_path %}
+                    <span id="login-link"><a href="{{ login_url }}">Log in</a></span>
+                    {% endif %}
+                {% endif %}
+            </div>
+            <div id="main">
+                {% block content %}
+                <h1>{{ title }}</h1>
+                {% endblock %}
+            </div>
+        </div>
+        <div id="footer-logo"><a href="http://www.ubuntu.com"></a></div>
+        <div id="copyright">
+            <p>
+            © 2012-2015 Canonical Ltd.
+            <a href="https://launchpad.net/errors">Source code</a> for this service
+            {% if code_revno %}
+                (r{{ code_revno }})
+            {% endif %}
+            is licensed under the <a href="http://www.gnu.org/licenses/agpl-3.0.html">AGPL</a>.
+            <br>
+            Ubuntu and Canonical are registered trademarks of Canonical Group Ltd.
+            <br>
+            <a href="https://wiki.ubuntu.com/ErrorTracker">Contribute</a> to the Ubuntu Error tracker project.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

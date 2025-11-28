@@ -1,0 +1,33 @@
+body {
+    overflow-y:scroll;
+}
+#mean {
+    height: 450px;
+    min-width: 100px;
+    min-height: 100px;
+}
+
+.nvd3 .nv-axis.nv-x  line {
+    fill: none;
+    stroke: #333;
+    stroke-opacity: 1;
+	stroke-dasharray: 1,5;
+	stroke-width: 1px;
+    shape-rendering: crispEdges;
+    stroke-linecap: round;
+}
+
+.nvd3 .nv-axis.nv-y line {
+    display: none;
+}
+.nvd3 .nv-axis.nv-y path.domain,
+.nvd3 .nv-axis.nv-x path.domain {
+    stroke-opacity: 1;
+    stroke: #aea79e;
+}
+
+
+svg text {
+    font-family: Ubuntu;
+}
+

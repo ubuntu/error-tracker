@@ -20,7 +20,10 @@ charmcraft.spread -v -reuse -resend
 
 Start with the Python dependencies
 ```
+# For 'daisy' only
 sudo apt install apport-retrace python3-amqp python3-bson python3-cassandra python3-flask python3-mock python3-pygit2 python3-pytest python3-pytest-cov python3-swiftclient ubuntu-dbgsym-keyring
+# Add this for 'errors'
+sudo apt install python3-django-tastypie python3-numpy
 ```
 
 Then start a local Cassandra, RabbitMQ and swift (`docker` should works fine too):
@@ -40,12 +43,17 @@ Or start each individual process (from the `./src` folder):
 
 daisy:
 ```
-python3 ./daisy/app.py
+./run-daisy.sh
 ```
 
 retracer:
 ```
-python3 ./retracer.py -a amd64 --sandbox-dir /tmp/sandbox -v --config-dir ./retracer/config
+./run-retracer.sh
+```
+
+errors:
+```
+./run-errors.sh
 ```
 
 From there, you can manually upload a crash with the following, from any folder
