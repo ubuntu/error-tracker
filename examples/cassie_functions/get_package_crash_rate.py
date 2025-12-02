@@ -11,7 +11,7 @@ from errors.cassie import get_package_crash_rate
 setup_cassandra()
 
 # Example: Get crash rate for a package update
-release = "Ubuntu 22.04"
+release = "Ubuntu 24.04"
 src_package = "firefox"
 old_version = "120.0"
 new_version = "121.0"

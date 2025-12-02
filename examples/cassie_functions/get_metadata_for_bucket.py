@@ -12,7 +12,7 @@ setup_cassandra()
 
 # Example: Get metadata for a specific bucket
 bucketid = "example_bucket_id_12345"
-release = "Ubuntu 22.04"
+release = "Ubuntu 24.04"
 
 metadata = get_metadata_for_bucket(bucketid, release=release)
 print(f"Metadata: {metadata}")
