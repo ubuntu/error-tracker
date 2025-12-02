@@ -6,7 +6,6 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections import OrderedDict
 from functools import cmp_to_key
 from uuid import UUID
 
@@ -382,7 +381,7 @@ def get_retracer_means(start, finish):
     except DoesNotExist:
         return iter([])
 
-    result = OrderedDict()
+    result = dict()
     for timing in timings:
         # Filter by date range
         if timing < start_str or timing > finish_str:
@@ -454,7 +453,7 @@ def chunks(l, n):
 
 
 def get_metadata_for_buckets(bucketids, release=None):
-    ret = OrderedDict()
+    ret = dict()
     for bucketid in bucketids:
         bucket_key = bucketid.encode() if isinstance(bucketid, str) else bucketid
         try:
@@ -521,14 +520,14 @@ def get_average_crashes(field, release, days=7):
 
     try:
         key = "oopses:%s" % field
-        oopses = OrderedDict()
+        oopses = dict()
         oops_rows = Counters.objects.filter(
             key=key.encode(), column1__gte=start, column1__lte=end
         ).all()
         for row in oops_rows:
             oopses[row.column1] = row.value
 
-        users = OrderedDict()
+        users = dict()
         release_key = release.encode() if isinstance(release, str) else release
         user_rows = UniqueUsers90Days.objects.filter(
             key=release_key, column1__gte=start, column1__lte=end
