@@ -12,7 +12,7 @@ backends:
     # spread: https://github.com/canonical/spread/pull/185
     allocate: |
       CONTAINER_NAME="error-tracker-${SPREAD_SYSTEM/./-}-${RANDOM}"
-      DISK="${DISK:-20}"
+      DISK="${DISK:-30}"
       CPU="${CPU:-4}"
       MEM="${MEM:-5}"
 
