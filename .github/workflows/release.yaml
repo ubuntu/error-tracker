@@ -1,4 +1,4 @@
-name: Release charms to other channels
+name: Release charm to other channels
 
 on:
   workflow_dispatch:
@@ -24,10 +24,7 @@ on:
         required: true
         type: choice
         options:
-          - retracer
-          - timers
-          - daisy
-          - web
+          - error-tracker
 
 jobs:
   promote-charm:
@@ -45,6 +42,6 @@ jobs:
 
           # for multi charm repo
           tag-prefix: ${{ inputs.charm-name }}
-          charm-path: charms/${{ inputs.charm-name }}
+          charm-path: .
 
           base-channel: "24.04"
