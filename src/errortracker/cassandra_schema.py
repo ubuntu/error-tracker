@@ -202,41 +202,43 @@ class AwaitingRetrace(ErrorTrackerTable):
 
 class ErrorsByRelease(ErrorTrackerTable):
     __table_name__ = "ErrorsByRelease"
-    key = columns.Blob(db_field="key", primary_key=True)
+    key = columns.Ascii(db_field="key", primary_key=True)
+    key2 = columns.DateTime(db_field="key2", primary_key=True)
     column1 = columns.TimeUUID(db_field="column1", primary_key=True)
-    value = columns.Blob(db_field="value")
+    value = columns.DateTime(db_field="value")
 
 
 class BucketVersionsCount(ErrorTrackerTable):
     __table_name__ = "BucketVersionsCount"
-    key = columns.Blob(db_field="key", primary_key=True)
-    column1 = columns.Text(db_field="column1", primary_key=True)
+    key = columns.Text(db_field="key", primary_key=True)
+    column1 = columns.Ascii(db_field="column1", primary_key=True)
+    column2 = columns.Ascii(db_field="column2", primary_key=True)
     value = columns.Counter(db_field="value")
 
 
 class BugToCrashSignatures(ErrorTrackerTable):
     __table_name__ = "BugToCrashSignatures"
-    key = columns.Blob(db_field="key", primary_key=True)
+    key = columns.VarInt(db_field="key", primary_key=True)
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Blob(db_field="value")
 
 
 class SystemImages(ErrorTrackerTable):
     __table_name__ = "SystemImages"
-    key = columns.Blob(db_field="key", primary_key=True)
+    key = columns.Text(db_field="key", primary_key=True)
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Blob(db_field="value")
 
 
 class UniqueUsers90Days(ErrorTrackerTable):
     __table_name__ = "UniqueUsers90Days"
-    key = columns.Blob(db_field="key", primary_key=True)
+    key = columns.Text(db_field="key", primary_key=True)
     column1 = columns.Text(db_field="column1", primary_key=True)
-    value = columns.Counter(db_field="value")
+    value = columns.BigInt(db_field="value")
 
 
 class UserBinaryPackages(ErrorTrackerTable):
     __table_name__ = "UserBinaryPackages"
-    key = columns.Blob(db_field="key", primary_key=True)
-    column1 = columns.Text(db_field="column1", primary_key=True)
+    key = columns.Ascii(db_field="key", primary_key=True)
+    column1 = columns.Ascii(db_field="column1", primary_key=True)
     value = columns.Blob(db_field="value")
