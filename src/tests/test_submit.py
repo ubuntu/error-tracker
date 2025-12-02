@@ -10,7 +10,7 @@ import apport
 import bson
 import pytest
 
-from daisy.app import app as daisy_flask_app
+from daisy.app import create_app
 from errortracker import amqp_utils, cassandra_schema, swift_utils
 
 # SHA-512 of the system-uuid
@@ -23,6 +23,7 @@ sha512_system_uuid = (
 
 @pytest.fixture()
 def app():
+    daisy_flask_app = create_app()
     daisy_flask_app.config.update(
         {
             "TESTING": True,

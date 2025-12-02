@@ -120,7 +120,7 @@ After=network.target
 User=ubuntu
 Group=ubuntu
 WorkingDirectory={REPO_LOCATION}/src
-ExecStart=gunicorn -c {REPO_LOCATION}/src/daisy/gunicorn_config.py 'daisy.app:app'
+ExecStart=gunicorn -c {REPO_LOCATION}/src/daisy/gunicorn_config.py 'daisy.app:create_app()'
 Restart=always
 
 [Install]
