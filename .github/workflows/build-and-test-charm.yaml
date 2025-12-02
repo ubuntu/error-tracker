@@ -50,24 +50,12 @@ jobs:
     name: Build charm
     runs-on: ubuntu-latest
     steps:
-      - name: Aggressive cleanup to regain disk space
-        run: |
-          # Remove Java (JDKs)
-          sudo rm -rf /usr/lib/jvm
-          # Remove .NET SDKs
-          sudo rm -rf /usr/share/dotnet
-          # Remove Swift toolchain
-          sudo rm -rf /usr/share/swift
-          # Remove Haskell (GHC)
-          sudo rm -rf /usr/local/.ghcup
-          # Remove Julia
-          sudo rm -rf /usr/local/julia*
-          # Remove Android SDKs
-          sudo rm -rf /usr/local/lib/android
-          # Remove Chromium (optional if not using for browser tests)
-          sudo rm -rf /usr/local/share/chromium
-          # Remove Microsoft/Edge and Google Chrome builds
-          sudo rm -rf /opt/microsoft /opt/google
+      - name: Free Disk Space (Ubuntu)
+        uses: Hyask/free-disk-space@4f025bdd96db60187593b61863469bfc94c97833 # v1.3.1+apt-get-quiet
+        # uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          tool-cache: true  # We don't need any pre-cached tools
+          large-packages: false  # Not so much disk gained for too long runtime
 
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
