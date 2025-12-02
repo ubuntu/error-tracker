@@ -12,7 +12,7 @@ setup_cassandra()
 
 # Example: Get metadata for multiple buckets
 bucketids = ["bucket_1", "bucket_2", "bucket_3"]
-release = "Ubuntu 22.04"
+release = "Ubuntu 24.04"
 
 metadata_dict = get_metadata_for_buckets(bucketids, release=release)
 for bucketid, metadata in metadata_dict.items():
