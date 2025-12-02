@@ -36,7 +36,7 @@ from errortracker.cassandra_schema import (
     UserOOPS,
 )
 
-session = cassandra.cassandra_session()
+session = cassandra.cassandra_session
 
 
 def _split_into_dictionaries(original):
@@ -64,17 +64,17 @@ def _get_range_of_dates(start, finish):
 
 def get_oopses_by_day(date, limit=1000):
     """All of the OOPSes in the given day."""
-    oopses_by_day = session.prepare('SELECT value FROM crashdb."DayOOPS" WHERE key = ? LIMIT ?;')
-    for row in session.execute(oopses_by_day, [date, limit]):
+    oopses_by_day = session().prepare('SELECT value FROM crashdb."DayOOPS" WHERE key = ? LIMIT ?;')
+    for row in session().execute(oopses_by_day, [date, limit]):
         yield row.value
 
 
 def get_oopses_by_release(release, limit=1000):
     """All of the OOPSes in the given release."""
-    oopses_by_release = session.prepare(
+    oopses_by_release = session().prepare(
         'SELECT column1 FROM crashdb."ErrorsByRelease" WHERE key = ? LIMIT ? ALLOW FILTERING;'
     )
-    for row in session.execute(oopses_by_release, [release.encode(), limit]):
+    for row in session().execute(oopses_by_release, [release.encode(), limit]):
         yield row.column1
 
 
