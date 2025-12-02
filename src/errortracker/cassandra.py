@@ -2,6 +2,7 @@ import inspect
 import os
 
 from cassandra.auth import PlainTextAuthProvider
+from cassandra.cluster import ConsistencyLevel
 from cassandra.cqlengine import connection, management
 from cassandra.policies import RoundRobinPolicy
 
@@ -27,6 +28,7 @@ def setup_cassandra():
         connection.setup(
             config.cassandra_creds["hosts"],
             KEYSPACE,
+            consistency=ConsistencyLevel.QUORUM,
             auth_provider=auth_provider,
             load_balancing_policy=RoundRobinPolicy(),
             protocol_version=4,
