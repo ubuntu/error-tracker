@@ -187,10 +187,8 @@ def get_bucket_counts(
                 results[column] = count + existing
         except DoesNotExist:
             continue
-    
-    return sorted(
-        list(results.items()), key=lambda x: x[1], reverse=True
-    )
+
+    return sorted(list(results.items()), key=lambda x: x[1], reverse=True)
 
 
 def get_crashes_for_bucket(bucketid, limit=100, start=None):
@@ -206,16 +204,16 @@ def get_crashes_for_bucket(bucketid, limit=100, start=None):
             start_uuid = UUID(start)
             # Filter to get items less than start (for reversed ordering)
             query = query.filter(column1__lt=start_uuid)
-        
+
         # Order by column1 descending (most recent first)
         rows = list(query.limit(limit + (1 if start else 0)).all())
-        
+
         # Sort by column1 descending (TimeUUID orders chronologically)
         rows.sort(key=lambda x: x.column1, reverse=True)
-        
+
         if start:
             # Skip the first item (which is the start value)
-            return [row.column1 for row in rows[1:limit+1]]
+            return [row.column1 for row in rows[1 : limit + 1]]
         else:
             return [row.column1 for row in rows[:limit]]
     except DoesNotExist:
@@ -231,14 +229,14 @@ def get_package_for_bucket(bucketid):
         oopsids = [row.column1 for row in rows]
     except DoesNotExist:
         return ("", "")
-    
+
     for oopsid in oopsids:
         try:
             oops_rows = OOPS.objects.filter(key=str(oopsid).encode(), column1="Package").all()
             for row in oops_rows:
                 value = row.value
                 if isinstance(value, bytes):
-                    value = value.decode('utf-8')
+                    value = value.decode("utf-8")
                 package_and_version = value.split()[:2]
                 if len(package_and_version) == 1:
                     return (package_and_version[0], "")
@@ -255,16 +253,16 @@ def get_crash(oopsid, columns=None):
         if columns:
             # Filter by specific columns
             query = query.filter(column1__in=columns)
-        
+
         oops = {}
         for row in query.all():
             oops[row.column1] = row.value
-            
+
         if not oops:
             return {}
     except DoesNotExist:
         return {}
-    
+
     if "StacktraceAddressSignature" in oops:
         SAS = oops["StacktraceAddressSignature"]
         if not SAS:
@@ -276,7 +274,7 @@ def get_crash(oopsid, columns=None):
         return oops
     else:
         return oops
-    
+
     try:
         index_key = b"crash_signature_for_stacktrace_address_signature"
         index_rows = Indexes.objects.filter(key=index_key, column1=SAS).all()
@@ -359,9 +357,7 @@ def get_retracer_counts(start, finish):
                 if date_key not in results_dict:
                     results_dict[date_key] = {}
                 results_dict[date_key][row.column1] = row.value
-        return (
-            (date, _split_into_dictionaries(result)) for date, result in results_dict.items()
-        )
+        return ((date, _split_into_dictionaries(result)) for date, result in results_dict.items())
     else:
         dates = _get_range_of_dates(start, finish)
         results = {}
@@ -385,7 +381,7 @@ def get_retracer_means(start, finish):
         timings = Indexes.get_as_dict(key=b"mean_retracing_time")
     except DoesNotExist:
         return iter([])
-    
+
     result = OrderedDict()
     for timing in timings:
         # Filter by date range
@@ -434,11 +430,11 @@ def get_metadata_for_bucket(bucketid, release=None):
             rows = BucketMetadata.objects.filter(key=bucket_key, column1__lt="~").all()
         else:
             rows = BucketMetadata.objects.filter(key=bucket_key).all()
-        
+
         ret = {}
         for row in rows:
             ret[row.column1] = row.value
-        
+
         if release and ret:
             try:
                 ret["FirstSeen"] = ret["~%s:FirstSeen" % release]
@@ -466,16 +462,16 @@ def get_metadata_for_buckets(bucketids, release=None):
                 rows = BucketMetadata.objects.filter(key=bucket_key, column1__lt="~").all()
             else:
                 rows = BucketMetadata.objects.filter(key=bucket_key).all()
-            
+
             bucket_data = {}
             for row in rows:
                 bucket_data[row.column1] = row.value
-            
+
             if bucket_data:
                 ret[bucketid] = bucket_data
         except DoesNotExist:
             pass
-    
+
     if release:
         for bucket_id in ret:
             bucket = ret[bucket_id]
@@ -499,19 +495,19 @@ def get_user_crashes(user_token, limit=50, start=None):
     try:
         user_key = user_token.encode() if isinstance(user_token, str) else user_token
         query = UserOOPS.objects.filter(key=user_key)
-        
+
         if start:
             # Filter to get items greater than start
             query = query.filter(column1__gt=start)
-        
+
         rows = list(query.limit(limit).all())
-        
+
         for row in rows:
             # Since we don't have timestamp directly, we'll use the column1 as a proxy
             results[row.column1] = {"submitted": row.column1}
     except DoesNotExist:
         return []
-    
+
     return [
         (k, results[k]["submitted"])
         for k in sorted(results.keys(), key=lambda x: results[x]["submitted"], reverse=True)
@@ -522,7 +518,7 @@ def get_average_crashes(field, release, days=7):
     dates = _get_range_of_dates(0, days)
     start = dates[-1]
     end = dates[0]
-    
+
     try:
         key = "oopses:%s" % field
         oopses = OrderedDict()
@@ -531,7 +527,7 @@ def get_average_crashes(field, release, days=7):
         ).all()
         for row in oops_rows:
             oopses[row.column1] = row.value
-        
+
         users = OrderedDict()
         release_key = release.encode() if isinstance(release, str) else release
         user_rows = UniqueUsers90Days.objects.filter(
@@ -561,19 +557,17 @@ def get_average_instances(bucketid, release, days=7):
     dates = _get_range_of_dates(0, days)
     start = dates[-1]
     end = dates[0]
-    
+
     release_key = release.encode() if isinstance(release, str) else release
     user_rows = UniqueUsers90Days.objects.filter(
         key=release_key, column1__gte=start, column1__lte=end
     ).all()
     users = {row.column1: row.value for row in user_rows}
-    
+
     for date in dates:
         try:
             key = "%s:%s" % (release, date)
-            count_rows = DayBucketsCount.objects.filter(
-                key=key.encode(), column1=bucketid
-            ).all()
+            count_rows = DayBucketsCount.objects.filter(key=key.encode(), column1=bucketid).all()
             count = None
             for row in count_rows:
                 count = row.value
@@ -610,7 +604,9 @@ def get_source_package_for_bucket(bucketid):
     oopsids = [row.column1 for row in bucket_rows]
     for oopsid in oopsids:
         try:
-            oops_rows = OOPS.objects.filter(key=str(oopsid).encode(), column1="SourcePackage").all()
+            oops_rows = OOPS.objects.filter(
+                key=str(oopsid).encode(), column1="SourcePackage"
+            ).all()
             for row in oops_rows:
                 return row.value
         except (KeyError, DoesNotExist):
@@ -643,13 +639,13 @@ def get_binary_packages_for_user(user):
         return None
     if len(binary_packages) == 0:
         return None
-    
+
     results = {}
     for pkg in binary_packages:
         count = DayBucketsCount.objects.filter(key=pkg.encode()).limit(1).count()
         if count > 0:
             results[pkg] = count
-    
+
     # Remove entries with 0 count
     results = {k: v for k, v in results.items() if v > 0}
     return [k[0:-7] for k in list(results.keys())]
@@ -665,18 +661,20 @@ def get_package_crash_rate(
     old_vers_column = "%s:%s:%s" % (release, src_package, old_version)
     new_vers_column = "%s:%s:%s" % (release, src_package, new_version)
     results = {}
-    
+
     try:
         # The first thing done is the reversing of the order that's why it
         # is column_start (get items <= date in reverse order)
-        old_rows = Counters.objects.filter(
-            key=old_vers_column.encode(), column1__lte=date
-        ).limit(15).all()
+        old_rows = (
+            Counters.objects.filter(key=old_vers_column.encode(), column1__lte=date)
+            .limit(15)
+            .all()
+        )
         old_rows_sorted = sorted(old_rows, key=lambda x: x.column1, reverse=True)
         old_vers_data = {row.column1: row.value for row in old_rows_sorted}
     except DoesNotExist:
         old_vers_data = None
-    
+
     try:
         # this may be unnecessarily long since updates phase in ~3 days
         new_rows = Counters.objects.filter(key=new_vers_column.encode()).limit(15).all()
@@ -685,29 +683,35 @@ def get_package_crash_rate(
     except DoesNotExist:
         results["increase"] = False
         return results
-    
+
     if not new_vers_data:
         results["increase"] = False
         return results
-    
+
     if exclude_proposed:
         try:
-            proposed_old_rows = CountersForProposed.objects.filter(
-                key=old_vers_column.encode(), column1__lte=date
-            ).limit(15).all()
-            proposed_old_rows_sorted = sorted(proposed_old_rows, key=lambda x: x.column1, reverse=True)
+            proposed_old_rows = (
+                CountersForProposed.objects.filter(key=old_vers_column.encode(), column1__lte=date)
+                .limit(15)
+                .all()
+            )
+            proposed_old_rows_sorted = sorted(
+                proposed_old_rows, key=lambda x: x.column1, reverse=True
+            )
             proposed_old_vers_data = {row.column1: row.value for row in proposed_old_rows_sorted}
         except DoesNotExist:
             proposed_old_vers_data = None
         try:
-            proposed_new_rows = CountersForProposed.objects.filter(
-                key=new_vers_column.encode()
-            ).limit(15).all()
-            proposed_new_rows_sorted = sorted(proposed_new_rows, key=lambda x: x.column1, reverse=True)
+            proposed_new_rows = (
+                CountersForProposed.objects.filter(key=new_vers_column.encode()).limit(15).all()
+            )
+            proposed_new_rows_sorted = sorted(
+                proposed_new_rows, key=lambda x: x.column1, reverse=True
+            )
             proposed_new_vers_data = {row.column1: row.value for row in proposed_new_rows_sorted}
         except DoesNotExist:
             proposed_new_vers_data = None
-    
+
     today = datetime.datetime.utcnow().strftime("%Y%m%d")
     try:
         today_crashes = new_vers_data[today]
@@ -715,7 +719,7 @@ def get_package_crash_rate(
         # no crashes today so not an increase
         results["increase"] = False
         return results
-    
+
     # subtract CountersForProposed data from today crashes
     if exclude_proposed and proposed_new_vers_data:
         try:
@@ -727,7 +731,7 @@ def get_package_crash_rate(
             # no crashes today so not an increase
             results["increase"] = False
             return results
-    
+
     if new_vers_data and not old_vers_data:
         results["increase"] = True
         results["previous_average"] = None
@@ -740,7 +744,7 @@ def get_package_crash_rate(
         )
         results["web_link"] = absolute_uri + web_link
         return results
-    
+
     first_date = date
     oldest_date = list(old_vers_data.keys())[-1]
     dates = [x for x in _date_range_iterator(oldest_date, first_date)]
@@ -761,12 +765,12 @@ def get_package_crash_rate(
         # the day doesn't exist so there were 0 errors
         except KeyError:
             previous_vers_crashes.append(0)
-    
+
     results["increase"] = False
     # 2 crashes may be a fluke
     if today_crashes < 3:
         return results
-    
+
     now = datetime.datetime.utcnow()
     hour = float(now.hour)
     minute = float(now.minute)
@@ -800,22 +804,26 @@ def get_package_crash_rate(
 
 def get_package_new_buckets(src_pkg, previous_version, new_version):
     results = []
-    
+
     # Ensure src_pkg and versions are strings for Ascii fields
     src_pkg_str = src_pkg if isinstance(src_pkg, str) else src_pkg.decode("utf-8")
     new_version_str = new_version if isinstance(new_version, str) else new_version.decode("utf-8")
-    previous_version_str = previous_version if isinstance(previous_version, str) else previous_version.decode("utf-8")
-    
+    previous_version_str = (
+        previous_version if isinstance(previous_version, str) else previous_version.decode("utf-8")
+    )
+
     # new version has no buckets
     try:
         new_rows = SourceVersionBuckets.objects.filter(key=src_pkg_str, key2=new_version_str).all()
         n_data = [row.column1 for row in new_rows]
     except (KeyError, DoesNotExist):
         return results
-    
+
     # if previous version has no buckets return an empty list
     try:
-        prev_rows = SourceVersionBuckets.objects.filter(key=src_pkg_str, key2=previous_version_str).all()
+        prev_rows = SourceVersionBuckets.objects.filter(
+            key=src_pkg_str, key2=previous_version_str
+        ).all()
         p_data = [row.column1 for row in prev_rows]
     except (KeyError, DoesNotExist):
         p_data = []
@@ -823,16 +831,30 @@ def get_package_new_buckets(src_pkg, previous_version, new_version):
     new_buckets = set(n_data).difference(set(p_data))
     for bucket in new_buckets:
         # do not return buckets that failed to retrace
-        bucket_str = bucket if isinstance(bucket, str) else bucket.decode("utf-8") if isinstance(bucket, bytes) else str(bucket)
+        bucket_str = (
+            bucket
+            if isinstance(bucket, str)
+            else bucket.decode("utf-8")
+            if isinstance(bucket, bytes)
+            else str(bucket)
+        )
         if bucket_str.startswith("failed:"):
             continue
-        
+
         # BucketVersionSystems2 expects key as Text (string)
-        bucket_key = bucket if isinstance(bucket, str) else bucket.decode("utf-8") if isinstance(bucket, bytes) else str(bucket)
+        bucket_key = (
+            bucket
+            if isinstance(bucket, str)
+            else bucket.decode("utf-8")
+            if isinstance(bucket, bytes)
+            else str(bucket)
+        )
         try:
-            count_rows = BucketVersionSystems2.objects.filter(
-                key=bucket_key, key2=new_version_str
-            ).limit(4).all()
+            count_rows = (
+                BucketVersionSystems2.objects.filter(key=bucket_key, key2=new_version_str)
+                .limit(4)
+                .all()
+            )
             count = len(list(count_rows))
         except DoesNotExist:
             continue
@@ -849,13 +871,13 @@ def record_bug_for_bucket(bucketid, bug):
         # Prepare keys with proper encoding
         bucket_key = bucketid.encode() if isinstance(bucketid, str) else bucketid
         bug_key = str(int(bug)).encode()
-        
+
         # BugToCrashSignatures expects column1 as Text (string)
         bucketid_str = bucketid if isinstance(bucketid, str) else bucketid.decode("utf-8")
-        
+
         # Insert into BucketMetadata
         BucketMetadata.create(key=bucket_key, column1="CreatedBug", value=bug)
-        
+
         # Insert into BugToCrashSignatures
         BugToCrashSignatures.create(key=bug_key, column1=bucketid_str, value=b"")
 
