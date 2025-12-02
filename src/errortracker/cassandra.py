@@ -28,7 +28,7 @@ def setup_cassandra():
         connection.setup(
             config.cassandra_creds["hosts"],
             KEYSPACE,
-            consistency=ConsistencyLevel.QUORUM,
+            consistency=ConsistencyLevel.name_to_value[config.cassandra_consistency_level],
             auth_provider=auth_provider,
             load_balancing_policy=RoundRobinPolicy(),
             protocol_version=4,
