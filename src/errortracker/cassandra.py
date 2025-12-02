@@ -11,8 +11,8 @@ from errortracker import config
 
 _connected = False
 _session = None
-KEYSPACE = config.cassandra_creds["keyspace"]
-REPLICATION_FACTOR = 3
+KEYSPACE: str = config.cassandra_creds["keyspace"]
+REPLICATION_FACTOR: int = 3
 
 
 def setup_cassandra():
