@@ -26,6 +26,7 @@ cassandra_creds = {
     # allow the pool to overflow
     "max_overflow": 18,
 }
+cassandra_consistency_level = "ONE"
 
 # Example:
 # swift_creds = {

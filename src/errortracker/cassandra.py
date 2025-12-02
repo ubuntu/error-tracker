@@ -11,8 +11,8 @@ from errortracker import config
 
 _connected = False
 _session = None
-KEYSPACE = config.cassandra_creds["keyspace"]
-REPLICATION_FACTOR = 3
+KEYSPACE: str = config.cassandra_creds["keyspace"]
+REPLICATION_FACTOR: int = 3
 
 
 def setup_cassandra():
@@ -28,7 +28,7 @@ def setup_cassandra():
         connection.setup(
             config.cassandra_creds["hosts"],
             KEYSPACE,
-            consistency=ConsistencyLevel.QUORUM,
+            consistency=ConsistencyLevel.name_to_value[config.cassandra_consistency_level],
             auth_provider=auth_provider,
             load_balancing_policy=RoundRobinPolicy(),
             protocol_version=4,
