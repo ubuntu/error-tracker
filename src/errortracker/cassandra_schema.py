@@ -13,8 +13,11 @@ class ErrorTrackerTable(models.Model):
 
 class Counters(ErrorTrackerTable):
     __table_name__ = "Counters"
+    # key = the index we count ("Ubuntu 24.04:zsh:5.9-6ubuntu2", "Ubuntu 24.04:zsh", etc...)
     key = columns.Blob(db_field="key", primary_key=True)
+    # column1 = a datestamp ("20251101", "20240612", etc...)
     column1 = columns.Text(db_field="column1", primary_key=True)
+    # value = the count of crashes for that release:package[:version] that day
     value = columns.Counter(db_field="value")
 
 
@@ -234,8 +237,11 @@ class SystemImages(ErrorTrackerTable):
 
 class UniqueUsers90Days(ErrorTrackerTable):
     __table_name__ = "UniqueUsers90Days"
+    # key = Ubuntu series ("Ubuntu 26.04", "Ubuntu 25.10", etc...)
     key = columns.Text(db_field="key", primary_key=True)
+    # column1 = a datestamp ("20251101", "20240612", etc...)
     column1 = columns.Text(db_field="column1", primary_key=True)
+    # value = the count of unique users of that release that day
     value = columns.BigInt(db_field="value")
 
 

@@ -528,9 +528,8 @@ def get_average_crashes(field, release, days=7):
             oopses[row.column1] = row.value
 
         users = dict()
-        release_key = release.encode() if isinstance(release, str) else release
         user_rows = UniqueUsers90Days.objects.filter(
-            key=release_key, column1__gte=start, column1__lte=end
+            key=release, column1__gte=start, column1__lte=end
         ).all()
         for row in user_rows:
             users[row.column1] = row.value
