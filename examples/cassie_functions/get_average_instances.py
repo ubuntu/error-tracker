@@ -12,7 +12,7 @@ setup_cassandra()
 
 # Example: Get average instances for a bucket
 bucketid = "example_bucket_id_12345"
-release = "Ubuntu 22.04"
+release = "Ubuntu 24.04"
 days = 7
 
 for timestamp, avg in get_average_instances(bucketid, release, days=days):
