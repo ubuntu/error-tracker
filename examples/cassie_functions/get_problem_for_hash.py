@@ -11,7 +11,7 @@ from errors.cassie import get_problem_for_hash
 setup_cassandra()
 
 # Example: Get problem bucket for a hash
-hashed = "abc123def456"
+hashed = "3f322b0f41718376ceefaf12fe3c69c046b6f643"
 
 problem = get_problem_for_hash(hashed)
 if problem:

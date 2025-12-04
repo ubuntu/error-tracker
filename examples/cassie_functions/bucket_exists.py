@@ -11,7 +11,7 @@ from errors.cassie import bucket_exists
 setup_cassandra()
 
 # Example: Check if a bucket exists
-bucketid = "example_bucket_id_12345"
+bucketid = "/bin/zsh:11:makezleparams:execzlefunc:redrawhook:zlecore:zleread"
 
 exists = bucket_exists(bucketid)
 print(f"Bucket {bucketid} exists: {exists}")

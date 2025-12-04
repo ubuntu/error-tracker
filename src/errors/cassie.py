@@ -556,9 +556,8 @@ def get_average_instances(bucketid, release, days=7):
     start = dates[-1]
     end = dates[0]
 
-    release_key = release.encode() if isinstance(release, str) else release
     user_rows = UniqueUsers90Days.objects.filter(
-        key=release_key, column1__gte=start, column1__lte=end
+        key=release, column1__gte=start, column1__lte=end
     ).all()
     users = {row.column1: row.value for row in user_rows}
 
@@ -628,10 +627,11 @@ def get_binary_packages_for_user(user):
     # if a package's last crash was reported more than a month ago then it
     # won't be returned here, however the package isn't likely to appear in
     # the most-common-problems.
+    # XXX: that 30 days delta + %Y%m doesn't seem to produce a nice sliding
+    # time window. Is this expected? apparently yes, but that seems a bit wrong
     period = (datetime.date.today() - datetime.timedelta(30)).strftime("%Y%m")
     try:
-        user_key = user.encode() if isinstance(user, str) else user
-        pkg_rows = UserBinaryPackages.objects.filter(key=user_key).all()
+        pkg_rows = UserBinaryPackages.objects.filter(key=user).all()
         binary_packages = [row.column1 + ":%s" % period for row in pkg_rows]
     except DoesNotExist:
         return None
@@ -641,11 +641,11 @@ def get_binary_packages_for_user(user):
     results = {}
     for pkg in binary_packages:
         count = DayBucketsCount.objects.filter(key=pkg.encode()).limit(1).count()
+        # remove packages that don't have recent crashes
         if count > 0:
             results[pkg] = count
 
-    # Remove entries with 0 count
-    results = {k: v for k, v in results.items() if v > 0}
+    # trim the date suffix to only keep the package name
     return [k[0:-7] for k in list(results.keys())]
 
 
