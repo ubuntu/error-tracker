@@ -47,15 +47,15 @@ def _split_into_dictionaries(original):
     return value
 
 
-def _get_range_of_dates(start, finish):
+def _get_range_of_dates(start_x_days_ago: int, finish_x_days_ago: int) -> list[str]:
     """Get a range of dates from start to finish.
     This is necessary because we use the Cassandra random partitioner, so
     lexicographical ranges are not possible."""
-    finish = finish - start
-    date = datetime.datetime.utcnow() - datetime.timedelta(days=start)
+    finish_x_days_ago = finish_x_days_ago - start_x_days_ago
+    date = datetime.datetime.utcnow() - datetime.timedelta(days=start_x_days_ago)
     delta = datetime.timedelta(days=1)
     dates = []
-    for i in range(finish):
+    for i in range(finish_x_days_ago):
         dates.append(date.strftime("%Y%m%d"))
         date = date - delta
     return dates
@@ -198,23 +198,13 @@ def get_crashes_for_bucket(bucketid, limit=100, start=None):
     relevant to the current state of the problem.
     """
     try:
-        query = Bucket.objects.filter(key=bucketid)
+        query = Bucket.objects.filter(key=bucketid).order_by("-column1")
         if start:
             start_uuid = UUID(start)
-            # Filter to get items less than start (for reversed ordering)
+            # Get items less than start (because of reversed ordering)
             query = query.filter(column1__lt=start_uuid)
 
-        # Order by column1 descending (most recent first)
-        rows = list(query.limit(limit + (1 if start else 0)).all())
-
-        # Sort by column1 descending (TimeUUID orders chronologically)
-        rows.sort(key=lambda x: x.column1, reverse=True)
-
-        if start:
-            # Skip the first item (which is the start value)
-            return [row.column1 for row in rows[1 : limit + 1]]
-        else:
-            return [row.column1 for row in rows[:limit]]
+        return [row.column1 for row in list(query.limit(limit).all())]
     except DoesNotExist:
         return []
 
@@ -248,7 +238,7 @@ def get_package_for_bucket(bucketid):
 
 def get_crash(oopsid, columns=None):
     try:
-        query = OOPS.objects.filter(key=oopsid.encode() if isinstance(oopsid, str) else oopsid)
+        query = OOPS.objects.filter(key=oopsid.encode())
         if columns:
             # Filter by specific columns
             query = query.filter(column1__in=columns)
@@ -421,14 +411,13 @@ def get_crash_count(start, finish, release=None):
             pass
 
 
-def get_metadata_for_bucket(bucketid, release=None):
+def get_metadata_for_bucket(bucketid: str, release: str = None):
     try:
-        bucket_key = bucketid.encode() if isinstance(bucketid, str) else bucketid
         if not release:
             # Get all columns up to "~" (non-inclusive)
-            rows = BucketMetadata.objects.filter(key=bucket_key, column1__lt="~").all()
+            rows = BucketMetadata.objects.filter(key=bucketid, column1__lt="~").all()
         else:
-            rows = BucketMetadata.objects.filter(key=bucket_key).all()
+            rows = BucketMetadata.objects.filter(key=bucketid).all()
 
         ret = {}
         for row in rows:
