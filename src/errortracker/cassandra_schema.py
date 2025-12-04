@@ -169,8 +169,8 @@ class DayBucketsCount(ErrorTrackerTable):
     # the index we count
     #   - Ubuntu 24.04:20251201
     #   - zsh:amd64:20251201
-    #   - Crash:zsh:amd64:20251201
-    # No idea about the different between the last two examples
+    #   - Crash:zsh:amd64:20251201 (No idea about the difference with the previous example)
+    #   - package:tvtime:(not installed)\nSetting up tvtime (1.0.11-8build2) ...\ndpkg: error processing package tvtime (--configure):\n installed tvtime package post-installation script subprocess returned error exit status 1\n
     key = columns.Blob(db_field="key", primary_key=True)
     # The bucketid we could:
     #   - /bin/zsh:11:__GI__IO_flush_all:_IO_cleanup:__run_exit_handlers:__GI_exit:zexit
