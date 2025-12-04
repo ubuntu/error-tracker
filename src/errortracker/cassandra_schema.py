@@ -13,11 +13,15 @@ class ErrorTrackerTable(models.Model):
 
 class Counters(ErrorTrackerTable):
     __table_name__ = "Counters"
-    # key = the index we count ("Ubuntu 24.04:zsh:5.9-6ubuntu2", "Ubuntu 24.04:zsh", etc...)
+    # the index we count
+    #   - Ubuntu 24.04:zsh:5.9-6ubuntu2
+    #   - Ubuntu 24.04:zsh
     key = columns.Blob(db_field="key", primary_key=True)
-    # column1 = a datestamp ("20251101", "20240612", etc...)
+    # a datestamp
+    #   - 20251101
+    #   - 20240612
     column1 = columns.Text(db_field="column1", primary_key=True)
-    # value = the count of crashes for that release:package[:version] that day
+    # the count of crashes for that release:package[:version] that day
     value = columns.Counter(db_field="value")
 
 
@@ -162,8 +166,17 @@ class DayBuckets(ErrorTrackerTable):
 
 class DayBucketsCount(ErrorTrackerTable):
     __table_name__ = "DayBucketsCount"
+    # the index we count
+    #   - Ubuntu 24.04:20251201
+    #   - zsh:amd64:20251201
+    #   - Crash:zsh:amd64:20251201
+    # No idea about the different between the last two examples
     key = columns.Blob(db_field="key", primary_key=True)
+    # The bucketid we could:
+    #   - /bin/zsh:11:__GI__IO_flush_all:_IO_cleanup:__run_exit_handlers:__GI_exit:zexit
+    #   - /bin/brltty:*** buffer overflow detected ***: terminated
     column1 = columns.Text(db_field="column1", primary_key=True)
+    # the counter itself
     value = columns.Counter(db_field="value")
 
 
@@ -237,16 +250,25 @@ class SystemImages(ErrorTrackerTable):
 
 class UniqueUsers90Days(ErrorTrackerTable):
     __table_name__ = "UniqueUsers90Days"
-    # key = Ubuntu series ("Ubuntu 26.04", "Ubuntu 25.10", etc...)
+    # Ubuntu series ("Ubuntu 26.04", "Ubuntu 25.10", etc...)
     key = columns.Text(db_field="key", primary_key=True)
-    # column1 = a datestamp ("20251101", "20240612", etc...)
+    # a datestamp ("20251101", "20240612", etc...)
     column1 = columns.Text(db_field="column1", primary_key=True)
-    # value = the count of unique users of that release that day
+    # the count of unique users of that release that day
     value = columns.BigInt(db_field="value")
 
 
 class UserBinaryPackages(ErrorTrackerTable):
     __table_name__ = "UserBinaryPackages"
+    # a team that usually owns packages (like for MIR)
+    #   - debcrafters-packages
+    #   - foundations-bugs
+    #   - xubuntu-bugs
     key = columns.Ascii(db_field="key", primary_key=True)
+    # package names
+    #   - abiword
+    #   - util-linux
+    # looks to be binary packages only, but not 100% certain
     column1 = columns.Ascii(db_field="column1", primary_key=True)
+    # looks unused
     value = columns.Blob(db_field="value")
