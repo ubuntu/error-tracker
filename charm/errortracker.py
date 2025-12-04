@@ -56,7 +56,7 @@ class ErrorTracker:
         self._install_et()
 
     def _install_et(self):
-        shutil.copytree(".", REPO_LOCATION)
+        shutil.copytree(".", REPO_LOCATION, dirs_exist_ok=True)
         check_call(["chown", "-R", "ubuntu:ubuntu", str(REPO_LOCATION)])
 
     def get_version(self):
