@@ -159,7 +159,7 @@ def submit(request, system_token):
             try:
                 whoopsie_version = request.headers["X-Whoopsie-Version"]
                 metrics.meter(
-                    "invalid.duplicate_report.whoopise_%s" % whoopsie_version.replace(".", "_")
+                    "invalid.duplicate_report.whoopsie_%s" % whoopsie_version.replace(".", "_")
                 )
             except KeyError:
                 pass
