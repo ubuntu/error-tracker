@@ -166,9 +166,9 @@ cassandra_creds = {{
 }}
 
 swift_creds = {{
-    "os_auth_url": "{swift["os_auth_url"]}",
-    "os_username": "{swift["os_username"]}",
-    "os_password": "{swift["os_password"]}",
+    "auth_url": "{swift["os_auth_url"]}",
+    "username": "{swift["os_username"]}",
+    "password": "{swift["os_password"]}",
     "auth_version": "{swift["auth_version"]}",
 }}
 """

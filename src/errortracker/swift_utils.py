@@ -11,14 +11,14 @@ def get_swift_client():
         return _client
 
     opts = {}
-    for key in ["os_region_name", "os_tenant_name"]:
+    for key in ["region_name", "tenant_name"]:
         if key in config.swift_creds:
             opts[key] = config.swift_creds[key]
 
     _client = swiftclient.client.Connection(
-        config.swift_creds["os_auth_url"],
-        config.swift_creds["os_username"],
-        config.swift_creds["os_password"],
+        config.swift_creds["auth_url"],
+        config.swift_creds["username"],
+        config.swift_creds["password"],
         os_options=opts,
         auth_version=config.swift_creds["auth_version"],
     )

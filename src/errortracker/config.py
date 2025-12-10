@@ -30,18 +30,18 @@ cassandra_consistency_level = "ONE"
 
 # Example:
 # swift_creds = {
-#     "os_auth_url": "http://keystone.example.com/",
-#     "os_username": "ostack",
-#     "os_password": "secret",
-#     "os_tenant_name": "ostack_project",
-#     "os_region_name": "region01",
+#     "auth_url": "http://keystone.example.com/",
+#     "username": "ostack",
+#     "password": "secret",
+#     "tenant_name": "ostack_project",
+#     "region_name": "region01",
 #     "auth_version": "3.0",
 # }
 # Default value is good for local dev with saio
 swift_creds = {
-    "os_auth_url": "http://127.0.0.1:8080/auth/v1.0",
-    "os_username": "test:tester",
-    "os_password": "testing",
+    "auth_url": "http://127.0.0.1:8080/auth/v1.0",
+    "username": "test:tester",
+    "password": "testing",
     "auth_version": "1.0",
 }
 
