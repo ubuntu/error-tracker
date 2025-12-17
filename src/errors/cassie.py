@@ -636,17 +636,11 @@ def get_package_crash_rate(
         except DoesNotExist:
             proposed_new_vers_data = None
 
-        print(f"{proposed_old_vers_data=}")
-        print(f"{proposed_new_vers_data=}")
-    print(f"{old_vers_data=}")
-    print(f"{new_vers_data=}")
     today = datetime.datetime.utcnow().strftime("%Y%m%d")
-    print(today)
     try:
         today_crashes = new_vers_data[today]
     except KeyError:
         # no crashes today so not an increase
-        print("No data for today")
         results["increase"] = False
         return results
 
@@ -659,7 +653,6 @@ def get_package_crash_rate(
         today_crashes = today_crashes - today_proposed_crashes
         if today_crashes == 0:
             # no crashes today so not an increase
-            print("No data for today outside -proposed")
             results["increase"] = False
             return results
 
@@ -677,11 +670,8 @@ def get_package_crash_rate(
         return results
 
     first_date = date
-    print(f"{first_date=}")
     oldest_date = list(old_vers_data.keys())[-1]
-    print(f"{oldest_date=}")
     dates = [x for x in _date_range_iterator(oldest_date, first_date)]
-    print(f"{dates=}")
     previous_vers_crashes = []
     previous_days = len(dates[:-1])
     for day in dates[:-1]:
@@ -703,15 +693,12 @@ def get_package_crash_rate(
     results["increase"] = False
     # 2 crashes may be a fluke
     if today_crashes < 3:
-        print("Less than 3 crashes today")
         return results
 
     now = datetime.datetime.utcnow()
     hour = float(now.hour)
     minute = float(now.minute)
     mean_crashes = numpy.average(previous_vers_crashes)
-    print(f"{mean_crashes=}")
-    print(f"{previous_vers_crashes=}")
     standard_crashes = (mean_crashes + numpy.std(previous_vers_crashes)).round()
     # if an update isn't fully phased then the previous package version will
     # generally have more crashes than the phasing one so multiple the quanity
@@ -736,10 +723,6 @@ def get_package_crash_rate(
         results["web_link"] = absolute_uri + web_link
         results["previous_period_in_days"] = previous_days
         results["previous_average"] = standard_crashes
-    print("Difference less than 1")
-    print(f"{difference=}")
-    print(f"{today_crashes=}")
-    print(f"{standard_crashes=}")
     return results
 
 
