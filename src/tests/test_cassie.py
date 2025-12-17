@@ -50,3 +50,87 @@ class TestCassie:
             },
             rel=1e-1,  # We don't want much precision, Cassandra is already messing up the values
         )
+
+    def test_get_package_crash_rate_no_crashes_today(self, datetime_now, cassandra_data):
+        """Test case where new version has no crashes today - should return increase=False"""
+        now = datetime_now
+
+        crash_rate = cassie.get_package_crash_rate(
+            "Ubuntu 24.04",
+            "no-crashes-today",
+            "1",
+            "2",
+            "100",
+            (now - timedelta(days=0)).strftime("%Y%m%d"),
+            "https://errors.internal/",
+        )
+        assert crash_rate == {"increase": False}
+
+    def test_get_package_crash_rate_few_crashes(self, datetime_now, cassandra_data):
+        """Test case where new version has only 2 crashes today (less than threshold of 3) - should return increase=False"""
+        now = datetime_now
+
+        crash_rate = cassie.get_package_crash_rate(
+            "Ubuntu 24.04",
+            "few-crashes",
+            "1",
+            "2",
+            "100",
+            (now - timedelta(days=0)).strftime("%Y%m%d"),
+            "https://errors.internal/",
+        )
+        assert crash_rate == {"increase": False}
+
+    def test_get_package_crash_rate_new_package(self, datetime_now, cassandra_data):
+        """Test case where there's no old version data - should return increase=True with difference=today_crashes"""
+        now = datetime_now
+
+        crash_rate = cassie.get_package_crash_rate(
+            "Ubuntu 24.04",
+            "new-package",
+            "0",  # Old version that doesn't exist
+            "1",
+            "100",
+            (now - timedelta(days=0)).strftime("%Y%m%d"),
+            "https://errors.internal/",
+        )
+        assert crash_rate == approx(
+            {
+                "increase": True,
+                "difference": 5,  # Should equal the number of crashes today
+                "web_link": "https://errors.internal/?release=Ubuntu%2024.04&package=new-package&version=1",
+                "previous_average": None,
+            },
+            rel=1e-1,
+        )
+
+    def test_get_package_crash_rate_low_difference(self, datetime_now, cassandra_data):
+        """Test case where crash rate is similar between versions (difference <= 1) - should return increase=False"""
+        now = datetime_now
+
+        crash_rate = cassie.get_package_crash_rate(
+            "Ubuntu 24.04",
+            "low-difference",
+            "1",
+            "2",
+            "100",
+            (now - timedelta(days=0)).strftime("%Y%m%d"),
+            "https://errors.internal/",
+        )
+        assert crash_rate == {"increase": False}
+
+    def test_get_package_crash_rate_all_proposed(self, datetime_now, cassandra_data):
+        """Test case where all today's crashes are from proposed and we exclude proposed - should return increase=False"""
+        now = datetime_now
+
+        crash_rate = cassie.get_package_crash_rate(
+            "Ubuntu 24.04",
+            "all-proposed",
+            "1",
+            "2",
+            "100",
+            (now - timedelta(days=0)).strftime("%Y%m%d"),
+            "https://errors.internal/",
+            exclude_proposed=True,
+        )
+        assert crash_rate == {"increase": False}
