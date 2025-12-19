@@ -20,7 +20,7 @@ import retracer as et_retracer
 from errortracker import cassandra
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="class")
 def temporary_db():
     cassandra.KEYSPACE = "tmp"
     cassandra.REPLICATION_FACTOR = 1
@@ -29,7 +29,7 @@ def temporary_db():
     management.drop_keyspace(cassandra.KEYSPACE)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="class")
 def retracer(temporary_db):
     temp = Path(tempfile.mkdtemp())
     config_dir = temp / "config"
@@ -54,10 +54,11 @@ def datetime_now():
     return datetime.now()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="class")
 def cassandra_data(datetime_now, temporary_db):
-    import bson
     import logging
+
+    import bson
 
     from daisy.submit import submit
 
@@ -105,7 +106,7 @@ def cassandra_data(datetime_now, temporary_db):
     # no-crashes-today package version 1 (old version with crashes)
     for i in [30, 20, 10, 5, 2]:
         new_oops(i, {"DistroRelease": "Ubuntu 24.04", "Package": "no-crashes-today 1", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/no-crashes-today", "StacktraceAddressSignature": "/usr/bin/no-crashes-today:1:/usr/bin/no-crashes-today+10"})
-    
+
     # no-crashes-today package version 2 (no crashes today - last crash was yesterday)
     for i in [5, 3, 1]:
         new_oops(i, {"DistroRelease": "Ubuntu 24.04", "Package": "no-crashes-today 2", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/no-crashes-today", "StacktraceAddressSignature": "/usr/bin/no-crashes-today:2:/usr/bin/no-crashes-today+20"})
@@ -113,7 +114,7 @@ def cassandra_data(datetime_now, temporary_db):
     # few-crashes package version 1 (old version with crashes)
     for i in [30, 20, 10, 5, 2]:
         new_oops(i, {"DistroRelease": "Ubuntu 24.04", "Package": "few-crashes 1", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/few-crashes", "StacktraceAddressSignature": "/usr/bin/few-crashes:1:/usr/bin/few-crashes+10"})
-    
+
     # few-crashes package version 2 (only 2 crashes today - less than threshold of 3)
     for i in [0, 0]:
         new_oops(i, {"DistroRelease": "Ubuntu 24.04", "Package": "few-crashes 2", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/few-crashes", "StacktraceAddressSignature": "/usr/bin/few-crashes:2:/usr/bin/few-crashes+20"})
@@ -125,7 +126,7 @@ def cassandra_data(datetime_now, temporary_db):
     # low-difference package version 1 (old version with consistent crashes)
     for i in [30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]:
         new_oops(i, {"DistroRelease": "Ubuntu 24.04", "Package": "low-difference 1", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/low-difference", "StacktraceAddressSignature": "/usr/bin/low-difference:1:/usr/bin/low-difference+10"})
-    
+
     # low-difference package version 2 (similar crash rate to version 1, so difference should be low)
     # Only 1 crash today which is less than the expected average
     for i in [0]:
@@ -134,7 +135,7 @@ def cassandra_data(datetime_now, temporary_db):
     # all-proposed package version 1
     for i in [30, 20, 10]:
         new_oops(i, {"DistroRelease": "Ubuntu 24.04", "Package": "all-proposed 1", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/all-proposed", "StacktraceAddressSignature": "/usr/bin/all-proposed:1:/usr/bin/all-proposed+10"})
-    
+
     # all-proposed package version 2 (all crashes today are from proposed)
     for i in [0, 0, 0, 0]:
         new_oops(i, {"DistroRelease": "Ubuntu 24.04", "Package": "all-proposed 2", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/all-proposed", "StacktraceAddressSignature": "/usr/bin/all-proposed:2:/usr/bin/all-proposed+20", "Tags": "package-from-proposed"})
