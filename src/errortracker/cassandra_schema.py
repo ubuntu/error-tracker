@@ -12,8 +12,15 @@ class ErrorTrackerTable(models.Model):
 
 class Counters(ErrorTrackerTable):
     __table_name__ = "Counters"
+    # the index we count
+    #   - Ubuntu 24.04:zsh:5.9-6ubuntu2
+    #   - Ubuntu 24.04:zsh
     key = columns.Blob(db_field="key", primary_key=True)
+    # a datestamp
+    #   - 20251101
+    #   - 20240612
     column1 = columns.Text(db_field="column1", primary_key=True)
+    # the count of crashes for that release:package[:version] that day
     value = columns.Counter(db_field="value")
 
 
@@ -55,9 +62,15 @@ class CouldNotBucket(ErrorTrackerTable):
 
 class DayOOPS(ErrorTrackerTable):
     __table_name__ = "DayOOPS"
+    # a day
+    #   - b'20160809'
+    #   - b'20260116'
     key = columns.Blob(db_field="key", primary_key=True)
+    # an OOPS that appeared that day
     column1 = columns.TimeUUID(db_field="column1", primary_key=True)
+    # an OOPS that appeared that day
     value = columns.Blob(db_field="value")
+    # yes, both column1 and value are the same, just the format is changing
 
 
 class DayUsers(ErrorTrackerTable):
@@ -69,8 +82,13 @@ class DayUsers(ErrorTrackerTable):
 
 class UserOOPS(ErrorTrackerTable):
     __table_name__ = "UserOOPS"
+    # the user ID, aka machine-id
+    #   - b'<just big long strings>'
     key = columns.Blob(db_field="key", primary_key=True)
+    # an OOPS reported by that machine
+    #   - <just random UUIDs>
     column1 = columns.Text(db_field="column1", primary_key=True)
+    # appears to be unused
     value = columns.Blob(db_field="value")
 
 
@@ -105,8 +123,20 @@ class SystemOOPSHashes(ErrorTrackerTable):
 
 class BucketMetadata(ErrorTrackerTable):
     __table_name__ = "BucketMetadata"
+    # the bucket ID
+    #   - b'/bin/zsh:11:makezleparams:execzlefunc:redrawhook:zlecore:zleread'
     key = columns.Blob(db_field="key", primary_key=True)
+    # Which metadata
+    #   - FirstSeen (package version)
+    #   - LastSeen (package version)
+    #   - FirstSeenRelease (Ubuntu series)
+    #   - ~Ubuntu 25.04:LastSeen (package version)
+    #   - CreatedBug
     column1 = columns.Text(db_field="column1", primary_key=True)
+    # The corresponding value for the metadata
+    #   - 5.9-6ubuntu2 (package version)
+    #   - Ubuntu 18.04 (Ubuntu series)
+    #   - <an LP bug number>
     value = columns.Text(db_field="value")
 
     @classmethod
@@ -149,16 +179,34 @@ class Bucket(ErrorTrackerTable):
 
 class DayBuckets(ErrorTrackerTable):
     __table_name__ = "DayBuckets"
+    # a day
+    #   - 20160809
+    #   - 20260116
     key = columns.Text(db_field="key", primary_key=True)
+    # the bucketid:
+    #   - /bin/zsh:11:__GI__IO_flush_all:_IO_cleanup:__run_exit_handlers:__GI_exit:zexit
+    #   - /bin/brltty:*** buffer overflow detected ***: terminated
     key2 = columns.Text(db_field="key2", primary_key=True)
+    # an OOPS id:
+    #   - <uuid>
     column1 = columns.Text(db_field="column1", primary_key=True)
     value = columns.Blob(db_field="value")
 
 
 class DayBucketsCount(ErrorTrackerTable):
     __table_name__ = "DayBucketsCount"
+    # the index we count
+    #   - 20251201
+    #   - Ubuntu 24.04:20251201
+    #   - zsh:amd64:20251201
+    #   - Crash:zsh:amd64:20251201 (No idea about the difference with the previous example)
+    #   - package:tvtime:(not installed)\nSetting up tvtime (1.0.11-8build2) ...\ndpkg: error processing package tvtime (--configure):\n installed tvtime package post-installation script subprocess returned error exit status 1\n
     key = columns.Blob(db_field="key", primary_key=True)
+    # The bucketid we count:
+    #   - /bin/zsh:11:__GI__IO_flush_all:_IO_cleanup:__run_exit_handlers:__GI_exit:zexit
+    #   - /bin/brltty:*** buffer overflow detected ***: terminated
     column1 = columns.Text(db_field="column1", primary_key=True)
+    # the counter itself
     value = columns.Counter(db_field="value")
 
 
@@ -202,9 +250,14 @@ class AwaitingRetrace(ErrorTrackerTable):
 
 class ErrorsByRelease(ErrorTrackerTable):
     __table_name__ = "ErrorsByRelease"
+    # The release:
+    #   - Ubuntu 25.04
     key = columns.Ascii(db_field="key", primary_key=True)
+    # The datetime when we received the OOPS
     key2 = columns.DateTime(db_field="key2", primary_key=True)
+    # The OOPS id
     column1 = columns.TimeUUID(db_field="column1", primary_key=True)
+    # The datetime when we received the OOPS (again???)
     value = columns.DateTime(db_field="value")
 
 
@@ -218,27 +271,53 @@ class BucketVersionsCount(ErrorTrackerTable):
 
 class BugToCrashSignatures(ErrorTrackerTable):
     __table_name__ = "BugToCrashSignatures"
+    # The bug number
     key = columns.VarInt(db_field="key", primary_key=True)
+    # The crash signature:
+    #   - /usr/lib/gnome-do/Do.exe:8:g_hash_table_lookup:mono_find_jit_icall_by_addr:mono_emit_jit_icall:mono_method_to_ir:mini_method_compile
     column1 = columns.Text(db_field="column1", primary_key=True)
+    # appears to be usused
     value = columns.Blob(db_field="value")
 
 
 class SystemImages(ErrorTrackerTable):
+    # Very likely useless nowadays, doesn't have much up to date data
     __table_name__ = "SystemImages"
+    # One of those:
+    #   - device_image
+    #   - rootfs_build
+    #   - channel
+    #   - device_name
     key = columns.Text(db_field="key", primary_key=True)
+    # The version of the image type:
+    #   - 16.04/community/walid/devel 101 titan
+    #   - ubuntu-touch/vivid-proposed-customized-here 99 mako
     column1 = columns.Text(db_field="column1", primary_key=True)
+    # Looks empty and unused
     value = columns.Blob(db_field="value")
 
 
 class UniqueUsers90Days(ErrorTrackerTable):
     __table_name__ = "UniqueUsers90Days"
+    # Ubuntu series ("Ubuntu 26.04", "Ubuntu 25.10", etc...)
     key = columns.Text(db_field="key", primary_key=True)
+    # a datestamp ("20251101", "20240612", etc...)
     column1 = columns.Text(db_field="column1", primary_key=True)
+    # the count of unique users of that release that day
     value = columns.BigInt(db_field="value")
 
 
 class UserBinaryPackages(ErrorTrackerTable):
     __table_name__ = "UserBinaryPackages"
+    # a team that usually owns packages (like for MIR)
+    #   - debcrafters-packages
+    #   - foundations-bugs
+    #   - xubuntu-bugs
     key = columns.Ascii(db_field="key", primary_key=True)
+    # package names
+    #   - abiword
+    #   - util-linux
+    # looks to be binary packages only, but not 100% certain
     column1 = columns.Ascii(db_field="column1", primary_key=True)
+    # looks unused
     value = columns.Blob(db_field="value")
