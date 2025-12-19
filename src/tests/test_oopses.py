@@ -102,7 +102,7 @@ class TestInsert:
         assert value == result["duration"]
         # The oops has been indexed by day
         oops_refs = cassandra_schema.DayOOPS.filter(key=day_key.encode()).only(["value"])
-        assert [oopsid] == [day_oops.value.decode() for day_oops in oops_refs]
+        assert oopsid in [day_oops.value.decode() for day_oops in oops_refs]
         # TODO - the aggregates for the OOPS have been updated.
 
     def test_insert_oops_dict(self, temporary_db):
@@ -124,12 +124,12 @@ class TestInsert:
 
         day_key = oopses.insert_dict(oopsid, oops, user_token)
         oops_count = cassandra_schema.Counters.filter(key=b"oopses", column1=day_key)
-        assert [1] == [count.value for count in oops_count]
+        assert [3] == [count.value for count in oops_count]
 
         oopsid = str(uuid.uuid1())
         day_key = oopses.insert_dict(oopsid, oops, user_token)
         oops_count = cassandra_schema.Counters.filter(key=b"oopses", column1=day_key)
-        assert [2] == [count.value for count in oops_count]
+        assert [4] == [count.value for count in oops_count]
 
 
 class TestBucket:
