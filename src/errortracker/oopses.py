@@ -100,7 +100,11 @@ def _insert(
     :param ttl: boolean for setting the time to live for the column
     :return: The day which the oops was filed under.
     """
-    day_key = time.strftime("%Y%m%d", time.gmtime())
+    try:
+        # Try to get the actual day of that crash, otherwise fallback to today
+        day_key = time.strftime("%Y%m%d", time.strptime(insert_dict["Date"], "%c"))
+    except Exception:
+        day_key = time.strftime("%Y%m%d", time.gmtime())
     now_uuid = uuid.uuid1()
 
     if ttl:
