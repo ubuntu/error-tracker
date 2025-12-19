@@ -17,4 +17,3 @@ finish = 7
 for date, means in get_retracer_means(start, finish):
     print(f"Date: {date}")
     print(f"Means: {means}")
-    break  # Show first result only

@@ -11,7 +11,7 @@ from errors.cassie import get_average_instances
 setup_cassandra()
 
 # Example: Get average instances for a bucket
-bucketid = "example_bucket_id_12345"
+bucketid = "/bin/zsh:11:makezleparams:execzlefunc:redrawhook:zlecore:zleread"
 release = "Ubuntu 24.04"
 days = 7
 

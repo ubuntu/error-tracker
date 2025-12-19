@@ -11,7 +11,7 @@ from errors.cassie import get_metadata_for_bucket
 setup_cassandra()
 
 # Example: Get metadata for a specific bucket
-bucketid = "example_bucket_id_12345"
+bucketid = "/bin/zsh:11:makezleparams:execzlefunc:redrawhook:zlecore:zleread"
 release = "Ubuntu 24.04"
 
 metadata = get_metadata_for_bucket(bucketid, release=release)

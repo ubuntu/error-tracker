@@ -11,7 +11,7 @@ from errors.cassie import record_bug_for_bucket
 setup_cassandra()
 
 # Example: Record a bug for a bucket
-bucketid = "example_bucket_id_12345"
+bucketid = "/bin/zsh:11:makezleparams:execzlefunc:redrawhook:zlecore:zleread"
 bug = 123456  # Launchpad bug number
 
 record_bug_for_bucket(bucketid, bug)

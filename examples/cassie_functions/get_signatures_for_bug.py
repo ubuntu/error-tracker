@@ -11,9 +11,16 @@ from errors.cassie import get_signatures_for_bug
 setup_cassandra()
 
 # Example: Get crash signatures for a bug
-bug = 123456  # Launchpad bug number
+bug = 2066094  # Launchpad bug number
 
 signatures = get_signatures_for_bug(bug)
 print(f"Found {len(signatures)} signatures")
-for signature in signatures[:5]:
+for signature in signatures:
+    print(f"Signature: {signature}")
+
+bug = 1578412  # Launchpad bug number
+
+signatures = get_signatures_for_bug(bug)
+print(f"Found {len(signatures)} signatures")
+for signature in signatures:
     print(f"Signature: {signature}")

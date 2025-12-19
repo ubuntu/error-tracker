@@ -11,12 +11,12 @@ from errors.cassie import get_system_image_versions
 setup_cassandra()
 
 # Example: Get versions for a system image type
-image_type = "ubuntu-touch"
+image_type = "device_image"
 
 versions = get_system_image_versions(image_type)
 if versions:
     print(f"Found {len(versions)} versions")
-    for version in versions[:5]:
+    for version in versions:
         print(f"Version: {version}")
 else:
     print("No versions found")

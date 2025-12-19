@@ -11,10 +11,10 @@ from errors.cassie import get_traceback_for_bucket
 setup_cassandra()
 
 # Example: Get traceback for a bucket
-bucketid = "example_bucket_id_12345"
+bucketid = "/usr/bin/classicmenu-indicator:AttributeError:/usr/bin/classicmenu-indicator@11:main:__init__"
 
 traceback = get_traceback_for_bucket(bucketid)
 if traceback:
-    print(f"Traceback: {traceback[:200]}...")  # Show first 200 chars
+    print(f"Traceback: {traceback}...")
 else:
     print("No traceback found")

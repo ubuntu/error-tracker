@@ -11,7 +11,7 @@ from errors.cassie import get_crash
 setup_cassandra()
 
 # Example: Get crash details
-oopsid = "example_oops_id_12345"
+oopsid = "e3855456-cecb-11f0-b91f-fa163ec44ecd"
 columns = ["Package", "StacktraceAddressSignature"]
 
 crash_data = get_crash(oopsid, columns=columns)

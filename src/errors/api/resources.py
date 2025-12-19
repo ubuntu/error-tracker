@@ -614,10 +614,6 @@ class SystemCrashesResource(ErrorsResource):
                 # TODO: use a cassandra function that does a multiget of the
                 # crashes
                 for crash, ts in crashes:
-                    # cassandra records time in microseconds, convert to
-                    # seconds
-                    ts = (ts["submitted"][1]) * 1e-6
-                    ts = datetime.datetime.utcfromtimestamp(ts)
                     d = cassie.get_crash(str(crash), columns=cols)
                     program = split_package_and_version(d.get("Package", ""))[0]
                     if not program:

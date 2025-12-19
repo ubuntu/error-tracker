@@ -11,7 +11,7 @@ from errors.cassie import get_package_for_bucket
 setup_cassandra()
 
 # Example: Get package information for a bucket
-bucketid = "example_bucket_id_12345"
+bucketid = "/bin/zsh:11:makezleparams:execzlefunc:redrawhook:zlecore:zleread"
 
 package, version = get_package_for_bucket(bucketid)
 print(f"Package: {package}")

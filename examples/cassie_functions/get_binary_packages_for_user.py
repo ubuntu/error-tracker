@@ -11,12 +11,13 @@ from errors.cassie import get_binary_packages_for_user
 setup_cassandra()
 
 # Example: Get binary packages for a user
-user = "example_user_12345"
+user = "foundations-bugs"  # quite slow (~1m56s)
+user = "xubuntu-bugs"  # way faster (~12s)
 
 packages = get_binary_packages_for_user(user)
 if packages:
     print(f"Found {len(packages)} packages")
-    for package in packages[:5]:
+    for package in packages:
         print(f"Package: {package}")
 else:
     print("No packages found")

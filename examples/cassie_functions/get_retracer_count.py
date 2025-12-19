@@ -11,7 +11,7 @@ from errors.cassie import get_retracer_count
 setup_cassandra()
 
 # Example: Get retracer count for a specific date
-date = "20231115"
+date = "20260115"
 
 count_data = get_retracer_count(date)
 print(f"Retracer count data: {count_data}")

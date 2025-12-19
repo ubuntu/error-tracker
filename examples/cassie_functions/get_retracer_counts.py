@@ -17,4 +17,3 @@ finish = 7
 for date, counts in get_retracer_counts(start, finish):
     print(f"Date: {date}")
     print(f"Counts: {counts}")
-    break  # Show first result only

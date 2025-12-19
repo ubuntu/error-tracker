@@ -11,9 +11,12 @@ from errors.cassie import get_crash_count
 setup_cassandra()
 
 # Example: Get crash count for Ubuntu 24.04
-start = 0
-finish = 7
+start = 3
+finish = 10
 release = "Ubuntu 24.04"
 
 for date, count in get_crash_count(start, finish, release=release):
+    print(f"Date: {date}, Release: {release}, Crashes: {count}")
+
+for date, count in get_crash_count(start, finish):
     print(f"Date: {date}, Crashes: {count}")

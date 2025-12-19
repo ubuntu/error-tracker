@@ -11,9 +11,9 @@ from errors.cassie import get_versions_for_bucket
 setup_cassandra()
 
 # Example: Get versions for a bucket
-bucketid = "example_bucket_id_12345"
+bucketid = "/bin/zsh:11:makezleparams:execzlefunc:redrawhook:zlecore:zleread"
 
 versions = get_versions_for_bucket(bucketid)
 print(f"Versions: {versions}")
-for version, count in list(versions.items())[:5]:
-    print(f"Version: {version}, Count: {count}")
+for os, version in list(versions.items()):
+    print(f"OS: {os}, Version: {version}")
