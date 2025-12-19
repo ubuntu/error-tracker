@@ -11,11 +11,11 @@ from errors.cassie import get_average_crashes
 setup_cassandra()
 
 # Example: Get average crashes per user
-field = "Ubuntu 22.04"
-release = "Ubuntu 22.04"
-days = 7
+field = "zsh:5.9-6ubuntu2"
+release = "Ubuntu 24.04"
+days = 14
 
 data = get_average_crashes(field, release, days=days)
 print(f"Average crash data: {data}")
-for timestamp, avg in data[:5]:
+for timestamp, avg in data:
     print(f"Timestamp: {timestamp}, Average: {avg}")

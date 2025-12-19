@@ -47,15 +47,15 @@ def _split_into_dictionaries(original):
     return value
 
 
-def _get_range_of_dates(start, finish):
+def _get_range_of_dates(start_x_days_ago: int, finish_x_days_ago: int) -> list[str]:
     """Get a range of dates from start to finish.
     This is necessary because we use the Cassandra random partitioner, so
     lexicographical ranges are not possible."""
-    finish = finish - start
-    date = datetime.datetime.utcnow() - datetime.timedelta(days=start)
+    finish_x_days_ago = finish_x_days_ago - start_x_days_ago
+    date = datetime.datetime.utcnow() - datetime.timedelta(days=start_x_days_ago)
     delta = datetime.timedelta(days=1)
     dates = []
-    for i in range(finish):
+    for i in range(finish_x_days_ago):
         dates.append(date.strftime("%Y%m%d"))
         date = date - delta
     return dates
@@ -198,23 +198,13 @@ def get_crashes_for_bucket(bucketid, limit=100, start=None):
     relevant to the current state of the problem.
     """
     try:
-        query = Bucket.objects.filter(key=bucketid)
+        query = Bucket.objects.filter(key=bucketid).order_by("-column1")
         if start:
             start_uuid = UUID(start)
-            # Filter to get items less than start (for reversed ordering)
+            # Get items less than start (because of reversed ordering)
             query = query.filter(column1__lt=start_uuid)
 
-        # Order by column1 descending (most recent first)
-        rows = list(query.limit(limit + (1 if start else 0)).all())
-
-        # Sort by column1 descending (TimeUUID orders chronologically)
-        rows.sort(key=lambda x: x.column1, reverse=True)
-
-        if start:
-            # Skip the first item (which is the start value)
-            return [row.column1 for row in rows[1 : limit + 1]]
-        else:
-            return [row.column1 for row in rows[:limit]]
+        return [row.column1 for row in list(query.limit(limit).all())]
     except DoesNotExist:
         return []
 
@@ -248,7 +238,7 @@ def get_package_for_bucket(bucketid):
 
 def get_crash(oopsid, columns=None):
     try:
-        query = OOPS.objects.filter(key=oopsid.encode() if isinstance(oopsid, str) else oopsid)
+        query = OOPS.objects.filter(key=oopsid.encode())
         if columns:
             # Filter by specific columns
             query = query.filter(column1__in=columns)
@@ -421,14 +411,13 @@ def get_crash_count(start, finish, release=None):
             pass
 
 
-def get_metadata_for_bucket(bucketid, release=None):
+def get_metadata_for_bucket(bucketid: str, release: str = None):
     try:
-        bucket_key = bucketid.encode() if isinstance(bucketid, str) else bucketid
         if not release:
             # Get all columns up to "~" (non-inclusive)
-            rows = BucketMetadata.objects.filter(key=bucket_key, column1__lt="~").all()
+            rows = BucketMetadata.objects.filter(key=bucketid.encode(), column1__lt="~").all()
         else:
-            rows = BucketMetadata.objects.filter(key=bucket_key).all()
+            rows = BucketMetadata.objects.filter(key=bucketid.encode()).all()
 
         ret = {}
         for row in rows:
@@ -437,6 +426,9 @@ def get_metadata_for_bucket(bucketid, release=None):
         if release and ret:
             try:
                 ret["FirstSeen"] = ret["~%s:FirstSeen" % release]
+            except KeyError:
+                pass
+            try:
                 ret["LastSeen"] = ret["~%s:LastSeen" % release]
             except KeyError:
                 pass
@@ -455,37 +447,7 @@ def chunks(l, n):
 def get_metadata_for_buckets(bucketids, release=None):
     ret = dict()
     for bucketid in bucketids:
-        bucket_key = bucketid.encode() if isinstance(bucketid, str) else bucketid
-        try:
-            if not release:
-                rows = BucketMetadata.objects.filter(key=bucket_key, column1__lt="~").all()
-            else:
-                rows = BucketMetadata.objects.filter(key=bucket_key).all()
-
-            bucket_data = {}
-            for row in rows:
-                bucket_data[row.column1] = row.value
-
-            if bucket_data:
-                ret[bucketid] = bucket_data
-        except DoesNotExist:
-            pass
-
-    if release:
-        for bucket_id in ret:
-            bucket = ret[bucket_id]
-            try:
-                bucket["FirstSeen"] = bucket["~%s:FirstSeen" % release]
-                bucket["LastSeen"] = bucket["~%s:LastSeen" % release]
-            except KeyError:
-                # Rather than confuse developers with half release-specific
-                # data. Of course this will only apply for the current row, so
-                # it's possible subsequent rows will show release-specific
-                # data.
-                if "FirstSeen" in bucket:
-                    del bucket["FirstSeen"]
-                if "LastSeen" in bucket:
-                    del bucket["LastSeen"]
+        ret[bucketid] = get_metadata_for_bucket(bucketid, release)
     return ret
 
 
@@ -528,9 +490,8 @@ def get_average_crashes(field, release, days=7):
             oopses[row.column1] = row.value
 
         users = dict()
-        release_key = release.encode() if isinstance(release, str) else release
         user_rows = UniqueUsers90Days.objects.filter(
-            key=release_key, column1__gte=start, column1__lte=end
+            key=release, column1__gte=start, column1__lte=end
         ).all()
         for row in user_rows:
             users[row.column1] = row.value
@@ -557,9 +518,8 @@ def get_average_instances(bucketid, release, days=7):
     start = dates[-1]
     end = dates[0]
 
-    release_key = release.encode() if isinstance(release, str) else release
     user_rows = UniqueUsers90Days.objects.filter(
-        key=release_key, column1__gte=start, column1__lte=end
+        key=release, column1__gte=start, column1__lte=end
     ).all()
     users = {row.column1: row.value for row in user_rows}
 
@@ -629,10 +589,11 @@ def get_binary_packages_for_user(user):
     # if a package's last crash was reported more than a month ago then it
     # won't be returned here, however the package isn't likely to appear in
     # the most-common-problems.
+    # XXX: that 30 days delta + %Y%m doesn't seem to produce a nice sliding
+    # time window. Is this expected? apparently yes, but that seems a bit wrong
     period = (datetime.date.today() - datetime.timedelta(30)).strftime("%Y%m")
     try:
-        user_key = user.encode() if isinstance(user, str) else user
-        pkg_rows = UserBinaryPackages.objects.filter(key=user_key).all()
+        pkg_rows = UserBinaryPackages.objects.filter(key=user).all()
         binary_packages = [row.column1 + ":%s" % period for row in pkg_rows]
     except DoesNotExist:
         return None
@@ -642,11 +603,11 @@ def get_binary_packages_for_user(user):
     results = {}
     for pkg in binary_packages:
         count = DayBucketsCount.objects.filter(key=pkg.encode()).limit(1).count()
+        # remove packages that don't have recent crashes
         if count > 0:
             results[pkg] = count
 
-    # Remove entries with 0 count
-    results = {k: v for k, v in results.items() if v > 0}
+    # trim the date suffix to only keep the package name
     return [k[0:-7] for k in list(results.keys())]
 
 
@@ -657,33 +618,39 @@ def get_package_crash_rate(
 
     # the generic counter only includes Crashes for packages from official
     # Ubuntu sources and from systems not under auto testing
-    old_vers_column = "%s:%s:%s" % (release, src_package, old_version)
-    new_vers_column = "%s:%s:%s" % (release, src_package, new_version)
+    old_vers_column = "oopses:Crash:%s:%s:%s" % (release, src_package, old_version)
+    new_vers_column = "oopses:Crash:%s:%s:%s" % (release, src_package, new_version)
     results = {}
 
     try:
-        # The first thing done is the reversing of the order that's why it
-        # is column_start (get items <= date in reverse order)
         old_rows = (
             Counters.objects.filter(key=old_vers_column.encode(), column1__lte=date)
+            .order_by("-column1")
             .limit(15)
             .all()
         )
-        old_rows_sorted = sorted(old_rows, key=lambda x: x.column1, reverse=True)
-        old_vers_data = {row.column1: row.value for row in old_rows_sorted}
+        old_vers_data = {row.column1: row.value for row in old_rows}
     except DoesNotExist:
         old_vers_data = None
 
     try:
         # this may be unnecessarily long since updates phase in ~3 days
-        new_rows = Counters.objects.filter(key=new_vers_column.encode()).limit(15).all()
-        new_rows_sorted = sorted(new_rows, key=lambda x: x.column1, reverse=True)
-        new_vers_data = {row.column1: row.value for row in new_rows_sorted}
+        new_rows = (
+            Counters.objects.filter(key=new_vers_column.encode())
+            .order_by("-column1")
+            .limit(15)
+            .all()
+        )
+        print(new_rows)
+        new_vers_data = {row.column1: row.value for row in new_rows}
+        print(new_vers_data)
     except DoesNotExist:
+        print("New data does not exist")
         results["increase"] = False
         return results
 
     if not new_vers_data:
+        print("No new data")
         results["increase"] = False
         return results
 
@@ -691,31 +658,35 @@ def get_package_crash_rate(
         try:
             proposed_old_rows = (
                 CountersForProposed.objects.filter(key=old_vers_column.encode(), column1__lte=date)
+                .order_by("-column1")
                 .limit(15)
                 .all()
             )
-            proposed_old_rows_sorted = sorted(
-                proposed_old_rows, key=lambda x: x.column1, reverse=True
-            )
-            proposed_old_vers_data = {row.column1: row.value for row in proposed_old_rows_sorted}
+            proposed_old_vers_data = {row.column1: row.value for row in proposed_old_rows}
         except DoesNotExist:
             proposed_old_vers_data = None
         try:
             proposed_new_rows = (
-                CountersForProposed.objects.filter(key=new_vers_column.encode()).limit(15).all()
+                CountersForProposed.objects.filter(key=new_vers_column.encode())
+                .order_by("-column1")
+                .limit(15)
+                .all()
             )
-            proposed_new_rows_sorted = sorted(
-                proposed_new_rows, key=lambda x: x.column1, reverse=True
-            )
-            proposed_new_vers_data = {row.column1: row.value for row in proposed_new_rows_sorted}
+            proposed_new_vers_data = {row.column1: row.value for row in proposed_new_rows}
         except DoesNotExist:
             proposed_new_vers_data = None
 
+        print(f"{proposed_old_vers_data=}")
+        print(f"{proposed_new_vers_data=}")
+    print(f"{old_vers_data=}")
+    print(f"{new_vers_data=}")
     today = datetime.datetime.utcnow().strftime("%Y%m%d")
+    print(today)
     try:
         today_crashes = new_vers_data[today]
     except KeyError:
         # no crashes today so not an increase
+        print("No data for today")
         results["increase"] = False
         return results
 
@@ -728,6 +699,7 @@ def get_package_crash_rate(
         today_crashes = today_crashes - today_proposed_crashes
         if today_crashes == 0:
             # no crashes today so not an increase
+            print("No data for today outside -proposed")
             results["increase"] = False
             return results
 
@@ -745,8 +717,11 @@ def get_package_crash_rate(
         return results
 
     first_date = date
+    print(f"{first_date=}")
     oldest_date = list(old_vers_data.keys())[-1]
+    print(f"{oldest_date=}")
     dates = [x for x in _date_range_iterator(oldest_date, first_date)]
+    print(f"{dates=}")
     previous_vers_crashes = []
     previous_days = len(dates[:-1])
     for day in dates[:-1]:
@@ -768,12 +743,15 @@ def get_package_crash_rate(
     results["increase"] = False
     # 2 crashes may be a fluke
     if today_crashes < 3:
+        print("Less than 3 crashes today")
         return results
 
     now = datetime.datetime.utcnow()
     hour = float(now.hour)
     minute = float(now.minute)
     mean_crashes = numpy.average(previous_vers_crashes)
+    print(f"{mean_crashes=}")
+    print(f"{previous_vers_crashes=}")
     standard_crashes = (mean_crashes + numpy.std(previous_vers_crashes)).round()
     # if an update isn't fully phased then the previous package version will
     # generally have more crashes than the phasing one so multiple the quanity
@@ -798,6 +776,10 @@ def get_package_crash_rate(
         results["web_link"] = absolute_uri + web_link
         results["previous_period_in_days"] = previous_days
         results["previous_average"] = standard_crashes
+    print("Difference less than 1")
+    print(f"{difference=}")
+    print(f"{today_crashes=}")
+    print(f"{standard_crashes=}")
     return results
 
 
