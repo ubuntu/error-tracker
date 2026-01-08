@@ -140,9 +140,9 @@ def swift(juju: jubilant.Juju, services) -> dict[str, str]:
         unit="swift/0",
     )
     return {
-        "os_auth_url": f"http://{swift_host}:8080/auth/v1.0",
-        "os_username": "test:tester",
-        "os_password": "testing",
+        "auth_url": f"http://{swift_host}:8080/auth/v1.0",
+        "username": "test:tester",
+        "password": "testing",
         "auth_version": "1.0",
     }
 
@@ -166,9 +166,9 @@ cassandra_creds = {{
 }}
 
 swift_creds = {{
-    "auth_url": "{swift["os_auth_url"]}",
-    "username": "{swift["os_username"]}",
-    "password": "{swift["os_password"]}",
+    "auth_url": "{swift["auth_url"]}",
+    "username": "{swift["username"]}",
+    "password": "{swift["password"]}",
     "auth_version": "{swift["auth_version"]}",
 }}
 """

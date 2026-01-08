@@ -72,6 +72,6 @@ def check_config(juju, amqp, cassandra, swift, unit):
     assert f'[ "{cassandra["host"]}" ]' in config, (
         "missing or wrong cassandra entry in configuration"
     )
-    assert f'"os_auth_url": "{swift["os_auth_url"]}"' in config, (
+    assert f'"auth_url": "{swift["auth_url"]}"' in config, (
         "missing or wrong swift entry in configuration"
     )
