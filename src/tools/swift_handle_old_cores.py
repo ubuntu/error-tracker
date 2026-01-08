@@ -20,6 +20,7 @@ if len(sys.argv) == 2:
 swift_client = swift_utils.get_swift_client()
 bucket = config.swift_bucket
 
+cassandra.setup_cassandra()
 session = cassandra.cassandra_session()
 
 connection = amqp_utils.get_connection()
@@ -50,20 +51,22 @@ for container in swift_client.get_container(container=bucket, limit=limit):
     # the dict is the metadata for the container
     if isinstance(container, dict):
         continue
-    oops_lookup = session.prepare('SELECT value FROM "OOPS" WHERE key=? and column1=?')
+    oops_lookup = session.prepare(
+        f'SELECT value FROM {session.keyspace}."OOPS" WHERE key=? and column1=?'
+    )
     for core in container:
         uuid = core["name"]
         count += 1
         try:
-            arch = session.execute(oops_lookup, [uuid.encode(), "Architecture"]).one()[0]
-        except (IndexError, TypeError):
+            arch = session.execute(oops_lookup, [uuid.encode(), "Architecture"]).one()["value"]
+        except (IndexError, TypeError, KeyError):
             arch = ""
         if not arch:
             print("could not find architecture for %s" % uuid, file=sys.stderr)
             remove_core(bucket, uuid)
             continue
         try:
-            release = session.execute(oops_lookup, [uuid.encode(), "DistroRelease"]).one()[0]
+            release = session.execute(oops_lookup, [uuid.encode(), "DistroRelease"]).one()["value"]
         except (IndexError, TypeError):
             release = ""
         if not release:
@@ -80,7 +83,7 @@ for container in swift_client.get_container(container=bucket, limit=limit):
         try:
             fail_reason = session.execute(
                 oops_lookup, [uuid.encode(), "RetraceFailureReason"]
-            ).one()[0]
+            ).one()["value"]
         except (IndexError, TypeError):
             fail_reason = ""
         # these were already retraced these but the core wasn't removed for
