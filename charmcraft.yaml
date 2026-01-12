@@ -26,7 +26,24 @@ parts:
     source: .
     plugin: charm
     charm-entrypoint: charm/charm.py
-    charm-requirements: [charm_requirements.txt]
+    # This is the fastest way to get this charm to build:
+    #   * uv plugin doesn't support charm-entrypoint
+    #   * charm-requirements doesn't use binary Python packages, thus ends-up building some Rust
+    # Update that list with the following:
+    #   * uv sync --group charm-deps
+    #   * uv pip freeze
+    charm-binary-python-packages:
+      - annotated-types==0.7.0
+      - importlib-metadata==8.7.1
+      - opentelemetry-api==1.39.1
+      - ops==3.5.0
+      - pydantic==2.12.5
+      - pydantic-core==2.41.5
+      - pyyaml==6.0.3
+      - typing-extensions==4.15.0
+      - typing-inspection==0.4.2
+      - websocket-client==1.9.0
+      - zipp==3.23.0
 
 charm-libs:
   - lib: haproxy.haproxy_route

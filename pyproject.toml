@@ -3,6 +3,12 @@ name = "error-tracker"
 requires-python = ">=3.8"
 dynamic = ["version"]
 
+[dependency-groups]
+charm-deps = [
+    "ops",
+    "pydantic"
+]
+
 [project.optional-dependencies]
 dev = [
     "jubilant",
