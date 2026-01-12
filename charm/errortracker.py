@@ -101,8 +101,12 @@ class ErrorTracker:
             return
 
     def configure(self, config: str):
+        logger.info("Setting up local_config.py")
         config_location = REPO_LOCATION / "src"
         (config_location / "local_config.py").write_text(config)
+
+        logger.info("Setting up Cassandra schema")
+        check_call([REPO_LOCATION / "src" / "tools" / "setup_cassandra.py"])
 
     def configure_daisy(self):
         logger.info("Configuring daisy")
