@@ -11,10 +11,11 @@ from errortracker import cassandra
 SRC_PACKAGE_TEAM_MAPPING = "https://ubuntu-archive-team.ubuntu.com/package-team-mapping.json"
 
 
+cassandra.setup_cassandra()
 session = cassandra.cassandra_session()
 
 user_binary_packages_insert = session.prepare(
-    'INSERT INTO "UserBinaryPackages" (key, column1, value) VALUES (?, ?, 0x)'
+    f'INSERT INTO {session.keyspace}."UserBinaryPackages" (key, column1, value) VALUES (?, ?, 0x)'
 )
 
 launchpad = Launchpad.login_anonymously("unsubscribed-packages", "production")

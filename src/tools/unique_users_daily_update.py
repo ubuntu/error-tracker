@@ -8,6 +8,7 @@ from cassandra.query import SimpleStatement
 
 from errortracker import cassandra
 
+cassandra.setup_cassandra()
 session = cassandra.cassandra_session()
 
 d = distro_info.UbuntuDistroInfo()
@@ -53,21 +54,22 @@ if __name__ == "__main__":
             hex_daterelease = ("%s:%s" % (release, date)).encode()
             # column1 is the system uuid
             results = session.execute(
-                SimpleStatement('SELECT column1 FROM "DayUsers" WHERE key=%s'),
+                SimpleStatement(f'SELECT column1 FROM {session.keyspace}."DayUsers" WHERE key=%s'),
                 [hex_daterelease],
             )
             rows = [row for row in results]
             user_count += len(rows)
-            # row[0] is column1 which is the system uuid
-            users.update([row[0] for row in rows])
+            users.update([row["column1"] for row in rows])
             print(f"found {user_count} users")
         # value is the number of users
         uu_results = session.execute(
-            SimpleStatement('SELECT value from "UniqueUsers90Days" WHERE key=%s and column1=%s'),
+            SimpleStatement(
+                f'SELECT value from {session.keyspace}."UniqueUsers90Days" WHERE key=%s and column1=%s'
+            ),
             [release, formatted],
         )
         try:
-            uu_count = [r[0] for r in uu_results][0]
+            uu_count = [r["value"] for r in uu_results][0]
         except IndexError:
             uu_count = 0
         print(("Was %s" % uu_count))
@@ -75,9 +77,9 @@ if __name__ == "__main__":
         if not dry_run:
             session.execute(
                 SimpleStatement(
-                    "INSERT INTO \"%s\" (key, column1, value) \
+                    "INSERT INTO %s.\"%s\" (key, column1, value) \
                              VALUES ('%s', '%s', %d)"
-                    % ("UniqueUsers90Days", release, formatted, len(users))
+                    % (session.keyspace, "UniqueUsers90Days", release, formatted, len(users))
                 )
             )
         print(("%s:%s" % (release, len(users))))

@@ -5,13 +5,14 @@ from urllib.request import urlretrieve
 
 from errortracker import cassandra
 
+cassandra.setup_cassandra()
 session = cassandra.cassandra_session()
 
 bm_table_insert = session.prepare(
-    "INSERT INTO \"BucketMetadata\" (key, column1, value) VALUES (?, 'LaunchpadBug', ?)"
+    f"INSERT INTO {session.keyspace}.\"BucketMetadata\" (key, column1, value) VALUES (?, 'LaunchpadBug', ?)"
 )
 b2c_table_insert = session.prepare(
-    'INSERT INTO "BugToCrashSignatures" (key, column1, value) VALUES (?, ?, 0x)'
+    f'INSERT INTO {session.keyspace}."BugToCrashSignatures" (key, column1, value) VALUES (?, ?, 0x)'
 )
 
 DB_URL = "https://ubuntu-archive-team.ubuntu.com/apport-duplicates/apport_duplicates.db"
