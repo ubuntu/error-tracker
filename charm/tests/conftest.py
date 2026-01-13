@@ -125,7 +125,6 @@ def swift(juju: jubilant.Juju, services) -> dict[str, str]:
     swift_host = juju.status().get_units("swift")["swift/0"].public_address
     logger.info("swift address: " + swift_host)
 
-    # juju.exec("sudo", "apt-get", "update", unit="swift/0")
     juju.exec("sudo", "apt-get", "install", "-Uy", "docker.io", unit="swift/0")
     juju.exec(
         "docker",
