@@ -21,7 +21,7 @@ Description={description}
 [Service]
 Type=oneshot
 User=ubuntu
-Environment=PYTHONPATH={HOME}/config
+Environment=PYTHONPATH={REPO_LOCATION}/src
 ExecStart={command}
 """
     )
