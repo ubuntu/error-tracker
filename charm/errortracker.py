@@ -192,6 +192,16 @@ WantedBy=multi-user.target
         check_call(["systemctl", "restart", "retracer@i386"])
 
     def configure_timers(self):
+        logger.info("Installing additional timers dependencies")
+        check_call(
+            [
+                "apt-get",
+                "install",
+                "-y",
+                "gdb",
+            ]
+        )
+
         logger.info("Configuring timers")
         setup_systemd_timer(
             "et-unique-users-daily-update",
