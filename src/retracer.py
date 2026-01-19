@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 #
-# Copyright © 2011-2024 Canonical Ltd.
+# Copyright © 2011-2026 Canonical Ltd.
 # Authors: Evan Dandrea <evan.dandrea@canonical.com>
 #          Brian Murray <brian.murray@canonical.com>
 #          Florent 'Skia' Jacquet <florent.jacquet@canonical.com>
@@ -28,7 +28,6 @@ import re
 import shutil
 import signal
 import socket
-import struct
 import sys
 import tempfile
 import time
@@ -39,6 +38,7 @@ import amqp
 
 # external libs
 from apport import Report
+from cassandra.marshal import float_pack, varint_pack
 from problem_report import CompressedValue, _base64_decoder
 
 from daisy.metrics import get_metrics
@@ -256,20 +256,16 @@ class Retracer:
         )
         mean[mean_key] = new_mean
         mean[count_key] += 1
-        try:
-            cassandra_schema.Indexes.objects.create(
-                key=b"mean_retracing_time",
-                column1=mean_key,
-                value=struct.pack("!f", mean[mean_key]),
-            )
-            cassandra_schema.Indexes.objects.create(
-                key=b"mean_retracing_time",
-                column1=count_key,
-                value=struct.pack("!i", mean[count_key]),
-            )
-        except struct.error as e:
-            log(f"TODO SKIA - Issue packing data: {repr(e)}")
-            log(f"TODO SKIA - data: {mean}")
+        cassandra_schema.Indexes.objects.create(
+            key=b"mean_retracing_time",
+            column1=mean_key,
+            value=float_pack(mean[mean_key]),
+        )
+        cassandra_schema.Indexes.objects.create(
+            key=b"mean_retracing_time",
+            column1=count_key,
+            value=varint_pack(mean[count_key]),
+        )
 
         # Report this into statsd as well.
         prefix = "timings.retracing"
