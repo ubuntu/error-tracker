@@ -1,6 +1,5 @@
-import struct
-
 from cassandra.cqlengine import columns, models
+from cassandra.marshal import float_unpack, varint_unpack
 
 DoesNotExist = models.Model.DoesNotExist
 
@@ -35,11 +34,10 @@ class Indexes(ErrorTrackerTable):
         query = Indexes.objects.filter(*args, **kwargs)
         d = {}
         for result in query:
-            # XXX: cassandra should be able to deserialize more properly by itself
             if result.key == b"mean_retracing_time" and not result.column1.endswith("count"):
-                d[result.column1] = struct.unpack("!f", result.value)[0]
+                d[result.column1] = float_unpack(result.value)
             elif result.key == b"mean_retracing_time" and result.column1.endswith("count"):
-                d[result.column1] = struct.unpack("!i", result.value)[0]
+                d[result.column1] = varint_unpack(result.value)
             else:
                 d[result.column1] = result.value
         if not d:
