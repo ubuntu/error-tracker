@@ -38,6 +38,8 @@ unneeded_columns = (
     "Dependencies",
     "UserGroups",
     "UpgradeStatus",
+    "ShellJournal",
+    "JournalAll",
     "JournalErrors",
     "Desktop-Session",
     "Env",
