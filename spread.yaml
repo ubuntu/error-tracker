@@ -52,6 +52,7 @@ suites:
           python3-bson \
           python3-cassandra \
           python3-flask \
+          python3-numpy \
           python3-pygit2 \
           python3-pytest \
           python3-pytest-cov \
