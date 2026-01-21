@@ -86,7 +86,7 @@ def create_test_data(datetime_now=datetime.now()):
     # a retraced and bucketed report
     report = Report()
     report["DistroRelease"] = "Ubuntu 24.04"
-    report["Package"] = "already-bucketed 1"
+    report["Package"] = "already-bucketed 1.0"
     report["SourcePackage"] = "already-bucketed-src"
     report["ExecutablePath"] = "/usr/bin/already-bucketed"
     report["Signal"] = "11"
@@ -113,7 +113,7 @@ def create_test_data(datetime_now=datetime.now()):
     )
 
     # another similar crash
-    new_oops(i, {"DistroRelease": "Ubuntu 26.04", "Architecture": "amd64", "Package": "already-bucketed 2", "SourcePackage": "already-bucketed-src", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/already-bucketed", "StacktraceAddressSignature": report["StacktraceAddressSignature"], "StacktraceTop": report["StacktraceTop"], "Signal": report["Signal"]})
+    new_oops(i, {"DistroRelease": "Ubuntu 26.04", "Architecture": "amd64", "Package": "already-bucketed 2.0", "SourcePackage": "already-bucketed-src", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/already-bucketed", "StacktraceAddressSignature": report["StacktraceAddressSignature"], "StacktraceTop": report["StacktraceTop"], "Signal": report["Signal"]})
     # fmt: on
 
     # re-enable daisy logger

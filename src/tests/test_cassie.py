@@ -151,8 +151,8 @@ class TestCassie:
         bucket_id = "/usr/bin/already-bucketed:11:func1:main"
         crashes = cassie.get_crashes_for_bucket(bucket_id, limit=10)
         assert isinstance(crashes, list)
-        # Should have one crash from the test data
-        assert len(crashes) == 1
+        # Should have two crashes from the test data
+        assert len(crashes) == 2
 
         for crash in crashes:
             assert isinstance(crash, UUID)
@@ -168,8 +168,8 @@ class TestCassie:
         metadata = cassie.get_metadata_for_bucket(bucket_id)
         assert isinstance(metadata, dict)
         assert metadata["Source"] == "already-bucketed"
-        assert metadata["FirstSeen"] == "1"
-        assert metadata["LastSeen"] == "2"
+        assert metadata["FirstSeen"] == "1.0"
+        assert metadata["LastSeen"] == "2.0"
         assert metadata["FirstSeenRelease"] == "Ubuntu 24.04"
         assert metadata["LastSeenRelease"] == "Ubuntu 26.04"
 
@@ -183,13 +183,8 @@ class TestCassie:
         bucket_id = "/usr/bin/already-bucketed:11:func1:main"
         versions = cassie.get_versions_for_bucket(bucket_id)
         assert isinstance(versions, dict)
-        # Dictionary maps (release, version) tuples to counts
-        for key, value in versions.items():
-            # Key should be a tuple of (release, version)
-            assert isinstance(key, tuple)
-            assert len(key) == 2
-            # Value should be a count
-            assert isinstance(value, (int, numpy.integer))
+        assert versions["Ubuntu 24.04"] == "1.0"
+        assert versions["Ubuntu 26.04"] == "2.0"
 
     def test_get_versions_for_bucket_nonexistent(self, cassandra_data):
         """Test get_versions_for_bucket returns empty dict for non-existent bucket"""

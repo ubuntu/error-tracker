@@ -215,6 +215,12 @@ def bucket(oopsid, bucketid, fields=None, proposed_fields=False):
     return day_key
 
 
+def update_bucket_versions_count(crash_signature: str, release: str, version: str):
+    cassandra_schema.BucketVersionsCount(
+        key=crash_signature, column1=release, column2=version
+    ).update(value=1)
+
+
 def update_bucket_metadata(bucketid, source, version, comparator, release=""):
     # We only update the first and last seen version fields. We do not update
     # the current version field as talking to Launchpad is an expensive
