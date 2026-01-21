@@ -196,3 +196,27 @@ class TestCassie:
         """Test get_versions_for_bucket returns empty dict for non-existent bucket"""
         versions = cassie.get_versions_for_bucket("nonexistent_bucket_12345")
         assert versions == {}
+
+    def test_record_bug_for_bucket_and_get_signatures(self, cassandra_data):
+        """Test record_bug_for_bucket records a bug and get_signatures_for_bug retrieves it"""
+        from unittest.mock import patch
+
+        from errortracker import config
+
+        bucket_id = "/usr/bin/test-bucket:42:func:main"
+        bug_number = 100123
+
+        # Temporarily disable staging mode to test the actual functionality
+        with patch.object(config, "lp_use_staging", False):
+            # Record a bug for a bucket
+            cassie.record_bug_for_bucket(bucket_id, bug_number)
+
+        # Retrieve signatures for that bug
+        signatures = cassie.get_signatures_for_bug(bug_number)
+        assert isinstance(signatures, list)
+        assert signatures == [bucket_id]
+
+    def test_get_signatures_for_bug_nonexistent(self, cassandra_data):
+        """Test get_signatures_for_bug returns empty list for non-existent bug"""
+        signatures = cassie.get_signatures_for_bug(888888)
+        assert signatures == []
