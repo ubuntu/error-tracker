@@ -134,3 +134,12 @@ class TestCassie:
             exclude_proposed=True,
         )
         assert crash_rate == {"increase": False}
+
+    def test_bucket_exists_true(self, cassandra_data):
+        """Test bucket_exists returns True for existing bucket"""
+        assert cassie.bucket_exists("/usr/bin/already-bucketed:11:func1:main") is True
+
+    def test_bucket_exists_false(self, cassandra_data):
+        """Test bucket_exists returns False for non-existing bucket"""
+        # Use a non-existent bucket ID
+        assert cassie.bucket_exists("nonexistent_bucket_12345") is False

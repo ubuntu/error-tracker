@@ -1,10 +1,13 @@
 import locale
 import logging
+import uuid
 from datetime import datetime, timedelta
 
 import bson
+from apport import Report
 
 from daisy.submit import submit
+from errortracker import utils
 
 
 def create_test_data(datetime_now=datetime.now()):
@@ -79,6 +82,19 @@ def create_test_data(datetime_now=datetime.now()):
     # all-proposed package version 2 (all crashes today are from proposed)
     for i in [0, 0, 0, 0]:
         new_oops(i, {"DistroRelease": "Ubuntu 24.04", "Package": "all-proposed 2", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/all-proposed", "StacktraceAddressSignature": "/usr/bin/all-proposed:2:/usr/bin/all-proposed+20", "Tags": "package-from-proposed"})
+
+    # a retraced and bucketed report
+    report = Report()
+    report["ExecutablePath"] = "/usr/bin/already-bucketed"
+    report["Signal"] = "11"
+    report["StacktraceTop"] = "func1 () at already-bucketed.c:42\nmain () at already-bucketed.c:14"
+    report["StacktraceAddressSignature"] = "/usr/bin/already-bucketed:42:/usr/bin/already-bucketed+28"
+    report["Stacktrace"] = "#0  0x40004000 in func1 () at ./already-bucketed.c:42\n#1  0x40005000 in main () at ./already-bucketed.c:14\n"
+    report["ThreadStacktrace"] = ".\nThread 1 (Thread 0x42424242 (LWP 4000)):\n#0  0x40004000 in func1 () at ./already-bucketed.c:42\n#1  0x40005000 in main () at ./already-bucketed.c:14\n"
+    utils.bucket(str(uuid.uuid1()), report.crash_signature(), report)
+
+    # another similar crash
+    new_oops(i, {"DistroRelease": "Ubuntu 26.04", "Package": "already-bucketed 1", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/already-bucketed", "StacktraceAddressSignature": report["StacktraceAddressSignature"], "StacktraceTop": report["StacktraceTop"], "Signal": report["Signal"]})
     # fmt: on
 
     # re-enable daisy logger
