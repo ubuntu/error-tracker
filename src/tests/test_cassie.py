@@ -1,4 +1,5 @@
 from datetime import timedelta
+from uuid import UUID
 
 import numpy
 from pytest import approx
@@ -143,3 +144,20 @@ class TestCassie:
         """Test bucket_exists returns False for non-existing bucket"""
         # Use a non-existent bucket ID
         assert cassie.bucket_exists("nonexistent_bucket_12345") is False
+
+    def test_get_crashes_for_bucket(self, cassandra_data):
+        """Test get_crashes_for_bucket returns list of crash UUIDs"""
+        # Use known bucket from test data
+        bucket_id = "/usr/bin/already-bucketed:11:func1:main"
+        crashes = cassie.get_crashes_for_bucket(bucket_id, limit=10)
+        assert isinstance(crashes, list)
+        # Should have one crash from the test data
+        assert len(crashes) == 1
+
+        for crash in crashes:
+            assert isinstance(crash, UUID)
+
+    def test_get_crashes_for_bucket_nonexistent(self, cassandra_data):
+        """Test get_crashes_for_bucket returns empty list for non-existent bucket"""
+        crashes = cassie.get_crashes_for_bucket("nonexistent_bucket_12345")
+        assert crashes == []
