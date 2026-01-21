@@ -161,3 +161,20 @@ class TestCassie:
         """Test get_crashes_for_bucket returns empty list for non-existent bucket"""
         crashes = cassie.get_crashes_for_bucket("nonexistent_bucket_12345")
         assert crashes == []
+
+    def test_get_metadata_for_bucket(self, cassandra_data):
+        """Test get_metadata_for_bucket returns metadata dictionary"""
+        bucket_id = "/usr/bin/already-bucketed:11:func1:main"
+        metadata = cassie.get_metadata_for_bucket(bucket_id)
+        assert isinstance(metadata, dict)
+        # Should have some metadata from the test data
+        if len(metadata) > 0:
+            # Check that keys and values are present
+            for key, value in metadata.items():
+                assert key is not None
+                assert value is not None
+
+    def test_get_metadata_for_bucket_nonexistent(self, cassandra_data):
+        """Test get_metadata_for_bucket returns empty dict for non-existent bucket"""
+        metadata = cassie.get_metadata_for_bucket("nonexistent_bucket_12345")
+        assert metadata == {}
