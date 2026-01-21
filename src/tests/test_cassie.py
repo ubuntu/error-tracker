@@ -178,3 +178,21 @@ class TestCassie:
         """Test get_metadata_for_bucket returns empty dict for non-existent bucket"""
         metadata = cassie.get_metadata_for_bucket("nonexistent_bucket_12345")
         assert metadata == {}
+
+    def test_get_versions_for_bucket(self, cassandra_data):
+        """Test get_versions_for_bucket returns version counts dictionary"""
+        bucket_id = "/usr/bin/already-bucketed:11:func1:main"
+        versions = cassie.get_versions_for_bucket(bucket_id)
+        assert isinstance(versions, dict)
+        # Dictionary maps (release, version) tuples to counts
+        for key, value in versions.items():
+            # Key should be a tuple of (release, version)
+            assert isinstance(key, tuple)
+            assert len(key) == 2
+            # Value should be a count
+            assert isinstance(value, (int, numpy.integer))
+
+    def test_get_versions_for_bucket_nonexistent(self, cassandra_data):
+        """Test get_versions_for_bucket returns empty dict for non-existent bucket"""
+        versions = cassie.get_versions_for_bucket("nonexistent_bucket_12345")
+        assert versions == {}
