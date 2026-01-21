@@ -313,7 +313,7 @@ def bucket(oops_id, data, day_key):
                     key=b"crash_signature_for_stacktrace_address_signature", column1=addr_sig
                 ).value.decode()
             except DoesNotExist:
-                pass
+                metrics.meter("missing.crash_signature")
         failed_to_retrace = False
         if crash_sig.startswith("failed:"):
             failed_to_retrace = True
@@ -358,7 +358,9 @@ def bucket(oops_id, data, day_key):
                     "StacktraceTop",
                 )
                 for unneeded_column in unneeded_columns:
-                    cassandra_schema.OOPS.filter(key=oops_id.encode(), column1=unneeded_column).delete()
+                    cassandra_schema.OOPS.filter(
+                        key=oops_id.encode(), column1=unneeded_column
+                    ).delete()
             # We have already retraced for this address signature, so this
             # crash can be immediately bucketed.
             utils.bucket(oops_id, crash_sig, data)

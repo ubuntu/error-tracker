@@ -167,12 +167,11 @@ class TestCassie:
         bucket_id = "/usr/bin/already-bucketed:11:func1:main"
         metadata = cassie.get_metadata_for_bucket(bucket_id)
         assert isinstance(metadata, dict)
-        # Should have some metadata from the test data
-        if len(metadata) > 0:
-            # Check that keys and values are present
-            for key, value in metadata.items():
-                assert key is not None
-                assert value is not None
+        assert metadata["Source"] == "already-bucketed"
+        assert metadata["FirstSeen"] == "1"
+        assert metadata["LastSeen"] == "2"
+        assert metadata["FirstSeenRelease"] == "Ubuntu 24.04"
+        assert metadata["LastSeenRelease"] == "Ubuntu 26.04"
 
     def test_get_metadata_for_bucket_nonexistent(self, cassandra_data):
         """Test get_metadata_for_bucket returns empty dict for non-existent bucket"""

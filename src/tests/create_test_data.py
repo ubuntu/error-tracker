@@ -7,7 +7,7 @@ import bson
 from apport import Report
 
 from daisy.submit import submit
-from errortracker import utils
+from errortracker import cassandra_schema, utils
 
 
 def create_test_data(datetime_now=datetime.now()):
@@ -85,6 +85,9 @@ def create_test_data(datetime_now=datetime.now()):
 
     # a retraced and bucketed report
     report = Report()
+    report["DistroRelease"] = "Ubuntu 24.04"
+    report["Package"] = "already-bucketed 1"
+    report["SourcePackage"] = "already-bucketed-src"
     report["ExecutablePath"] = "/usr/bin/already-bucketed"
     report["Signal"] = "11"
     report["StacktraceTop"] = "func1 () at already-bucketed.c:42\nmain () at already-bucketed.c:14"
@@ -92,9 +95,25 @@ def create_test_data(datetime_now=datetime.now()):
     report["Stacktrace"] = "#0  0x40004000 in func1 () at ./already-bucketed.c:42\n#1  0x40005000 in main () at ./already-bucketed.c:14\n"
     report["ThreadStacktrace"] = ".\nThread 1 (Thread 0x42424242 (LWP 4000)):\n#0  0x40004000 in func1 () at ./already-bucketed.c:42\n#1  0x40005000 in main () at ./already-bucketed.c:14\n"
     utils.bucket(str(uuid.uuid1()), report.crash_signature(), report)
+    # emulate the retracer
+    cassandra_schema.Indexes.objects.create(
+        key=b"crash_signature_for_stacktrace_address_signature",
+        column1=report["StacktraceAddressSignature"],
+        value=report.crash_signature().encode(),
+    )
+    cassandra_schema.Stacktrace.objects.create(
+        key=report["StacktraceAddressSignature"].encode(),
+        column1="Stacktrace",
+        value=report["Stacktrace"],
+    )
+    cassandra_schema.Stacktrace.objects.create(
+        key=report["StacktraceAddressSignature"].encode(),
+        column1="ThreadStacktrace",
+        value=report["ThreadStacktrace"],
+    )
 
     # another similar crash
-    new_oops(i, {"DistroRelease": "Ubuntu 26.04", "Package": "already-bucketed 1", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/already-bucketed", "StacktraceAddressSignature": report["StacktraceAddressSignature"], "StacktraceTop": report["StacktraceTop"], "Signal": report["Signal"]})
+    new_oops(i, {"DistroRelease": "Ubuntu 26.04", "Architecture": "amd64", "Package": "already-bucketed 2", "SourcePackage": "already-bucketed-src", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/already-bucketed", "StacktraceAddressSignature": report["StacktraceAddressSignature"], "StacktraceTop": report["StacktraceTop"], "Signal": report["Signal"]})
     # fmt: on
 
     # re-enable daisy logger
