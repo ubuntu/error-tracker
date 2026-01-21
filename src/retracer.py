@@ -313,6 +313,7 @@ class Retracer:
             return
 
         # We've processed this. Delete it off the MQ.
+        log("ack'ing message from main queue")
         msg.channel.basic_ack(msg.delivery_tag)
         # We don't call self.processed here because that would remove the core
         # file from the storage provider, and we want to retain it.
@@ -324,6 +325,7 @@ class Retracer:
         # Persistent
         body.properties["delivery_mode"] = 2
         msg.channel.basic_publish(body, exchange="", routing_key=queue)
+        log("pushed message to failed queue")
 
     def failed_to_process(self, msg, oops_id, old=False):
         # Try to remove the core file from the storage provider
@@ -331,6 +333,7 @@ class Retracer:
         removed = self.remove(oops_id)
         if removed:
             # We've processed this. Delete it off the MQ.
+            log("ack'ing message from queue (failed)")
             msg.channel.basic_ack(msg.delivery_tag)
             self.update_time_to_retrace(msg)
         # Removing the core file failed in the processing phase, so requeue
@@ -1129,6 +1132,7 @@ class Retracer:
         removed = self.remove(oops_id)
         if removed:
             # We've processed this. Delete it off the MQ.
+            log("ack'ing message from queue")
             msg.channel.basic_ack(msg.delivery_tag)
             self.update_time_to_retrace(msg)
             return True
