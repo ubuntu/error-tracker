@@ -214,3 +214,25 @@ class TestCassie:
         """Test get_signatures_for_bug returns empty list for non-existent bug"""
         signatures = cassie.get_signatures_for_bug(888888)
         assert signatures == []
+
+    def test_get_crash(self, cassandra_data):
+        """Test get_crash returns crash data dictionary"""
+        from uuid import UUID
+        # Get a crash UUID from the test data
+        bucket_id = "/usr/bin/already-bucketed:11:func1:main"
+        crashes = cassie.get_crashes_for_bucket(bucket_id, limit=1)
+        if len(crashes) > 0:
+            crash_uuid = str(crashes[0])  # Convert UUID to string
+            crash_data = cassie.get_crash(crash_uuid)
+            assert isinstance(crash_data, dict)
+            # Should have some crash data
+            if len(crash_data) > 0:
+                for key, value in crash_data.items():
+                    assert key is not None
+
+    def test_get_crash_nonexistent(self, cassandra_data):
+        """Test get_crash returns empty dict for non-existent crash"""
+        from uuid import uuid4
+        fake_uuid = str(uuid4())  # Convert UUID to string
+        crash_data = cassie.get_crash(fake_uuid)
+        assert crash_data == {}
