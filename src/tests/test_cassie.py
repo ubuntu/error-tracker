@@ -371,3 +371,15 @@ class TestCassie:
         packages = cassie.get_binary_packages_for_user("imatestsystem")
         # Should return None or empty list
         assert packages is None or packages == []
+
+    def test_get_package_new_buckets(self, cassandra_data):
+        """Test get_package_new_buckets returns list of new crash buckets"""
+        # Test with source packages that don't have new buckets
+        buckets = cassie.get_package_new_buckets("already-bucketed-src", "1.0", "2.0")
+        # Should return empty list since we don't have SourceVersionBuckets data
+        assert isinstance(buckets, list)
+
+    def test_get_package_new_buckets_nonexistent(self, cassandra_data):
+        """Test get_package_new_buckets returns empty list for non-existent package"""
+        buckets = cassie.get_package_new_buckets("nonexistent_package", "1.0", "2.0")
+        assert buckets == []
