@@ -358,3 +358,16 @@ class TestCassie:
         """Test get_user_crashes returns empty list for non-existent user"""
         crashes = cassie.get_user_crashes("nonexistent_user_12345")
         assert crashes == []
+
+    def test_get_binary_packages_for_user(self, cassandra_data):
+        """Test get_binary_packages_for_user returns list of packages or None"""
+        # Test with nonexistent user should return None
+        packages = cassie.get_binary_packages_for_user("nonexistent_user_12345")
+        assert packages is None
+
+    def test_get_binary_packages_for_user_no_data(self, cassandra_data):
+        """Test get_binary_packages_for_user returns None when user has no binary packages"""
+        # Test with a user that exists but has no binary packages
+        packages = cassie.get_binary_packages_for_user("imatestsystem")
+        # Should return None or empty list
+        assert packages is None or packages == []
