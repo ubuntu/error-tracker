@@ -121,6 +121,28 @@ def create_test_data(datetime_now=datetime.now()):
     # another similar crash
     new_oops(i, {"DistroRelease": "Ubuntu 26.04", "Architecture": "amd64", "Package": "already-bucketed 2.0", "SourcePackage": "already-bucketed-src", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/already-bucketed", "StacktraceAddressSignature": report["StacktraceAddressSignature"], "StacktraceTop": report["StacktraceTop"], "Signal": report["Signal"]})
 
+    # a failed retrace report
+    failed_report = Report()
+    failed_report["DistroRelease"] = "Ubuntu 24.04"
+    failed_report["Package"] = "failed-retrace 1.0"
+    failed_report["SourcePackage"] = "failed-retrace-src"
+    failed_report["ExecutablePath"] = "/usr/bin/failed-retrace"
+    failed_report["Signal"] = "11"
+    failed_report["StacktraceTop"] = "failed_func () at failed.c:10\nmain () at failed.c:5"
+    failed_report["StacktraceAddressSignature"] = "/usr/bin/failed-retrace:11:/usr/bin/failed-retrace+100"
+    utils.bucket(str(uuid.uuid1()), failed_report.crash_signature(), failed_report)
+    # emulate a failed retrace with failure reasons
+    cassandra_schema.BucketRetraceFailureReason.objects.create(
+        key=failed_report.crash_signature().encode(),
+        column1="missing-debug-symbols",
+        value="Debug symbols not available for package failed-retrace",
+    )
+    cassandra_schema.BucketRetraceFailureReason.objects.create(
+        key=failed_report.crash_signature().encode(),
+        column1="retrace-error",
+        value="Failed to generate stacktrace",
+    )
+
     cassandra_schema.SystemImages.objects.create(key="device_image", column1="ubuntu-touch/devel-proposed 227 hammerhead", value=b"")
     # fmt: on
 

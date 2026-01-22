@@ -311,10 +311,15 @@ class TestCassie:
 
     def test_get_retrace_failure_for_bucket(self, cassandra_data):
         """Test get_retrace_failure_for_bucket returns failure data"""
-        bucket_id = "/usr/bin/already-bucketed:11:func1:main"
+        bucket_id = "/usr/bin/failed-retrace:11:failed_func:main"
         result = cassie.get_retrace_failure_for_bucket(bucket_id)
-        # Should return empty dict if no failure data exists
+        # Should return dict with failure reasons
         assert isinstance(result, dict)
+        assert len(result) > 0
+        assert "missing-debug-symbols" in result
+        assert "Debug symbols not available" in result["missing-debug-symbols"]
+        assert "retrace-error" in result
+        assert "Failed to generate stacktrace" in result["retrace-error"]
 
     def test_get_retrace_failure_for_bucket_nonexistent(self, cassandra_data):
         """Test get_retrace_failure_for_bucket returns empty dict for non-existent bucket"""
