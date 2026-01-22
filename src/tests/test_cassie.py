@@ -236,3 +236,17 @@ class TestCassie:
         fake_uuid = str(uuid4())  # Convert UUID to string
         crash_data = cassie.get_crash(fake_uuid)
         assert crash_data == {}
+
+    def test_get_package_for_bucket(self, cassandra_data):
+        """Test get_package_for_bucket returns package name and version"""
+        bucket_id = "/usr/bin/already-bucketed:11:func1:main"
+        package, version = cassie.get_package_for_bucket(bucket_id)
+        # Should return tuple with package name and version
+        assert isinstance(package, (str, bytes))
+        assert isinstance(version, (str, bytes))
+
+    def test_get_package_for_bucket_nonexistent(self, cassandra_data):
+        """Test get_package_for_bucket returns empty strings for non-existent bucket"""
+        package, version = cassie.get_package_for_bucket("nonexistent_bucket_12345")
+        assert package == ""
+        assert version == ""
