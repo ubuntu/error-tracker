@@ -7,9 +7,11 @@
 """basic operations on oopses in the db."""
 
 import json
+import locale
 import re
 import time
 import uuid
+from datetime import datetime
 from hashlib import md5, sha1
 
 from cassandra.cqlengine.query import BatchQuery
@@ -101,10 +103,14 @@ def _insert(
     :return: The day which the oops was filed under.
     """
     try:
+        # Make sure the datetime will get formatted "correctly" in that cursed time format: Mon May  5 14:46:10 2025
+        locale.setlocale(locale.LC_ALL, "C.UTF-8")
         # Try to get the actual day of that crash, otherwise fallback to today
-        day_key = time.strftime("%Y%m%d", time.strptime(insert_dict["Date"], "%c"))
+        crash_datetime = datetime.strptime(insert_dict["Date"], "%c")
+        day_key = crash_datetime.strftime("%Y%m%d")
     except Exception:
-        day_key = time.strftime("%Y%m%d", time.gmtime())
+        crash_datetime = datetime.now()
+        day_key = datetime.strftime(datetime.now(), "%Y%m%d")
     now_uuid = uuid.uuid1()
 
     if ttl:
