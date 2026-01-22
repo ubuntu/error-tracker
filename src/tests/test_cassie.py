@@ -270,3 +270,15 @@ class TestCassie:
         """Test get_source_package_for_bucket returns empty string for non-existent bucket"""
         source_package = cassie.get_source_package_for_bucket("nonexistent_bucket_12345")
         assert source_package == ""
+
+    def test_get_traceback_for_bucket(self, cassandra_data):
+        """Test get_traceback_for_bucket returns traceback data or None"""
+        bucket_id = "/usr/bin/already-bucketed:11:func1:main"
+        traceback = cassie.get_traceback_for_bucket(bucket_id)
+        # Traceback field is not in test data, so should return None
+        assert traceback is None
+
+    def test_get_traceback_for_bucket_nonexistent(self, cassandra_data):
+        """Test get_traceback_for_bucket returns None for non-existent bucket"""
+        traceback = cassie.get_traceback_for_bucket("nonexistent_bucket_12345")
+        assert traceback is None
