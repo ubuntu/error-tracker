@@ -436,3 +436,23 @@ class TestCassie:
         date, count = results[0]
         assert isinstance(date, str)
         assert isinstance(count, int)
+
+    def test_get_bucket_counts(self, datetime_now, cassandra_data):
+        """Test get_bucket_counts returns list of (bucket_id, count) tuples"""
+        # Test with specific release and period
+        results = cassie.get_bucket_counts(release="Ubuntu 24.04", period="week")
+        # Results should be a list of tuples (bucket_id, count)
+        assert isinstance(results, list)
+        # Each item should be a tuple
+        for item in results:
+            assert isinstance(item, tuple)
+            assert len(item) == 2
+            bucket_id, count = item
+            assert isinstance(bucket_id, bytes) or isinstance(bucket_id, str)
+            assert isinstance(count, int)
+            assert count > 0
+
+    def test_get_bucket_counts_no_data(self, cassandra_data):
+        """Test get_bucket_counts returns empty list when no data matches"""
+        results = cassie.get_bucket_counts(release="Ubuntu 99.99", period="day")
+        assert results == []
