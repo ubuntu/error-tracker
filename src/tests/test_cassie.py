@@ -272,11 +272,14 @@ class TestCassie:
         assert source_package == ""
 
     def test_get_traceback_for_bucket(self, cassandra_data):
-        """Test get_traceback_for_bucket returns traceback data or None"""
+        """Test get_traceback_for_bucket returns traceback data"""
         bucket_id = "/usr/bin/already-bucketed:11:func1:main"
         traceback = cassie.get_traceback_for_bucket(bucket_id)
-        # Traceback field is not in test data, so should return None
-        assert traceback is None
+        # Check that traceback is returned and contains expected content
+        assert traceback is not None
+        assert b"Traceback (most recent call last)" in traceback
+        assert b"already-bucketed.py" in traceback
+        assert b"Test error" in traceback
 
     def test_get_traceback_for_bucket_nonexistent(self, cassandra_data):
         """Test get_traceback_for_bucket returns None for non-existent bucket"""

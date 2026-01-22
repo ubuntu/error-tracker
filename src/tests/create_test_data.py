@@ -111,6 +111,12 @@ def create_test_data(datetime_now=datetime.now()):
         column1="ThreadStacktrace",
         value=report["ThreadStacktrace"],
     )
+    # Add Traceback to BucketMetadata
+    cassandra_schema.BucketMetadata.objects.create(
+        key=report.crash_signature().encode(),
+        column1="Traceback",
+        value=b"Traceback (most recent call last):\n  File \"./already-bucketed.py\", line 42, in func1\n    raise Exception('Test error')\nException: Test error",
+    )
 
     # another similar crash
     new_oops(i, {"DistroRelease": "Ubuntu 26.04", "Architecture": "amd64", "Package": "already-bucketed 2.0", "SourcePackage": "already-bucketed-src", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/already-bucketed", "StacktraceAddressSignature": report["StacktraceAddressSignature"], "StacktraceTop": report["StacktraceTop"], "Signal": report["Signal"]})
