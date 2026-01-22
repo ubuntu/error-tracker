@@ -5,6 +5,7 @@
 # the GNU Affero General Public License, version 3 ("AGPLv3"). See the file
 # LICENSE in the source tree for more information.
 
+import datetime
 import json
 import time
 import uuid
@@ -130,6 +131,16 @@ class TestInsert:
         day_key = oopses.insert_dict(oopsid, oops, user_token)
         oops_count = cassandra_schema.Counters.filter(key=b"oopses", column1=day_key)
         assert [4] == [count.value for count in oops_count]
+
+    def test_insert_updates_errorsbyrelease(self, temporary_db):
+        oopsid = str(uuid.uuid1())
+        oops = {"DistroRelease": "Ubuntu 42.42", "Date": "Tue Jan 20 14:01:54 2026"}
+        user_token = "user1"
+
+        oopses.insert_dict(oopsid, oops, user_token)
+        result = list(cassandra_schema.ErrorsByRelease.filter(key="Ubuntu 42.42"))
+        assert len(result) == 1
+        assert result[0].value == datetime.datetime(2026, 1, 20, 14, 1, 54)
 
 
 class TestBucket:

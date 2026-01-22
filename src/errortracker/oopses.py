@@ -127,6 +127,13 @@ def _insert(
         automated_testing = True
 
     cassandra_schema.DayOOPS.create(key=day_key.encode(), column1=now_uuid, value=oopsid.encode())
+    if "DistroRelease" in insert_dict:
+        cassandra_schema.ErrorsByRelease.create(
+            key=insert_dict["DistroRelease"],
+            key2=datetime.now(),
+            column1=now_uuid,
+            value=crash_datetime,
+        )
 
     # Systems running automated tests should not be included in the OOPS count.
     if not automated_testing:
