@@ -7,7 +7,8 @@ import bson
 from apport import Report
 
 from daisy.submit import submit
-from errortracker import cassandra_schema, utils
+from errortracker import cassandra_schema as schema
+from errortracker import utils
 
 
 def create_test_data(datetime_now=datetime.now()):
@@ -82,6 +83,7 @@ def create_test_data(datetime_now=datetime.now()):
     # all-proposed package version 2 (all crashes today are from proposed)
     for i in [0, 0, 0, 0]:
         new_oops(i, {"DistroRelease": "Ubuntu 24.04", "Package": "all-proposed 2", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/all-proposed", "StacktraceAddressSignature": "/usr/bin/all-proposed:2:/usr/bin/all-proposed+20", "Tags": "package-from-proposed"})
+    # fmt: on
 
     # a retraced and bucketed report
     report = Report()
@@ -91,35 +93,51 @@ def create_test_data(datetime_now=datetime.now()):
     report["ExecutablePath"] = "/usr/bin/already-bucketed"
     report["Signal"] = "11"
     report["StacktraceTop"] = "func1 () at already-bucketed.c:42\nmain () at already-bucketed.c:14"
-    report["StacktraceAddressSignature"] = "/usr/bin/already-bucketed:42:/usr/bin/already-bucketed+28"
-    report["Stacktrace"] = "#0  0x40004000 in func1 () at ./already-bucketed.c:42\n#1  0x40005000 in main () at ./already-bucketed.c:14\n"
-    report["ThreadStacktrace"] = ".\nThread 1 (Thread 0x42424242 (LWP 4000)):\n#0  0x40004000 in func1 () at ./already-bucketed.c:42\n#1  0x40005000 in main () at ./already-bucketed.c:14\n"
+    report["StacktraceAddressSignature"] = (
+        "/usr/bin/already-bucketed:42:/usr/bin/already-bucketed+28"
+    )
+    report["Stacktrace"] = (
+        "#0  0x40004000 in func1 () at ./already-bucketed.c:42\n"
+        "#1  0x40005000 in main () at ./already-bucketed.c:14\n"
+    )
+    report["ThreadStacktrace"] = (
+        ".\nThread 1 (Thread 0x42424242 (LWP 4000)):\n"
+        "#0  0x40004000 in func1 () at ./already-bucketed.c:42\n"
+        "#1  0x40005000 in main () at ./already-bucketed.c:14\n"
+    )
     utils.bucket(str(uuid.uuid1()), report.crash_signature(), report)
     # emulate the retracer
-    cassandra_schema.Indexes.objects.create(
+    schema.Indexes.objects.create(
         key=b"crash_signature_for_stacktrace_address_signature",
         column1=report["StacktraceAddressSignature"],
         value=report.crash_signature().encode(),
     )
-    cassandra_schema.Stacktrace.objects.create(
+    schema.Stacktrace.objects.create(
         key=report["StacktraceAddressSignature"].encode(),
         column1="Stacktrace",
         value=report["Stacktrace"],
     )
-    cassandra_schema.Stacktrace.objects.create(
+    schema.Stacktrace.objects.create(
         key=report["StacktraceAddressSignature"].encode(),
         column1="ThreadStacktrace",
         value=report["ThreadStacktrace"],
     )
-    # Add Traceback to BucketMetadata
-    cassandra_schema.BucketMetadata.objects.create(
-        key=report.crash_signature().encode(),
-        column1="Traceback",
-        value=b"Traceback (most recent call last):\n  File \"./already-bucketed.py\", line 42, in func1\n    raise Exception('Test error')\nException: Test error",
-    )
 
     # another similar crash
-    new_oops(i, {"DistroRelease": "Ubuntu 26.04", "Architecture": "amd64", "Package": "already-bucketed 2.0", "SourcePackage": "already-bucketed-src", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/already-bucketed", "StacktraceAddressSignature": report["StacktraceAddressSignature"], "StacktraceTop": report["StacktraceTop"], "Signal": report["Signal"]})
+    new_oops(
+        0,
+        {
+            "DistroRelease": "Ubuntu 26.04",
+            "Architecture": "amd64",
+            "Package": "already-bucketed 2.0",
+            "SourcePackage": "already-bucketed-src",
+            "ProblemType": "Crash",
+            "ExecutablePath": "/usr/bin/already-bucketed",
+            "StacktraceAddressSignature": report["StacktraceAddressSignature"],
+            "StacktraceTop": report["StacktraceTop"],
+            "Signal": report["Signal"],
+        },
+    )
 
     # a failed retrace report
     failed_report = Report()
@@ -129,22 +147,78 @@ def create_test_data(datetime_now=datetime.now()):
     failed_report["ExecutablePath"] = "/usr/bin/failed-retrace"
     failed_report["Signal"] = "11"
     failed_report["StacktraceTop"] = "failed_func () at failed.c:10\nmain () at failed.c:5"
-    failed_report["StacktraceAddressSignature"] = "/usr/bin/failed-retrace:11:/usr/bin/failed-retrace+100"
+    failed_report["StacktraceAddressSignature"] = (
+        "/usr/bin/failed-retrace:11:/usr/bin/failed-retrace+100"
+    )
     utils.bucket(str(uuid.uuid1()), failed_report.crash_signature(), failed_report)
     # emulate a failed retrace with failure reasons
-    cassandra_schema.BucketRetraceFailureReason.objects.create(
+    schema.BucketRetraceFailureReason.objects.create(
         key=failed_report.crash_signature().encode(),
         column1="missing-debug-symbols",
         value="Debug symbols not available for package failed-retrace",
     )
-    cassandra_schema.BucketRetraceFailureReason.objects.create(
+    schema.BucketRetraceFailureReason.objects.create(
         key=failed_report.crash_signature().encode(),
         column1="retrace-error",
         value="Failed to generate stacktrace",
     )
 
-    cassandra_schema.SystemImages.objects.create(key="device_image", column1="ubuntu-touch/devel-proposed 227 hammerhead", value=b"")
-    # fmt: on
+    # a Python crash
+    python_report = Report()
+    python_report["DistroRelease"] = "Ubuntu 24.04"
+    python_report["Package"] = "python3-traceback 1.0"
+    python_report["SourcePackage"] = "python-traceback"
+    python_report["ExecutablePath"] = "/usr/bin/pytraceback"
+    python_report["Traceback"] = (
+        "Traceback (most recent call last):\n"
+        '  File "/usr/bin/pytraceback", line 42, in func1\n'
+        "    raise Exception('Test error')\n"
+        "Exception: Test error"
+    )
+    new_oops(30, python_report)
+    new_oops(8, python_report)
+    new_oops(0, python_report)
+
+    # This new crash is definitely bad, happening everywhere!
+    python_report["DistroRelease"] = "Ubuntu 24.04"
+    python_report["Package"] = "python3-traceback 1.1"
+    python_report["Traceback"] = (
+        "Traceback (most recent call last):\n"
+        '  File "/usr/bin/pytraceback", line 84, in func2\n'
+        "    raise RuntimeError('A very different traceback')\n"
+        "RuntimeError: A very different traceback"
+    )
+    new_oops(2, python_report, systemid="testsystem1")
+    new_oops(1, python_report, systemid="testsystem2")
+    new_oops(0, python_report, systemid="testsystem3")
+
+    # Even newer crash, less bad this time
+    python_report["Package"] = "python3-traceback 1.2"
+    python_report["Traceback"] = (
+        "Traceback (most recent call last):\n"
+        '  File "/usr/bin/pytraceback", line 94, in func3\n'
+        "    raise MemoryError('No more memory available, too bad')\n"
+        "MemoryError: No more memory available, too bad"
+    )
+    new_oops(1, python_report)
+
+    schema.SystemImages.objects.create(
+        key="device_image", column1="ubuntu-touch/devel-proposed 227 hammerhead", value=b""
+    )
+
+    schema.UserBinaryPackages.objects.create(key="foundations-bugs", column1="adduser")
+    schema.UserBinaryPackages.objects.create(key="foundations-bugs", column1="apt")
+    schema.UserBinaryPackages.objects.create(key="foundations-bugs", column1="util-linux")
+    schema.UserBinaryPackages.objects.create(key="xubuntu-bugs", column1="abiword")
+    schema.UserBinaryPackages.objects.create(key="daisy-pluckers", column1="failed-retrace")
+    schema.UserBinaryPackages.objects.create(key="daisy-pluckers", column1="already-bucketed")
+    schema.UserBinaryPackages.objects.create(key="daisy-pluckers", column1="never-crashed")
+
+    # XXX Hack to populate UniqueUsers90Days
+    # keep the import here, to avoid a new cassandra setup with the wrong keyspace in the tests
+    from tools import unique_users_daily_update
+
+    unique_users_daily_update.main()
 
     # re-enable daisy logger
     daisy_logger.setLevel(daisy_logger_level)
