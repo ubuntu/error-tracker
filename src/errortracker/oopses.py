@@ -146,12 +146,12 @@ def _insert(
                 cassandra_schema.Counters.filter(
                     key=f"oopses:{field}".encode(), column1=day_key
                 ).update(value=1)
-        if proposed_pkg:
-            for field in fields:
-                field = field.encode("ascii", errors="replace").decode()
-                cassandra_schema.CountersForProposed.filter(
-                    key=f"oopses:{field}".encode(), column1=day_key
-                ).update(value=1)
+            if proposed_pkg:
+                for field in fields:
+                    field = field.encode("ascii", errors="replace").decode()
+                    cassandra_schema.CountersForProposed.filter(
+                        key=f"oopses:{field}".encode(), column1=day_key
+                    ).update(value=1)
 
     if user_token:
         cassandra_schema.UserOOPS.create(key=user_token.encode(), column1=oopsid, value=b"")
