@@ -323,3 +323,20 @@ class TestCassie:
         """Test get_retrace_failure_for_bucket returns empty dict for non-existent bucket"""
         result = cassie.get_retrace_failure_for_bucket("nonexistent_bucket_12345")
         assert result == {}
+
+    def test_get_metadata_for_buckets(self, cassandra_data):
+        """Test get_metadata_for_buckets returns metadata for multiple buckets"""
+        bucket_ids = [
+            "/usr/bin/already-bucketed:11:func1:main",
+            "/usr/bin/failed-retrace:11:failed_func:main",
+        ]
+        metadata = cassie.get_metadata_for_buckets(bucket_ids)
+        assert isinstance(metadata, dict)
+        assert len(metadata) == 2
+        assert metadata["/usr/bin/already-bucketed:11:func1:main"]["Source"] == "already-bucketed"
+        assert metadata["/usr/bin/failed-retrace:11:failed_func:main"]["Source"] == "failed-retrace"
+
+    def test_get_metadata_for_buckets_empty(self, cassandra_data):
+        """Test get_metadata_for_buckets returns empty dict for empty list"""
+        metadata = cassie.get_metadata_for_buckets([])
+        assert metadata == {}
