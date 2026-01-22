@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 from uuid import UUID
 
 import numpy
@@ -340,3 +340,21 @@ class TestCassie:
         """Test get_metadata_for_buckets returns empty dict for empty list"""
         metadata = cassie.get_metadata_for_buckets([])
         assert metadata == {}
+
+    def test_get_user_crashes(self, cassandra_data):
+        """Test get_user_crashes returns list of crash UUIDs for a user"""
+        # Using the test system ID from create_test_data
+        user_token = "imatestsystem"
+        crashes = cassie.get_user_crashes(user_token, limit=5)
+        assert isinstance(crashes, list)
+        # Should have some crashes
+        assert len(crashes) > 0
+        # Each item should be a tuple of (uuid_str, datetime)
+        for uuid_str, crash_time in crashes:
+            assert isinstance(uuid_str, str)
+            assert isinstance(crash_time, datetime)
+
+    def test_get_user_crashes_nonexistent(self, cassandra_data):
+        """Test get_user_crashes returns empty list for non-existent user"""
+        crashes = cassie.get_user_crashes("nonexistent_user_12345")
+        assert crashes == []
