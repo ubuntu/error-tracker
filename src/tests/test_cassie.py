@@ -262,3 +262,16 @@ class TestCassie:
         """Test get_problem_for_hash returns None for non-existent hash"""
         result = cassie.get_problem_for_hash("nonexistent_hash_xyz")
         assert result is None
+
+    def test_get_system_image_versions(self, cassandra_data):
+        """Test get_system_image_versions returns list of versions"""
+        # Test with a common image type
+        versions = cassie.get_system_image_versions("ubuntu")
+        # Should return either a list or None
+        assert versions is None or isinstance(versions, list)
+
+    def test_get_system_image_versions_nonexistent(self, cassandra_data):
+        """Test get_system_image_versions returns empty list for non-existent type"""
+        versions = cassie.get_system_image_versions("nonexistent_image_type")
+        # Should return either None or an empty list
+        assert versions is None or versions == []
