@@ -217,33 +217,25 @@ class TestCassie:
 
     def test_get_crash(self, cassandra_data):
         """Test get_crash returns crash data dictionary"""
-        from uuid import UUID
         # Get a crash UUID from the test data
         bucket_id = "/usr/bin/already-bucketed:11:func1:main"
         crashes = cassie.get_crashes_for_bucket(bucket_id, limit=1)
-        if len(crashes) > 0:
-            crash_uuid = str(crashes[0])  # Convert UUID to string
-            crash_data = cassie.get_crash(crash_uuid)
-            assert isinstance(crash_data, dict)
-            # Should have some crash data
-            if len(crash_data) > 0:
-                for key, value in crash_data.items():
-                    assert key is not None
+        crash_data = cassie.get_crash(str(crashes[0]))
+        assert isinstance(crash_data, dict)
+        assert crash_data["ExecutablePath"] == "/usr/bin/already-bucketed"
+        assert crash_data["SourcePackage"] == "already-bucketed-src"
 
     def test_get_crash_nonexistent(self, cassandra_data):
         """Test get_crash returns empty dict for non-existent crash"""
-        from uuid import uuid4
-        fake_uuid = str(uuid4())  # Convert UUID to string
-        crash_data = cassie.get_crash(fake_uuid)
+        crash_data = cassie.get_crash("not-a-uuid")
         assert crash_data == {}
 
     def test_get_package_for_bucket(self, cassandra_data):
         """Test get_package_for_bucket returns package name and version"""
         bucket_id = "/usr/bin/already-bucketed:11:func1:main"
         package, version = cassie.get_package_for_bucket(bucket_id)
-        # Should return tuple with package name and version
-        assert isinstance(package, (str, bytes))
-        assert isinstance(version, (str, bytes))
+        assert package == "already-bucketed"
+        assert version == "2.0"
 
     def test_get_package_for_bucket_nonexistent(self, cassandra_data):
         """Test get_package_for_bucket returns empty strings for non-existent bucket"""
@@ -253,10 +245,9 @@ class TestCassie:
 
     def test_get_problem_for_hash(self, cassandra_data):
         """Test get_problem_for_hash returns problem signature for hash"""
-        # Test with a hash that might exist
-        result = cassie.get_problem_for_hash("somehash123")
-        # Should return either a value or None
-        assert result is None or isinstance(result, (str, bytes))
+        # Test with a hash that exists
+        result = cassie.get_problem_for_hash("6f2c361a80d2e8afd62563539e9618569e387b48")
+        assert result == "/usr/bin/already-bucketed:11:func1:main"
 
     def test_get_problem_for_hash_nonexistent(self, cassandra_data):
         """Test get_problem_for_hash returns None for non-existent hash"""
@@ -266,12 +257,5 @@ class TestCassie:
     def test_get_system_image_versions(self, cassandra_data):
         """Test get_system_image_versions returns list of versions"""
         # Test with a common image type
-        versions = cassie.get_system_image_versions("ubuntu")
-        # Should return either a list or None
-        assert versions is None or isinstance(versions, list)
-
-    def test_get_system_image_versions_nonexistent(self, cassandra_data):
-        """Test get_system_image_versions returns empty list for non-existent type"""
-        versions = cassie.get_system_image_versions("nonexistent_image_type")
-        # Should return either None or an empty list
-        assert versions is None or versions == []
+        versions = cassie.get_system_image_versions("device_image")
+        assert versions == ["ubuntu-touch/devel-proposed 227 hammerhead"]

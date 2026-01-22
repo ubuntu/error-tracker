@@ -788,11 +788,10 @@ def bucket_exists(bucketid):
         return False
 
 
-def get_problem_for_hash(hashed):
+def get_problem_for_hash(hashed: str):
     try:
         key = ("bucket_%s" % hashed[0]).encode()
-        hash_key = hashed.encode() if isinstance(hashed, str) else hashed
-        rows = Hashes.objects.filter(key=key, column1=hash_key).all()
+        rows = Hashes.objects.filter(key=key, column1=hashed.encode()).all()
         for row in rows:
             return row.value
         return None

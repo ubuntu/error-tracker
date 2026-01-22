@@ -114,6 +114,8 @@ def create_test_data(datetime_now=datetime.now()):
 
     # another similar crash
     new_oops(i, {"DistroRelease": "Ubuntu 26.04", "Architecture": "amd64", "Package": "already-bucketed 2.0", "SourcePackage": "already-bucketed-src", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/already-bucketed", "StacktraceAddressSignature": report["StacktraceAddressSignature"], "StacktraceTop": report["StacktraceTop"], "Signal": report["Signal"]})
+
+    cassandra_schema.SystemImages.objects.create(key="device_image", column1="ubuntu-touch/devel-proposed 227 hammerhead", value=b"")
     # fmt: on
 
     # re-enable daisy logger
