@@ -297,6 +297,12 @@ class TestCassie:
         stacktrace, thread_stacktrace = result
         assert "func1" in stacktrace
         assert "main" in stacktrace
+        # Check specific values in thread_stacktrace
+        assert thread_stacktrace is not None
+        assert "Thread 1" in thread_stacktrace
+        assert "0x42424242" in thread_stacktrace
+        assert "func1 ()" in thread_stacktrace
+        assert "already-bucketed.c:42" in thread_stacktrace
 
     def test_get_stacktrace_for_bucket_nonexistent(self, cassandra_data):
         """Test get_stacktrace_for_bucket returns (None, None) for non-existent bucket"""
