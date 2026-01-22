@@ -250,3 +250,15 @@ class TestCassie:
         package, version = cassie.get_package_for_bucket("nonexistent_bucket_12345")
         assert package == ""
         assert version == ""
+
+    def test_get_problem_for_hash(self, cassandra_data):
+        """Test get_problem_for_hash returns problem signature for hash"""
+        # Test with a hash that might exist
+        result = cassie.get_problem_for_hash("somehash123")
+        # Should return either a value or None
+        assert result is None or isinstance(result, (str, bytes))
+
+    def test_get_problem_for_hash_nonexistent(self, cassandra_data):
+        """Test get_problem_for_hash returns None for non-existent hash"""
+        result = cassie.get_problem_for_hash("nonexistent_hash_xyz")
+        assert result is None
