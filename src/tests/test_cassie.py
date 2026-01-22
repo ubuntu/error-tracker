@@ -299,3 +299,15 @@ class TestCassie:
         """Test get_stacktrace_for_bucket returns (None, None) for non-existent bucket"""
         result = cassie.get_stacktrace_for_bucket("nonexistent_bucket_12345")
         assert result == (None, None)
+
+    def test_get_retrace_failure_for_bucket(self, cassandra_data):
+        """Test get_retrace_failure_for_bucket returns failure data"""
+        bucket_id = "/usr/bin/already-bucketed:11:func1:main"
+        result = cassie.get_retrace_failure_for_bucket(bucket_id)
+        # Should return empty dict if no failure data exists
+        assert isinstance(result, dict)
+
+    def test_get_retrace_failure_for_bucket_nonexistent(self, cassandra_data):
+        """Test get_retrace_failure_for_bucket returns empty dict for non-existent bucket"""
+        result = cassie.get_retrace_failure_for_bucket("nonexistent_bucket_12345")
+        assert result == {}
