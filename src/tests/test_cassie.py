@@ -259,3 +259,14 @@ class TestCassie:
         # Test with a common image type
         versions = cassie.get_system_image_versions("device_image")
         assert versions == ["ubuntu-touch/devel-proposed 227 hammerhead"]
+
+    def test_get_source_package_for_bucket(self, cassandra_data):
+        """Test get_source_package_for_bucket returns source package name"""
+        bucket_id = "/usr/bin/already-bucketed:11:func1:main"
+        source_package = cassie.get_source_package_for_bucket(bucket_id)
+        assert source_package == "already-bucketed-src"
+
+    def test_get_source_package_for_bucket_nonexistent(self, cassandra_data):
+        """Test get_source_package_for_bucket returns empty string for non-existent bucket"""
+        source_package = cassie.get_source_package_for_bucket("nonexistent_bucket_12345")
+        assert source_package == ""
