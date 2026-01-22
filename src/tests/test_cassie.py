@@ -273,13 +273,11 @@ class TestCassie:
 
     def test_get_traceback_for_bucket(self, cassandra_data):
         """Test get_traceback_for_bucket returns traceback data"""
-        bucket_id = "/usr/bin/already-bucketed:11:func1:main"
+        bucket_id = "/usr/bin/pytraceback:Exception:func1"
         traceback = cassie.get_traceback_for_bucket(bucket_id)
-        # Check that traceback is returned and contains expected content
-        assert traceback is not None
-        assert b"Traceback (most recent call last)" in traceback
-        assert b"already-bucketed.py" in traceback
-        assert b"Test error" in traceback
+        assert "Traceback (most recent call last)" in traceback
+        assert "/usr/bin/pytraceback" in traceback
+        assert "Test error" in traceback
 
     def test_get_traceback_for_bucket_nonexistent(self, cassandra_data):
         """Test get_traceback_for_bucket returns None for non-existent bucket"""
@@ -295,10 +293,10 @@ class TestCassie:
         assert isinstance(result, tuple)
         assert len(result) == 2
         stacktrace, thread_stacktrace = result
+        # Check specific values in stacktrace
         assert "func1" in stacktrace
         assert "main" in stacktrace
         # Check specific values in thread_stacktrace
-        assert thread_stacktrace is not None
         assert "Thread 1" in thread_stacktrace
         assert "0x42424242" in thread_stacktrace
         assert "func1 ()" in thread_stacktrace
