@@ -282,3 +282,20 @@ class TestCassie:
         """Test get_traceback_for_bucket returns None for non-existent bucket"""
         traceback = cassie.get_traceback_for_bucket("nonexistent_bucket_12345")
         assert traceback is None
+
+    def test_get_stacktrace_for_bucket(self, cassandra_data):
+        """Test get_stacktrace_for_bucket returns stacktrace data"""
+        bucket_id = "/usr/bin/already-bucketed:11:func1:main"
+        result = cassie.get_stacktrace_for_bucket(bucket_id)
+        # Should return tuple of (Stacktrace, ThreadStacktrace)
+        assert result is not None
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        stacktrace, thread_stacktrace = result
+        assert "func1" in stacktrace
+        assert "main" in stacktrace
+
+    def test_get_stacktrace_for_bucket_nonexistent(self, cassandra_data):
+        """Test get_stacktrace_for_bucket returns (None, None) for non-existent bucket"""
+        result = cassie.get_stacktrace_for_bucket("nonexistent_bucket_12345")
+        assert result == (None, None)
