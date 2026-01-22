@@ -415,3 +415,24 @@ class TestCassie:
         """Test get_oopses_by_release returns empty list for a release with no crashes"""
         oopses = list(cassie.get_oopses_by_release("Ubuntu 99.99", limit=1000))
         assert oopses == []
+
+    def test_get_total_buckets_by_day(self, cassandra_data):
+        """Test get_total_buckets_by_day returns date and count tuples"""
+        results = list(cassie.get_total_buckets_by_day(0, 7))
+        # Should return 7 days of data (today through 7 days ago)
+        assert len(results) == 7
+        # Each result should be a tuple of (date_string, count)
+        for date, count in results:
+            assert isinstance(date, str)
+            assert len(date) == 8  # YYYYMMDD format
+            assert isinstance(count, int)
+            assert count >= 0
+
+    def test_get_total_buckets_by_day_range(self, cassandra_data):
+        """Test get_total_buckets_by_day with different date ranges"""
+        results = list(cassie.get_total_buckets_by_day(30, 31))
+        # Should return 1 day of data (30 days ago)
+        assert len(results) == 1
+        date, count = results[0]
+        assert isinstance(date, str)
+        assert isinstance(count, int)
