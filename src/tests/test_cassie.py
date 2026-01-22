@@ -383,3 +383,20 @@ class TestCassie:
         """Test get_package_new_buckets returns empty list for non-existent package"""
         buckets = cassie.get_package_new_buckets("nonexistent_package", "1.0", "2.0")
         assert buckets == []
+
+    def test_get_oopses_by_day(self, datetime_now, cassandra_data):
+        """Test get_oopses_by_day returns list of OOPS IDs for the given day"""
+        today = datetime_now.strftime("%Y%m%d")
+        oopses = list(cassie.get_oopses_by_day(today, limit=1000))
+        # We created several crashes today (0 days ago)
+        assert len(oopses) > 0
+        # Each OOPS should be a UUID
+        assert all(isinstance(oops, UUID) for oops in oopses)
+        # Check that we have crashes from multiple packages created today
+        assert len(oopses) >= 10  # We have many crashes today from various packages
+
+    def test_get_oopses_by_day_no_data(self, cassandra_data):
+        """Test get_oopses_by_day returns empty list for a day with no crashes"""
+        future_date = "20991231"  # Far future date with no crashes
+        oopses = list(cassie.get_oopses_by_day(future_date, limit=1000))
+        assert oopses == []
