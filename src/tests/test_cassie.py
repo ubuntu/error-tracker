@@ -400,3 +400,18 @@ class TestCassie:
         future_date = "20991231"  # Far future date with no crashes
         oopses = list(cassie.get_oopses_by_day(future_date, limit=1000))
         assert oopses == []
+
+    def test_get_oopses_by_release(self, cassandra_data):
+        """Test get_oopses_by_release returns list of OOPS IDs for the given release"""
+        oopses = list(cassie.get_oopses_by_release("Ubuntu 24.04", limit=1000))
+        # We created many crashes for Ubuntu 24.04
+        assert len(oopses) > 0
+        # Each OOPS should be a UUID
+        assert all(isinstance(oops, UUID) for oops in oopses)
+        # We should have at least 50 crashes for Ubuntu 24.04 from our test data
+        assert len(oopses) >= 50
+
+    def test_get_oopses_by_release_no_data(self, cassandra_data):
+        """Test get_oopses_by_release returns empty list for a release with no crashes"""
+        oopses = list(cassie.get_oopses_by_release("Ubuntu 99.99", limit=1000))
+        assert oopses == []
