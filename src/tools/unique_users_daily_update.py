@@ -11,7 +11,7 @@ from errortracker import cassandra
 cassandra.setup_cassandra()
 session = cassandra.cassandra_session()
 
-d = distro_info.UbuntuDistroInfo()
+UDI = distro_info.UbuntuDistroInfo()
 
 
 # Utilities
@@ -24,7 +24,7 @@ def _date_range_iterator(start, finish):
 
 
 # Main
-if __name__ == "__main__":
+def main():
     if "--dry-run" in sys.argv:
         dry_run = True
         sys.argv.remove("--dry-run")
@@ -33,10 +33,10 @@ if __name__ == "__main__":
 
     releases = [
         "Ubuntu " + r.replace(" LTS", "")
-        for r in sorted(set(d.supported(result="release") + d.supported_esm(result="release")))
+        for r in sorted(set(UDI.supported(result="release") + UDI.supported_esm(result="release")))
     ]
     try:
-        releases.append("Ubuntu " + d.devel(result="release"))
+        releases.append("Ubuntu " + UDI.devel(result="release"))
     except distro_info.DistroDataOutdated:
         print("Distro info outdated, unable to process devel")
 
@@ -84,3 +84,7 @@ if __name__ == "__main__":
             )
         print(("%s:%s" % (release, len(users))))
         print(("from %s days" % day_count))
+
+
+if __name__ == "__main__":
+    main()
