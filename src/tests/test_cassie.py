@@ -1,6 +1,7 @@
 from datetime import timedelta, datetime
 from uuid import UUID
 
+import distro_info
 import numpy
 from pytest import approx
 
@@ -334,7 +335,9 @@ class TestCassie:
         assert isinstance(metadata, dict)
         assert len(metadata) == 2
         assert metadata["/usr/bin/already-bucketed:11:func1:main"]["Source"] == "already-bucketed"
-        assert metadata["/usr/bin/failed-retrace:11:failed_func:main"]["Source"] == "failed-retrace"
+        assert (
+            metadata["/usr/bin/failed-retrace:11:failed_func:main"]["Source"] == "failed-retrace"
+        )
 
     def test_get_metadata_for_buckets_empty(self, cassandra_data):
         """Test get_metadata_for_buckets returns empty dict for empty list"""
@@ -347,12 +350,16 @@ class TestCassie:
         user_token = "imatestsystem"
         crashes = cassie.get_user_crashes(user_token, limit=5)
         assert isinstance(crashes, list)
-        # Should have some crashes
-        assert len(crashes) > 0
-        # Each item should be a tuple of (uuid_str, datetime)
+        assert len(crashes) == 5
         for uuid_str, crash_time in crashes:
             assert isinstance(uuid_str, str)
             assert isinstance(crash_time, datetime)
+        first_crash = crashes[0]
+        more_crashes = cassie.get_user_crashes(user_token, limit=5, start=first_crash[0])
+        assert len(crashes) == 5
+        assert crashes[1] == more_crashes[0]
+        assert crashes[2] == more_crashes[1]
+        assert more_crashes[-1] not in crashes
 
     def test_get_user_crashes_nonexistent(self, cassandra_data):
         """Test get_user_crashes returns empty list for non-existent user"""
@@ -361,23 +368,25 @@ class TestCassie:
 
     def test_get_binary_packages_for_user(self, cassandra_data):
         """Test get_binary_packages_for_user returns list of packages or None"""
-        # Test with nonexistent user should return None
+        packages = cassie.get_binary_packages_for_user("daisy-pluckers")
+        assert packages == ["already-bucketed", "failed-retrace"]
+
+    def test_get_binary_packages_for_user_no_crash(self, cassandra_data):
+        """Test get_binary_packages_for_user returns None when user has no binary packages"""
+        packages = cassie.get_binary_packages_for_user("foundations-bugs")
+        assert packages == []
+
+    def test_get_binary_packages_for_user_non_existing_user(self, cassandra_data):
+        """Test get_binary_packages_for_user returns None when user has no binary packages"""
         packages = cassie.get_binary_packages_for_user("nonexistent_user_12345")
         assert packages is None
 
-    def test_get_binary_packages_for_user_no_data(self, cassandra_data):
-        """Test get_binary_packages_for_user returns None when user has no binary packages"""
-        # Test with a user that exists but has no binary packages
-        packages = cassie.get_binary_packages_for_user("imatestsystem")
-        # Should return None or empty list
-        assert packages is None or packages == []
-
     def test_get_package_new_buckets(self, cassandra_data):
         """Test get_package_new_buckets returns list of new crash buckets"""
-        # Test with source packages that don't have new buckets
-        buckets = cassie.get_package_new_buckets("already-bucketed-src", "1.0", "2.0")
-        # Should return empty list since we don't have SourceVersionBuckets data
-        assert isinstance(buckets, list)
+        buckets = cassie.get_package_new_buckets("python-traceback", "1.0", "1.1")
+        assert buckets == ["/usr/bin/pytraceback:RuntimeError:func2"]
+        buckets = cassie.get_package_new_buckets("python-traceback", "1.1", "1.2")
+        assert buckets == []
 
     def test_get_package_new_buckets_nonexistent(self, cassandra_data):
         """Test get_package_new_buckets returns empty list for non-existent package"""
@@ -386,154 +395,160 @@ class TestCassie:
 
     def test_get_oopses_by_day(self, datetime_now, cassandra_data):
         """Test get_oopses_by_day returns list of OOPS IDs for the given day"""
-        today = datetime_now.strftime("%Y%m%d")
-        oopses = list(cassie.get_oopses_by_day(today, limit=1000))
-        # We created several crashes today (0 days ago)
-        assert len(oopses) > 0
-        # Each OOPS should be a UUID
+        yesterday = (datetime_now - timedelta(days=1)).strftime("%Y%m%d")
+        oopses = list(cassie.get_oopses_by_day(yesterday))
+        assert len(oopses) == 8
         assert all(isinstance(oops, UUID) for oops in oopses)
-        # Check that we have crashes from multiple packages created today
-        assert len(oopses) >= 10  # We have many crashes today from various packages
+        oopses = list(cassie.get_oopses_by_day(yesterday, limit=6))
+        assert len(oopses) == 6
+        a_week_ago = (datetime_now - timedelta(days=7)).strftime("%Y%m%d")
+        oopses = list(cassie.get_oopses_by_day(a_week_ago))
+        assert len(oopses) == 1
 
     def test_get_oopses_by_day_no_data(self, cassandra_data):
         """Test get_oopses_by_day returns empty list for a day with no crashes"""
         future_date = "20991231"  # Far future date with no crashes
-        oopses = list(cassie.get_oopses_by_day(future_date, limit=1000))
+        oopses = list(cassie.get_oopses_by_day(future_date))
         assert oopses == []
 
     def test_get_oopses_by_release(self, cassandra_data):
         """Test get_oopses_by_release returns list of OOPS IDs for the given release"""
-        oopses = list(cassie.get_oopses_by_release("Ubuntu 24.04", limit=1000))
-        # We created many crashes for Ubuntu 24.04
-        assert len(oopses) > 0
-        # Each OOPS should be a UUID
+        oopses = list(cassie.get_oopses_by_release("Ubuntu 24.04"))
+        assert len(oopses) == 81
         assert all(isinstance(oops, UUID) for oops in oopses)
-        # We should have at least 50 crashes for Ubuntu 24.04 from our test data
-        assert len(oopses) >= 50
+        oopses = list(cassie.get_oopses_by_release("Ubuntu 24.04", limit=6))
+        assert len(oopses) == 6
 
     def test_get_oopses_by_release_no_data(self, cassandra_data):
         """Test get_oopses_by_release returns empty list for a release with no crashes"""
-        oopses = list(cassie.get_oopses_by_release("Ubuntu 99.99", limit=1000))
+        oopses = list(cassie.get_oopses_by_release("Ubuntu 99.99"))
         assert oopses == []
 
     def test_get_total_buckets_by_day(self, cassandra_data):
         """Test get_total_buckets_by_day returns date and count tuples"""
         results = list(cassie.get_total_buckets_by_day(0, 7))
-        # Should return 7 days of data (today through 7 days ago)
         assert len(results) == 7
-        # Each result should be a tuple of (date_string, count)
+        assert results[0][1] == 4
+        assert results[1][1] == 2
+        assert results[2][1] == 1
+        assert results[-1][1] == 0
         for date, count in results:
             assert isinstance(date, str)
             assert len(date) == 8  # YYYYMMDD format
             assert isinstance(count, int)
-            assert count >= 0
-
-    def test_get_total_buckets_by_day_range(self, cassandra_data):
-        """Test get_total_buckets_by_day with different date ranges"""
         results = list(cassie.get_total_buckets_by_day(30, 31))
-        # Should return 1 day of data (30 days ago)
         assert len(results) == 1
-        date, count = results[0]
-        assert isinstance(date, str)
-        assert isinstance(count, int)
+        assert results[0][1] == 1
 
     def test_get_bucket_counts(self, datetime_now, cassandra_data):
         """Test get_bucket_counts returns list of (bucket_id, count) tuples"""
-        # Test with specific release and period
         results = cassie.get_bucket_counts(release="Ubuntu 24.04", period="week")
-        # Results should be a list of tuples (bucket_id, count)
-        assert isinstance(results, list)
-        # Each item should be a tuple
-        for item in results:
-            assert isinstance(item, tuple)
-            assert len(item) == 2
-            bucket_id, count = item
-            assert isinstance(bucket_id, bytes) or isinstance(bucket_id, str)
-            assert isinstance(count, int)
-            assert count > 0
+        assert results == [
+            (b"/usr/bin/pytraceback:RuntimeError:func2", 3),
+            (b"/usr/bin/pytraceback:MemoryError:func3", 1),
+            (b"/usr/bin/already-bucketed:11:func1:main", 1),
+            (b"/usr/bin/failed-retrace:11:failed_func:main", 1),
+            (b"/usr/bin/pytraceback:Exception:func1", 1),
+        ]
 
     def test_get_bucket_counts_no_data(self, cassandra_data):
         """Test get_bucket_counts returns empty list when no data matches"""
         results = cassie.get_bucket_counts(release="Ubuntu 99.99", period="day")
         assert results == []
 
-    def test_get_retracer_count(self, datetime_now, cassandra_data):
+    def test_get_retracer_count(self, datetime_now, cassandra_data, retracer):
         """Test get_retracer_count returns dictionary of retrace statistics"""
-        date = datetime_now.strftime("%Y%m%d")
-        result = cassie.get_retracer_count(date)
-        # Should return a dictionary (even if empty when no retrace stats exist)
-        assert isinstance(result, dict)
+        release = "Ubuntu 24.04"
+        yesterday = (datetime_now - timedelta(days=1)).strftime("%Y%m%d")
+        retracer.update_retrace_stats(release, yesterday, 30, True)
+        result = cassie.get_retracer_count(yesterday)
+        assert result == {"Ubuntu 24.04:amd64": {"success": 1}, "Ubuntu 24.04": {"success": 1}}
 
     def test_get_retracer_count_no_data(self, cassandra_data):
         """Test get_retracer_count returns empty dict for date with no stats"""
         result = cassie.get_retracer_count("20991231")
         assert result == {}
 
-    def test_get_retracer_counts(self, cassandra_data):
+    def test_get_retracer_counts(self, datetime_now, cassandra_data, retracer):
         """Test get_retracer_counts returns generator of (date, stats) tuples"""
+        release = "Ubuntu 24.04"
+        yesterday = (datetime_now - timedelta(days=1)).strftime("%Y%m%d")
+        three_days_ago = (datetime_now - timedelta(days=3)).strftime("%Y%m%d")
+        retracer.update_retrace_stats(release, yesterday, 30, True)
+        retracer.update_retrace_stats(release, three_days_ago, 30, True)
+        retracer.update_retrace_stats(release, three_days_ago, 30, True)
         results = list(cassie.get_retracer_counts(0, 7))
-        # Should return a list of tuples
-        assert isinstance(results, list)
-        for date, stats in results:
-            assert isinstance(date, str)
-            assert isinstance(stats, dict)
+        assert isinstance(results[0][0], str)
+        assert len(results[0][0]) == 8  # YYYYMMDD format
+        assert results[1][1] == {
+            "Ubuntu 24.04:amd64": {"success": 2},
+            "Ubuntu 24.04": {"success": 2},
+        }
+        assert results[3][1] == {
+            "Ubuntu 24.04:amd64": {"success": 2},
+            "Ubuntu 24.04": {"success": 2},
+        }
 
-    def test_get_retracer_means(self, cassandra_data):
+    def test_get_retracer_means(self, datetime_now, cassandra_data, retracer):
         """Test get_retracer_means returns list of (date, release_arch_dict) tuples"""
-        results = cassie.get_retracer_means(0, 3)
-        # Should return a list of tuples
-        assert isinstance(results, list)
-        assert len(results) == 3  # 3 days of data
-        for date, release_data in results:
-            assert isinstance(date, str)
-            assert len(date) == 8  # YYYYMMDD format
-            assert isinstance(release_data, dict)
+        release = distro_info.UbuntuDistroInfo().lts(result="release")
+        release = "Ubuntu " + release.replace(" LTS", "")
+        yesterday = (datetime_now - timedelta(days=1)).strftime("%Y%m%d")
+        three_days_ago = (datetime_now - timedelta(days=3)).strftime("%Y%m%d")
+        retracer.update_retrace_stats(release, yesterday, 30, True)
+        retracer.update_retrace_stats(release, three_days_ago, 20, True)
+        retracer.update_retrace_stats(release, three_days_ago, 60, True)
+        results = cassie.get_retracer_means(1, 4)
+        assert isinstance(results[0][0], str)
+        assert len(results[0][0]) == 8  # YYYYMMDD format
+        assert results[0][1][release]["amd64"] == 30.0
+        assert results[2][1][release]["amd64"] == 35.0
 
     def test_get_crash_count(self, datetime_now, cassandra_data):
         """Test get_crash_count returns generator of (date, count) tuples"""
         results = list(cassie.get_crash_count(0, 7))
-        # Should return a list of tuples
-        assert isinstance(results, list)
-        for date, count in results:
-            assert isinstance(date, str)
-            assert len(date) == 8  # YYYYMMDD format
-            assert isinstance(count, int)
-            assert count >= 0
+        assert isinstance(results[0][0], str)
+        assert len(results[0][0]) == 8  # YYYYMMDD format
+        assert results[0][1] == 20
+        assert results[2][1] == 7
 
     def test_get_crash_count_with_release(self, datetime_now, cassandra_data):
         """Test get_crash_count with release parameter returns filtered results"""
         results = list(cassie.get_crash_count(0, 7, release="Ubuntu 24.04"))
-        # Should return results (even if empty)
-        assert isinstance(results, list)
-        for date, count in results:
-            assert isinstance(date, str)
-            assert isinstance(count, int)
+        assert isinstance(results[0][0], str)
+        assert len(results[0][0]) == 8  # YYYYMMDD format
+        assert results[0][1] == 19
+        assert results[2][1] == 7
+        results = list(cassie.get_crash_count(0, 7, release="Ubuntu 26.04"))
+        assert results[0][1] == 1
+        assert len(results) == 1
 
-    def test_get_average_crashes(self, cassandra_data):
+    def test_get_average_crashes(self, datetime_now, cassandra_data):
         """Test get_average_crashes returns list of (timestamp, average) tuples"""
-        result = cassie.get_average_crashes("Ubuntu 24.04", "Ubuntu 24.04", days=7)
-        # Should return a list
-        assert isinstance(result, list)
-        for timestamp, avg in result:
-            assert isinstance(timestamp, int)  # Unix timestamp
-            assert isinstance(avg, float)
-            assert avg >= 0.0
+        yesterday = datetime_now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
+            days=1
+        )
+        result = cassie.get_average_crashes("python3-traceback", "Ubuntu 24.04", days=7)
+        assert result[0][0] == int(yesterday.timestamp())
+        assert result[0][1] == approx(0.666666666)
 
     def test_get_average_crashes_no_data(self, cassandra_data):
         """Test get_average_crashes returns empty list when no data exists"""
-        result = cassie.get_average_crashes("Ubuntu 99.99", "Ubuntu 99.99", days=7)
+        result = cassie.get_average_crashes("python3-traceback", "Ubuntu 99.99", days=7)
         assert result == []
 
-    def test_get_average_instances(self, cassandra_data):
+    def test_get_average_instances(self, datetime_now, cassandra_data):
         """Test get_average_instances returns generator of (timestamp, average) tuples"""
-        # Use a bucket that exists from test data
-        result = list(cassie.get_average_instances("test-bucket-id", "Ubuntu 24.04", days=7))
-        # Should return a list (possibly empty if bucket has no instance data)
-        assert isinstance(result, list)
-        for timestamp, avg in result:
-            assert isinstance(timestamp, int)  # Unix timestamp
-            assert isinstance(avg, float)
-            assert avg >= 0.0
+        yesterday = datetime_now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
+            days=1
+        )
+        result = list(
+            cassie.get_average_instances(
+                "/usr/bin/pytraceback:RuntimeError:func2", "Ubuntu 24.04", days=7
+            )
+        )
+        assert result[0][0] == int(yesterday.timestamp())
+        assert result[0][1] == approx(0.333333333)
 
     def test_get_average_instances_no_data(self, cassandra_data):
         """Test get_average_instances returns empty list for non-existent bucket"""
