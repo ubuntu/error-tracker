@@ -187,20 +187,16 @@ def bucket(oopsid, bucketid, fields=None, proposed_fields=False):
 
     :return: The day which the bucket was filed under.
     """
-    session = cassandra_session()
-    # Get the timestamp.
     try:
-        results = session.execute(
-            session.prepare(
-                f'SELECT WRITETIME (value) FROM {session.keyspace}."OOPS" WHERE key = ? LIMIT 1'
-            ),
-            [oopsid.encode()],
-        )
-        timestamp = list(results)[0]["writetime(value)"]
-        day_key = time.strftime("%Y%m%d", time.gmtime(timestamp / 1000000))
-    except IndexError:
-        # Eventual consistency. This OOPS probably occurred today.
-        day_key = time.strftime("%Y%m%d", time.gmtime())
+        # Make sure the datetime will get formatted "correctly" in that cursed time format: Mon May  5 14:46:10 2025
+        locale.setlocale(locale.LC_ALL, "C.UTF-8")
+        row = cassandra_schema.OOPS.objects.get(key=oopsid.encode(), column1="Date")
+        # Try to get the actual day of that crash, otherwise fallback to today
+        crash_datetime = datetime.strptime(row.value, "%c")
+        day_key = crash_datetime.strftime("%Y%m%d")
+    except Exception:
+        crash_datetime = datetime.now()
+        day_key = datetime.strftime(datetime.now(), "%Y%m%d")
 
     cassandra_schema.Bucket.create(key=bucketid, column1=uuid.UUID(oopsid), value=b"")
     cassandra_schema.DayBuckets.create(key=day_key, key2=bucketid, column1=oopsid, value=b"")
