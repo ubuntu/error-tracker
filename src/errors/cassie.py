@@ -55,7 +55,7 @@ def _get_range_of_dates(start_x_days_ago: int, finish_x_days_ago: int) -> list[s
     This is necessary because we use the Cassandra random partitioner, so
     lexicographical ranges are not possible."""
     finish_x_days_ago = finish_x_days_ago - start_x_days_ago
-    date = datetime.datetime.utcnow() - datetime.timedelta(days=start_x_days_ago)
+    date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=start_x_days_ago)
     delta = datetime.timedelta(days=1)
     dates = []
     for i in range(finish_x_days_ago):
@@ -636,7 +636,7 @@ def get_package_crash_rate(
         except DoesNotExist:
             proposed_new_vers_data = None
 
-    today = datetime.datetime.utcnow().strftime("%Y%m%d")
+    today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d")
     try:
         today_crashes = new_vers_data[today]
     except KeyError:
@@ -695,7 +695,7 @@ def get_package_crash_rate(
     if today_crashes < 3:
         return results
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     hour = float(now.hour)
     minute = float(now.minute)
     mean_crashes = numpy.average(previous_vers_crashes)
