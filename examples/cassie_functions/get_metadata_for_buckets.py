@@ -2,10 +2,11 @@
 """Example usage of get_metadata_for_buckets function."""
 
 import sys
-sys.path.insert(0, '../../src')
 
-from errortracker.cassandra import setup_cassandra
+sys.path.insert(0, "../../src")
+
 from errors.cassie import get_metadata_for_buckets
+from errortracker.cassandra import setup_cassandra
 
 # Setup Cassandra connection
 setup_cassandra()

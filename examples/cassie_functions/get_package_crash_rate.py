@@ -2,10 +2,11 @@
 """Example usage of get_package_crash_rate function."""
 
 import sys
-sys.path.insert(0, '../../src')
 
-from errortracker.cassandra import setup_cassandra
+sys.path.insert(0, "../../src")
+
 from errors.cassie import get_package_crash_rate
+from errortracker.cassandra import setup_cassandra
 
 # Setup Cassandra connection
 setup_cassandra()
@@ -20,7 +21,7 @@ date = "20231115"
 absolute_uri = "https://errors.ubuntu.com"
 
 result = get_package_crash_rate(
-    release, src_package, old_version, new_version, 
+    release, src_package, old_version, new_version,
     pup, date, absolute_uri, exclude_proposed=False
 )
 print(f"Crash rate analysis: {result}")

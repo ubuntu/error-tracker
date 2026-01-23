@@ -2,10 +2,11 @@
 """Example usage of get_average_crashes function."""
 
 import sys
-sys.path.insert(0, '../../src')
 
-from errortracker.cassandra import setup_cassandra
+sys.path.insert(0, "../../src")
+
 from errors.cassie import get_average_crashes
+from errortracker.cassandra import setup_cassandra
 
 # Setup Cassandra connection
 setup_cassandra()

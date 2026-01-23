@@ -41,11 +41,11 @@ def create_test_data(datetime_now=datetime.now()):
 
     # increase-rate package version 2
     for i in [2, 2, 1, 1, 1, 0, 0, 0, 0]:
-        new_oops(i,  {"DistroRelease": "Ubuntu 24.04", "Package": "increase-rate 2", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/increase-rate", "StacktraceAddressSignature": "/usr/bin/increase-rate:42:/usr/bin/increase-rate+fa0"})
+        new_oops(i, {"DistroRelease": "Ubuntu 24.04", "Package": "increase-rate 2", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/increase-rate", "StacktraceAddressSignature": "/usr/bin/increase-rate:42:/usr/bin/increase-rate+fa0"})
 
     # increase-rate package version 2 in proposed, even more crashes!
     for i in [1, 0]:
-        new_oops(i,  {"DistroRelease": "Ubuntu 24.04", "Package": "increase-rate 2", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/increase-rate", "StacktraceAddressSignature": "/usr/bin/increase-rate:42:/usr/bin/increase-rate+fa0", "Tags": "package-from-proposed"})
+        new_oops(i, {"DistroRelease": "Ubuntu 24.04", "Package": "increase-rate 2", "ProblemType": "Crash", "Architecture": "amd64", "ExecutablePath": "/usr/bin/increase-rate", "StacktraceAddressSignature": "/usr/bin/increase-rate:42:/usr/bin/increase-rate+fa0", "Tags": "package-from-proposed"})
 
     # no-crashes-today package version 1 (old version with crashes)
     for i in [30, 20, 10, 5, 2]:

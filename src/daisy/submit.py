@@ -165,12 +165,6 @@ def submit(request, system_token):
     pkg_arch = utils.get_package_architecture(data)
     problem_type = data.get("ProblemType", "")
     apport_version = data.get("ApportVersion", "")
-    third_party = False
-    if not utils.retraceable_package(package):
-        third_party = True
-    automated_testing = False
-    if system_token.startswith("deadbeef"):
-        automated_testing = True
 
     if not release:
         metrics.meter("missing.missing_release")

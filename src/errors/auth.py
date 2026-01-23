@@ -15,5 +15,5 @@ groups = [
 def can_see_stacktraces(func):
     def in_groups(u):
         return u.groups.filter(name__in=groups).count() > 0
-    l = "/login-failed"
-    return login_required(user_passes_test(in_groups, login_url=l)(func))
+
+    return login_required(user_passes_test(in_groups, login_url="/login-failed")(func))

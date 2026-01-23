@@ -1,19 +1,15 @@
 import datetime
-import operator
-import struct
-import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
-import distro_info
-from functools import cmp_to_key
 from uuid import UUID
 
+import distro_info
 import numpy
+from cassandra.util import datetime_from_uuid1
 
 from errortracker import cassandra, config
 from errortracker.cassandra_schema import (
+    OOPS,
     Bucket,
     BucketMetadata,
     BucketRetraceFailureReason,
@@ -25,9 +21,9 @@ from errortracker.cassandra_schema import (
     DayBucketsCount,
     DayOOPS,
     DoesNotExist,
+    ErrorsByRelease,
     Hashes,
     Indexes,
-    OOPS,
     RetraceStats,
     SourceVersionBuckets,
     Stacktrace,
@@ -35,10 +31,7 @@ from errortracker.cassandra_schema import (
     UniqueUsers90Days,
     UserBinaryPackages,
     UserOOPS,
-    ErrorsByRelease,
 )
-
-from cassandra.util import datetime_from_uuid1
 
 session = cassandra.cassandra_session
 
@@ -400,13 +393,6 @@ def get_metadata_for_bucket(bucketid: str, release: str = None):
         return ret
     except DoesNotExist:
         return {}
-
-
-def chunks(l, n):
-    # http://stackoverflow.com/a/312464/190597
-    """Yield successive n-sized chunks from l."""
-    for i in range(0, len(l), n):
-        yield l[i : i + n]
 
 
 def get_metadata_for_buckets(bucketids, release=None):

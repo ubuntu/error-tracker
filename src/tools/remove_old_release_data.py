@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import sys
-import uuid
 
 import distro_info
 from cassandra import OperationTimedOut

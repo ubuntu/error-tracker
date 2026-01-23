@@ -17,7 +17,6 @@ from hashlib import md5, sha1
 from cassandra.cqlengine.query import BatchQuery
 
 from errortracker import cassandra_schema
-from errortracker.cassandra import cassandra_session
 
 DAY = 60 * 60 * 24
 MONTH = DAY * 30
