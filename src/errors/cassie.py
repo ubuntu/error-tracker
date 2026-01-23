@@ -23,6 +23,7 @@ from errortracker.cassandra_schema import (
     Counters,
     CountersForProposed,
     DayBucketsCount,
+    DayOOPS,
     DoesNotExist,
     Hashes,
     Indexes,
@@ -34,6 +35,7 @@ from errortracker.cassandra_schema import (
     UniqueUsers90Days,
     UserBinaryPackages,
     UserOOPS,
+    ErrorsByRelease,
 )
 
 from cassandra.util import datetime_from_uuid1
@@ -66,17 +68,13 @@ def _get_range_of_dates(start_x_days_ago: int, finish_x_days_ago: int) -> list[s
 
 def get_oopses_by_day(date: str, limit: int = 1000):
     """All of the OOPSes in the given day."""
-    oopses_by_day = session().prepare('SELECT value FROM crashdb."DayOOPS" WHERE key = ? LIMIT ?;')
-    for row in session().execute(oopses_by_day, [date, limit]):
-        yield row.value
+    for row in DayOOPS.objects.filter(key=date.encode()).limit(limit):
+        yield row.column1
 
 
 def get_oopses_by_release(release: str, limit: int = 1000):
     """All of the OOPSes in the given release."""
-    oopses_by_release = session().prepare(
-        'SELECT column1 FROM crashdb."ErrorsByRelease" WHERE key = ? LIMIT ? ALLOW FILTERING;'
-    )
-    for row in session().execute(oopses_by_release, [release.encode(), limit]):
+    for row in ErrorsByRelease.objects.filter(key=release).limit(limit):
         yield row.column1
 
 
@@ -421,11 +419,11 @@ def get_metadata_for_buckets(bucketids, release=None):
 def get_user_crashes(user_token: str, limit: int = 50, start=None):
     results = {}
     try:
-        query = UserOOPS.objects.filter(key=user_token.encode()).limit(limit)
+        query = UserOOPS.objects.filter(key=user_token.encode()).limit(limit).order_by("-column1")
 
         if start:
-            # Filter to get items greater than start
-            query = query.filter(column1__gt=start)
+            # Filter to get items lower than start (reverse order)
+            query = query.filter(column1__lt=start)
 
         for row in query:
             # Since we don't have timestamp directly, we'll use the column1 to compute it
@@ -433,9 +431,7 @@ def get_user_crashes(user_token: str, limit: int = 50, start=None):
     except DoesNotExist:
         return []
 
-    return [
-        (k, results[k]) for k in sorted(results.keys(), key=lambda x: results[x], reverse=True)
-    ]
+    return [(k, results[k]) for k in results.keys()]
 
 
 def get_average_crashes(field, release, days=7):
@@ -549,26 +545,32 @@ def get_binary_packages_for_user(user):
     # if a package's last crash was reported more than a month ago then it
     # won't be returned here, however the package isn't likely to appear in
     # the most-common-problems.
-    # XXX: that 30 days delta + %Y%m doesn't seem to produce a nice sliding
-    # time window. Is this expected? apparently yes, but that seems a bit wrong
-    period = (datetime.date.today() - datetime.timedelta(30)).strftime("%Y%m")
+    last_month = (datetime.date.today() - datetime.timedelta(30)).strftime("%Y%m")
+    current_month = (datetime.date.today()).strftime("%Y%m")
+    binary_packages = []
     try:
         pkg_rows = UserBinaryPackages.objects.filter(key=user).all()
-        binary_packages = [row.column1 + ":%s" % period for row in pkg_rows]
+        binary_packages = [row.column1 for row in pkg_rows]
     except DoesNotExist:
         return None
     if len(binary_packages) == 0:
         return None
 
-    results = {}
+    results = []
     for pkg in binary_packages:
-        count = DayBucketsCount.objects.filter(key=pkg.encode()).limit(1).count()
-        # remove packages that don't have recent crashes
+        count = (
+            DayBucketsCount.objects.filter(key=(pkg + ":%s" % last_month).encode())
+            .limit(1)
+            .count()
+            + DayBucketsCount.objects.filter(key=(pkg + ":%s" % current_month).encode())
+            .limit(1)
+            .count()
+        )
+        # only include packages that have recent crashes
         if count > 0:
-            results[pkg] = count
+            results.append(pkg)
 
-    # trim the date suffix to only keep the package name
-    return [k[0:-7] for k in list(results.keys())]
+    return results
 
 
 def get_package_crash_rate(
@@ -601,16 +603,12 @@ def get_package_crash_rate(
             .limit(15)
             .all()
         )
-        print(new_rows)
         new_vers_data = {row.column1: row.value for row in new_rows}
-        print(new_vers_data)
     except DoesNotExist:
-        print("New data does not exist")
         results["increase"] = False
         return results
 
     if not new_vers_data:
-        print("No new data")
         results["increase"] = False
         return results
 
@@ -750,10 +748,7 @@ def get_package_new_buckets(src_pkg: str, previous_version: str, new_version: st
             continue
 
         try:
-            count_rows = (
-                BucketVersionSystems2.objects.filter(key=bucket, key2=new_version).limit(4).all()
-            )
-            count = len(list(count_rows))
+            count = BucketVersionSystems2.objects.filter(key=bucket, key2=new_version).count()
         except DoesNotExist:
             continue
         if count <= 2:

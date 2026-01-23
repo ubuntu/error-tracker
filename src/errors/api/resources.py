@@ -313,7 +313,7 @@ class DayOopsResource(ErrorsResource):
         oopses_by_day = set()
         oopses_by_release = set()
         for oops in cassie.get_oopses_by_day(date, limit):
-            oopses_by_day.add(str(oops))
+            oopses_by_day.add(oops)
         oopses = oopses_by_day
 
         if release:
