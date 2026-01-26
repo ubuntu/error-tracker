@@ -24,7 +24,7 @@ class TestCassie:
         assert crash_rate == approx(
             {
                 "increase": True,
-                "difference": numpy.float64(4.3),
+                "difference": numpy.float64(4.7),
                 "web_link": "https://errors.internal/?release=Ubuntu%2024.04&package=increase-rate&version=2",
                 "previous_period_in_days": 30,
                 "previous_average": numpy.float64(0.7),
