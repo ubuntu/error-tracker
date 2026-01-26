@@ -3,7 +3,7 @@
 import sys
 
 import distro_info
-from cassandra import OperationTimedOut
+from cassandra import Timeout
 from cassandra.cluster import NoHostAvailable
 from tenacity import retry, retry_if_exception_type, wait_exponential
 
@@ -105,9 +105,7 @@ unneeded_columns = (
 )
 
 
-@retry(
-    wait=wait_exponential(), retry=retry_if_exception_type((OperationTimedOut, NoHostAvailable))
-)
+@retry(wait=wait_exponential(), retry=retry_if_exception_type((Timeout, NoHostAvailable)))
 def check_and_remove_oops(oopsid):
     oops_data = cassandra_schema.OOPS.get_as_dict(key=oopsid.encode())
     if oops_data.get("DistroRelease", "") == release_name:
