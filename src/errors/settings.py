@@ -1,7 +1,7 @@
 # Django settings for errors project.
 import os
 
-from errortracker import config, cassandra
+from errortracker import cassandra, config
 
 cassandra.setup_cassandra()
 

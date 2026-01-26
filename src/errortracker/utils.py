@@ -158,6 +158,7 @@ def bucket(oops_id, crash_signature, report_dict):
             apt.apt_pkg.version_compare,
             release,
         )
+        oopses.update_bucket_versions_count(crash_signature, release, version)
         oopses.update_source_version_buckets(src_package, version, crash_signature)
 
 

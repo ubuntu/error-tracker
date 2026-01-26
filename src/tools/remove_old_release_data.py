@@ -1,20 +1,15 @@
 #!/usr/bin/python3
 
-import os
 import sys
-from datetime import datetime, timedelta
-from time import sleep
 
 import distro_info
 from cassandra import OperationTimedOut
 from cassandra.cluster import NoHostAvailable
+from tenacity import retry, retry_if_exception_type, wait_exponential
 
-from errortracker import cassandra
+from errortracker import cassandra, cassandra_schema
 
-session = cassandra.cassandra_session()
-
-oops_lookup_stmt = session.prepare('SELECT * FROM "OOPS" WHERE key=?')
-oops_delete_stmt = session.prepare('DELETE FROM "OOPS" WHERE key=? AND column1=?')
+cassandra.setup_cassandra()
 
 URL = "https://errors.ubuntu.com/oops/"
 
@@ -110,118 +105,32 @@ unneeded_columns = (
 )
 
 
+@retry(
+    wait=wait_exponential(), retry=retry_if_exception_type((OperationTimedOut, NoHostAvailable))
+)
 def check_and_remove_oops(oopsid):
-    data = {}
-    max_retries = 5
-    for i in range(max_retries):
-        period = 30 + (30 * i)
-        try:
-            oops_data = session.execute(oops_lookup_stmt, [oopsid.encode()])
-        except (OperationTimedOut, NoHostAvailable):
-            print(("Sleeping %ss as we timed out when querying." % period))
-            sleep(period)
-            continue
-        else:
-            break
-    else:
-        print(("Cassandra operation timed out %s times." % max_retries))
-        return
-    # all the column "names" are column1 so make a dictionary of keys: values
-    for od in oops_data:
-        data[od.column1] = od.value
-    # just double check that its the right release
-    if data.get("DistroRelease", "") == rname:
-        if data.get("ProcMaps", "") == "":
-            # print("Skipping already cleaned crash.")
+    oops_data = cassandra_schema.OOPS.get_as_dict(key=oopsid.encode())
+    if oops_data.get("DistroRelease", "") == release_name:
+        if oops_data.get("Date", "") == "":
+            print(("%s%s was skipped (already cleaned)" % (URL, oopsid)))
             return
         for column in unneeded_columns:
-            for i in range(max_retries):
-                period = 30 + (30 * i)
-                try:
-                    session.execute(oops_delete_stmt, [oopsid.encode(), "%s" % column])
-                except (OperationTimedOut, NoHostAvailable):
-                    print(("Sleeping %ss as we timed out when deleting." % period))
-                    sleep(period)
-                    continue
-                else:
-                    break
-            else:
-                print(("Cassandra operation timed out %s times." % max_retries))
-                return
-        print(("%s%s was from %s and had its data removed" % (URL, oopsid, rname)))
-
-
-# Main
-if __name__ == "__main__":
-    if "--dry-run" in sys.argv:
-        dry_run = True
-        sys.argv.remove("--dry-run")
+            cassandra_schema.OOPS.filter(key=oopsid.encode(), column1=column).delete()
+        print(("%s%s was from %s and had its data removed" % (URL, oopsid, release_name)))
     else:
-        dry_run = False
+        print(
+            ("%s%s was from %s and was kept" % (URL, oopsid, oops_data.get("DistroRelease", "")))
+        )
 
+
+if __name__ == "__main__":
     codename = sys.argv[1]
 
     di = distro_info.UbuntuDistroInfo()
     release = [r for r in di.get_all("object") if r.series == codename][0]
     # strip out "LTS"
-    rname = "Ubuntu %s" % release.version.split()[0]
+    release_name = "Ubuntu %s" % release.version.split()[0]
 
-    open_date = release.created
-    eol_date = release.eol
-
-    # use restart_date if you have to stop and start the job again
-    restart_date = ""
-    if restart_date:
-        open_date = datetime.strptime(restart_date, "%Y-%m-%d").date()
-
-    delta = eol_date - open_date
-
-    for i in range(delta.days + 1):
-        current_date = open_date + timedelta(days=i)
-
-        removal_progress = "%s-remove_old_%s_data.txt" % (
-            current_date,
-            rname.split(" ")[-1],
-        )
-        if os.path.exists(removal_progress):
-            with open(removal_progress, "r") as f:
-                last_row = f.readline()
-        else:
-            last_row = ""
-
-        run = 1
-        if last_row == "":
-            r_oopses = session.execute(
-                'SELECT * FROM "ErrorsByRelease" '
-                "WHERE key = '%s' "
-                "AND key2 = '%s' LIMIT 5000" % (rname, current_date)
-            )
-            print(("%s %s run: %s" % (rname, current_date, run)))
-            for r_oops_row in r_oopses:
-                check_and_remove_oops(str(r_oops_row.column1))
-                last_row = str(r_oops_row.column1)
-            run += 1
-
-        if last_row == "":
-            continue
-
-        while run < 150:
-            r_oopses2 = session.execute(
-                'SELECT * FROM "ErrorsByRelease" '
-                "WHERE key = '%s' "
-                "AND key2 = '%s' AND column1 > %s "
-                "LIMIT 5000" % (release, current_date, last_row)
-            )
-            print(("%s %s run: %s" % (rname, current_date, run)))
-            r_oops_row = ""
-            for r_oops_row in r_oopses2:
-                check_and_remove_oops(str(r_oops_row.column1))
-                last_row = str(r_oops_row.column1)
-            if r_oops_row:
-                with open(removal_progress, "w") as f:
-                    f.write(str(r_oops_row.column1))
-            else:
-                if os.path.exists(removal_progress):
-                    os.unlink(removal_progress)
-                break
-            run += 1
+    for row in cassandra_schema.ErrorsByRelease.filter(key=release_name).allow_filtering().all():
+        check_and_remove_oops(str(row.column1))
+        row.delete()

@@ -18,6 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from daisy.version import version_info as daisy_version_info
+
 from errors.version import version_info as errors_version_info
 
 

@@ -8,6 +8,7 @@
 
 import shutil
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -16,9 +17,10 @@ from cassandra.cqlengine import management
 
 import retracer as et_retracer
 from errortracker import cassandra
+from tests.create_test_data import create_test_data
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="class")
 def temporary_db():
     cassandra.KEYSPACE = "tmp"
     cassandra.REPLICATION_FACTOR = 1
@@ -27,7 +29,7 @@ def temporary_db():
     management.drop_keyspace(cassandra.KEYSPACE)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="class")
 def retracer(temporary_db):
     temp = Path(tempfile.mkdtemp())
     config_dir = temp / "config"
@@ -45,3 +47,14 @@ def retracer(temporary_db):
             architecture=architecture,
         )
     shutil.rmtree(temp)
+
+
+@pytest.fixture(scope="module")
+def datetime_now():
+    return datetime.now()
+
+
+@pytest.fixture(scope="class")
+def cassandra_data(datetime_now, temporary_db):
+    create_test_data(datetime_now)
+    yield

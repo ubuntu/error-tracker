@@ -26,12 +26,17 @@ sudo apt install apport-retrace python3-amqp python3-bson python3-cassandra pyth
 sudo apt install python3-django-tastypie python3-numpy
 ```
 
-Then start a local Cassandra, RabbitMQ and swift (`docker` should works fine too):
+Then start a local Cassandra, RabbitMQ and swift (`docker` should work fine too):
 ```
 podman run --name cassandra --network host --rm -d -e HEAP_NEWSIZE=10M -e MAX_HEAP_SIZE=200M docker.io/cassandra
 podman run --name rabbitmq --network host --rm -d docker.io/rabbitmq
 podman run --name swift --network host --rm -d docker.io/openstackswift/saio
 ```
+
+> Note:
+> * Cassandra can take some time (a minute or two?) to fully start.
+> * Also, sometimes, Cassandra can hang and you get some `OperationTimedOut`
+>   issues out of nowhere. Just `podman kill cassandra` and restart it.
 
 You can then then run the tests with `pytest`:
 ```

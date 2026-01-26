@@ -1,23 +1,8 @@
 # Treat strings as UTF-8 instead of ASCII
-import importlib
-import sys
-from functools import cmp_to_key
-
-importlib.reload(sys)
-
-from tastypie import fields
-from tastypie.authentication import Authentication, SessionAuthentication
-from tastypie.authorization import Authorization, DjangoAuthorization
-from tastypie.exceptions import NotFound
-from tastypie.resources import Resource
-
-from errors import cassie
-
-TASTYPIE_FULL_DEBUG = True
-
 import datetime
 import json as simplejson
 from collections import OrderedDict
+from functools import cmp_to_key
 from hashlib import sha1
 from operator import itemgetter
 from urllib.error import HTTPError
@@ -25,8 +10,14 @@ from urllib.parse import quote, unquote
 
 import apt
 from django.core.serializers import json
+from tastypie import fields
+from tastypie.authentication import Authentication, SessionAuthentication
+from tastypie.authorization import Authorization, DjangoAuthorization
+from tastypie.exceptions import NotFound
+from tastypie.resources import Resource
 from tastypie.serializers import Serializer
 
+from errors import cassie
 from errortracker import config, launchpad
 
 from ..metrics import measure_view
@@ -313,7 +304,7 @@ class DayOopsResource(ErrorsResource):
         oopses_by_day = set()
         oopses_by_release = set()
         for oops in cassie.get_oopses_by_day(date, limit):
-            oopses_by_day.add(str(oops))
+            oopses_by_day.add(oops)
         oopses = oopses_by_day
 
         if release:
@@ -614,10 +605,6 @@ class SystemCrashesResource(ErrorsResource):
                 # TODO: use a cassandra function that does a multiget of the
                 # crashes
                 for crash, ts in crashes:
-                    # cassandra records time in microseconds, convert to
-                    # seconds
-                    ts = (ts["submitted"][1]) * 1e-6
-                    ts = datetime.datetime.utcfromtimestamp(ts)
                     d = cassie.get_crash(str(crash), columns=cols)
                     program = split_package_and_version(d.get("Package", ""))[0]
                     if not program:
@@ -807,7 +794,7 @@ class AverageCrashesResource(ErrorsResource):
                             if item[0] in results:
                                 results[item[0]] -= item[1]
                         results = sorted(
-                            list(results.items()), key=cmp_to_key(lambda x, y: cmp(x[0], y[0]))
+                            list(results.items()), key=cmp_to_key(lambda x, y: x[0] <= y[0])
                         )
 
                         res = [{"x": result[0] * 1000, "y": result[1]} for result in results]

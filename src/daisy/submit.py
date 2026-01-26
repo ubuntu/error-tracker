@@ -36,22 +36,6 @@ metrics = get_metrics("daisy.%s" % socket.gethostname())
 logger = logging.getLogger("daisy")
 
 
-def update_counters(release, src_package, date, src_version=None):
-    if src_version:
-        key = "%s:%s:%s" % (release, src_package, src_version)
-    else:
-        key = "%s:%s" % (release, src_package)
-    cassandra_schema.Counters(key=key.encode(), column1=date).update(value=1)
-
-
-def update_proposed_counters(release, src_package, date, src_version=None):
-    if src_version:
-        key = "%s:%s:%s" % (release, src_package, src_version)
-    else:
-        key = "%s:%s" % (release, src_package)
-    cassandra_schema.CountersForProposed(key=key.encode(), column1=date).update(value=1)
-
-
 def create_minimal_report_from_bson(data):
     report = Report()
     for key in data:
@@ -181,12 +165,6 @@ def submit(request, system_token):
     pkg_arch = utils.get_package_architecture(data)
     problem_type = data.get("ProblemType", "")
     apport_version = data.get("ApportVersion", "")
-    third_party = False
-    if not utils.retraceable_package(package):
-        third_party = True
-    automated_testing = False
-    if system_token.startswith("deadbeef"):
-        automated_testing = True
 
     if not release:
         metrics.meter("missing.missing_release")
@@ -221,21 +199,6 @@ def submit(request, system_token):
         problem_type, release, package, version, pkg_arch
     )
 
-    # generic counter for crashes about a source package which is used by the
-    # phased-updater and only includes official Ubuntu packages and not those
-    # crahses from systems under auto testing.
-    if not third_party and not automated_testing and problem_type == "Crash":
-        update_counters(release=release, src_package=src_package, date=day_key)
-        if version == "":
-            metrics.meter("missing.missing_package_version")
-        else:
-            update_counters(
-                release=release,
-                src_package=src_package,
-                src_version=version,
-                date=day_key,
-            )
-
     # ProcMaps is useful for creating a crash sig, not after that
     if "Traceback" in data and "ProcMaps" in data:
         data.pop("ProcMaps")
@@ -262,18 +225,6 @@ def submit(request, system_token):
     package_from_proposed = False
     if "package-from-proposed" in tags:
         package_from_proposed = True
-        # generic counter for crashes about a source package which is used by
-        # the phased-updater and only includes official Ubuntu packages and
-        # not those from systems under auto testing.
-        if not third_party and not automated_testing and problem_type == "Crash":
-            update_proposed_counters(release=release, src_package=src_package, date=day_key)
-            if version != "":
-                update_proposed_counters(
-                    release=release,
-                    src_package=src_package,
-                    src_version=version,
-                    date=day_key,
-                )
 
     # A device is manually blocklisted if it has repeatedly failed to have an
     # crash inserted into the OOPS table.
@@ -356,7 +307,7 @@ def bucket(oops_id, data, day_key):
                     key=b"crash_signature_for_stacktrace_address_signature", column1=addr_sig
                 ).value.decode()
             except DoesNotExist:
-                pass
+                metrics.meter("missing.crash_signature")
         failed_to_retrace = False
         if crash_sig.startswith("failed:"):
             failed_to_retrace = True
@@ -401,7 +352,9 @@ def bucket(oops_id, data, day_key):
                     "StacktraceTop",
                 )
                 for unneeded_column in unneeded_columns:
-                    cassandra_schema.OOPS.filter(key=oops_id.encode(), column1=unneeded_column).delete()
+                    cassandra_schema.OOPS.filter(
+                        key=oops_id.encode(), column1=unneeded_column
+                    ).delete()
             # We have already retraced for this address signature, so this
             # crash can be immediately bucketed.
             utils.bucket(oops_id, crash_sig, data)

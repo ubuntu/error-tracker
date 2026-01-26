@@ -1147,7 +1147,7 @@ class Retracer:
         ts = msg.properties.get("timestamp")
         # If we are still unable to find the OOPS after 8 days then
         # just process it as a failure.
-        today = datetime.datetime.now(datetime.UTC)
+        today = datetime.datetime.now(datetime.timezone.utc)
         target_date = today - datetime.timedelta(days=8)
         # if we don't know how old it is it must be ancient
         if not ts:

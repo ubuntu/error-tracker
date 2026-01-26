@@ -152,7 +152,7 @@ def status(request):
 def bug(request, bug):
     try:
         bug = int(bug)
-    except:
+    except Exception:
         return HttpResponseRedirect("/")
 
     signatures = cassie.get_signatures_for_bug(bug)

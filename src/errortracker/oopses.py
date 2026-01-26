@@ -7,15 +7,16 @@
 """basic operations on oopses in the db."""
 
 import json
+import locale
 import re
 import time
 import uuid
+from datetime import datetime
 from hashlib import md5, sha1
 
 from cassandra.cqlengine.query import BatchQuery
 
 from errortracker import cassandra_schema
-from errortracker.cassandra import cassandra_session
 
 DAY = 60 * 60 * 24
 MONTH = DAY * 30
@@ -100,7 +101,15 @@ def _insert(
     :param ttl: boolean for setting the time to live for the column
     :return: The day which the oops was filed under.
     """
-    day_key = time.strftime("%Y%m%d", time.gmtime())
+    try:
+        # Make sure the datetime will get formatted "correctly" in that cursed time format: Mon May  5 14:46:10 2025
+        locale.setlocale(locale.LC_ALL, "C.UTF-8")
+        # Try to get the actual day of that crash, otherwise fallback to today
+        crash_datetime = datetime.strptime(insert_dict["Date"], "%c")
+        day_key = crash_datetime.strftime("%Y%m%d")
+    except Exception:
+        crash_datetime = datetime.now()
+        day_key = datetime.strftime(datetime.now(), "%Y%m%d")
     now_uuid = uuid.uuid1()
 
     if ttl:
@@ -117,6 +126,13 @@ def _insert(
         automated_testing = True
 
     cassandra_schema.DayOOPS.create(key=day_key.encode(), column1=now_uuid, value=oopsid.encode())
+    if "DistroRelease" in insert_dict:
+        cassandra_schema.ErrorsByRelease.create(
+            key=insert_dict["DistroRelease"],
+            key2=datetime.now(),
+            column1=now_uuid,
+            value=crash_datetime,
+        )
 
     # Systems running automated tests should not be included in the OOPS count.
     if not automated_testing:
@@ -129,12 +145,12 @@ def _insert(
                 cassandra_schema.Counters.filter(
                     key=f"oopses:{field}".encode(), column1=day_key
                 ).update(value=1)
-        if proposed_pkg:
-            for field in fields:
-                field = field.encode("ascii", errors="replace").decode()
-                cassandra_schema.CountersForProposed.filter(
-                    key=f"oopses:{field}".encode(), column1=day_key
-                ).update(value=1)
+            if proposed_pkg:
+                for field in fields:
+                    field = field.encode("ascii", errors="replace").decode()
+                    cassandra_schema.CountersForProposed.filter(
+                        key=f"oopses:{field}".encode(), column1=day_key
+                    ).update(value=1)
 
     if user_token:
         cassandra_schema.UserOOPS.create(key=user_token.encode(), column1=oopsid, value=b"")
@@ -170,20 +186,16 @@ def bucket(oopsid, bucketid, fields=None, proposed_fields=False):
 
     :return: The day which the bucket was filed under.
     """
-    session = cassandra_session()
-    # Get the timestamp.
     try:
-        results = session.execute(
-            session.prepare(
-                f'SELECT WRITETIME (value) FROM {session.keyspace}."OOPS" WHERE key = ? LIMIT 1'
-            ),
-            [oopsid.encode()],
-        )
-        timestamp = list(results)[0]["writetime(value)"]
-        day_key = time.strftime("%Y%m%d", time.gmtime(timestamp / 1000000))
-    except IndexError:
-        # Eventual consistency. This OOPS probably occurred today.
-        day_key = time.strftime("%Y%m%d", time.gmtime())
+        # Make sure the datetime will get formatted "correctly" in that cursed time format: Mon May  5 14:46:10 2025
+        locale.setlocale(locale.LC_ALL, "C.UTF-8")
+        row = cassandra_schema.OOPS.objects.get(key=oopsid.encode(), column1="Date")
+        # Try to get the actual day of that crash, otherwise fallback to today
+        crash_datetime = datetime.strptime(row.value, "%c")
+        day_key = crash_datetime.strftime("%Y%m%d")
+    except Exception:
+        crash_datetime = datetime.now()
+        day_key = datetime.strftime(datetime.now(), "%Y%m%d")
 
     cassandra_schema.Bucket.create(key=bucketid, column1=uuid.UUID(oopsid), value=b"")
     cassandra_schema.DayBuckets.create(key=day_key, key2=bucketid, column1=oopsid, value=b"")
@@ -209,6 +221,12 @@ def bucket(oopsid, bucketid, fields=None, proposed_fields=False):
                 value=1
             )
     return day_key
+
+
+def update_bucket_versions_count(crash_signature: str, release: str, version: str):
+    cassandra_schema.BucketVersionsCount(
+        key=crash_signature, column1=release, column2=version
+    ).update(value=1)
 
 
 def update_bucket_metadata(bucketid, source, version, comparator, release=""):

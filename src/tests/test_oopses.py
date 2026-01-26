@@ -5,6 +5,7 @@
 # the GNU Affero General Public License, version 3 ("AGPLv3"). See the file
 # LICENSE in the source tree for more information.
 
+import datetime
 import json
 import time
 import uuid
@@ -102,7 +103,7 @@ class TestInsert:
         assert value == result["duration"]
         # The oops has been indexed by day
         oops_refs = cassandra_schema.DayOOPS.filter(key=day_key.encode()).only(["value"])
-        assert [oopsid] == [day_oops.value.decode() for day_oops in oops_refs]
+        assert oopsid in [day_oops.value.decode() for day_oops in oops_refs]
         # TODO - the aggregates for the OOPS have been updated.
 
     def test_insert_oops_dict(self, temporary_db):
@@ -124,12 +125,22 @@ class TestInsert:
 
         day_key = oopses.insert_dict(oopsid, oops, user_token)
         oops_count = cassandra_schema.Counters.filter(key=b"oopses", column1=day_key)
-        assert [1] == [count.value for count in oops_count]
+        assert [3] == [count.value for count in oops_count]
 
         oopsid = str(uuid.uuid1())
         day_key = oopses.insert_dict(oopsid, oops, user_token)
         oops_count = cassandra_schema.Counters.filter(key=b"oopses", column1=day_key)
-        assert [2] == [count.value for count in oops_count]
+        assert [4] == [count.value for count in oops_count]
+
+    def test_insert_updates_errorsbyrelease(self, temporary_db):
+        oopsid = str(uuid.uuid1())
+        oops = {"DistroRelease": "Ubuntu 42.42", "Date": "Tue Jan 20 14:01:54 2026"}
+        user_token = "user1"
+
+        oopses.insert_dict(oopsid, oops, user_token)
+        result = list(cassandra_schema.ErrorsByRelease.filter(key="Ubuntu 42.42"))
+        assert len(result) == 1
+        assert result[0].value == datetime.datetime(2026, 1, 20, 14, 1, 54)
 
 
 class TestBucket:

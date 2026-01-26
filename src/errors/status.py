@@ -104,8 +104,7 @@ def check_most_common_problems():
     url = "/api/1.0/most-common-problems/?limit=100&format=json"
     response = c.get(url)
     data = loads(response.content)
-    l = len(data["objects"])
-    if l == 100:
+    if len(data["objects"]) == 100:
         obj = data["objects"][0]
         if "count" in obj and "function" in obj:
             return True
@@ -115,9 +114,8 @@ def check_most_common_problems():
 def check_oops_reports():
     today = datetime.date.today().strftime("%Y-%m-%d")
     try:
-        l = os.listdir(os.path.join(config.oops_repository, today))
         # If we get more than 25 oops reports, alert.
-        if len(l) > 25:
+        if len(os.listdir(os.path.join(config.oops_repository, today))) > 25:
             return False
         else:
             return True
