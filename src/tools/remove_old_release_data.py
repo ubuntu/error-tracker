@@ -129,6 +129,11 @@ if __name__ == "__main__":
     # strip out "LTS"
     release_name = "Ubuntu %s" % release.version.split()[0]
 
-    for row in cassandra_schema.ErrorsByRelease.filter(key=release_name).allow_filtering().all():
+    for row in (
+        cassandra_schema.ErrorsByRelease.filter(key=release_name)
+        .allow_filtering()
+        .limit(None)
+        .all()
+    ):
         check_and_remove_oops(str(row.column1))
         row.delete()
