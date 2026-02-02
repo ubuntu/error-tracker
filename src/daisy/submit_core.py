@@ -19,9 +19,7 @@
 import logging
 import random
 import socket
-from datetime import datetime, timezone
 
-import amqp
 from cassandra.cqlengine.query import DoesNotExist
 
 # from daisy import config
@@ -79,34 +77,6 @@ def write_to_swift(fileobj: bytes, oops_id: str):
     return True
 
 
-def write_to_amqp(message, arch):
-    queue = "retrace_%s" % arch
-    channel = amqp_utils.get_connection().channel()
-    if not channel:
-        return False
-    try:
-        channel.queue_declare(queue=queue, durable=True, auto_delete=False)
-        # We'll use this timestamp to measure how long it takes to process a
-        # retrace, from receiving the core file to writing the data back to
-        # Cassandra.
-        body = amqp.Message(message, timestamp=int(datetime.now(timezone.utc).timestamp()))
-        # Persistent
-        body.properties["delivery_mode"] = 2
-        channel.basic_publish(body, exchange="", routing_key=queue)
-        msg = "%s added to %s queue" % (message.split(":")[0], queue)
-        logger.info(msg)
-        queued = True
-    except amqp_utils.amqplib_error_types as e:
-        if amqp_utils.is_amqplib_connection_error(e):
-            # Could not connect / interrupted connection
-            queued = False
-        # Unknown error mode : don't hide it.
-        raise
-    finally:
-        channel.close()
-    return queued
-
-
 def submit_core(request, oopsid, arch, system_token):
     try:
         # every OOPS will have a SystemIdentifier
@@ -137,7 +107,7 @@ def submit_core(request, oopsid, arch, system_token):
         # same SAS.
         return msg, 500
 
-    queued = write_to_amqp(f"{oopsid}:swift", arch)
+    queued = amqp_utils.enqueue(f"{oopsid}:swift", "retrace_%s" % arch)
     if not queued:
         # If not written to amqp then write to log file
         msg = "Failure to write to amqp retrace queue %s %s" % (arch, message)
