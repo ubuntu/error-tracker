@@ -94,6 +94,7 @@ class ErrorTracker:
                     "python3-cassandra",
                     "python3-flask",
                     "python3-swiftclient",
+                    "python3-zstandard",
                 ]
             )
         except CalledProcessError as e:
