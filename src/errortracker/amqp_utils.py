@@ -1,9 +1,12 @@
 import socket
+from datetime import datetime, timezone
 
 import amqp
 from amqp import ConnectionError as AMQPConnectionException
 
 from errortracker import config
+
+logger = config.logger
 
 # From oops-amqp
 # These exception types always indicate an AMQP connection error/closure.
@@ -61,3 +64,30 @@ def get_connection():
             return None
         # Unknown error mode : don't hide it.
         raise
+
+
+def enqueue(message, queue):
+    channel = get_connection().channel()
+    if not channel:
+        return False
+    try:
+        channel.queue_declare(queue=queue, durable=True, auto_delete=False)
+        # We'll use this timestamp to measure how long it takes to process a
+        # retrace, from receiving the core file to writing the data back to
+        # Cassandra.
+        body = amqp.Message(message, timestamp=int(datetime.now(timezone.utc).timestamp()))
+        # Persistent
+        body.properties["delivery_mode"] = 2
+        channel.basic_publish(body, exchange="", routing_key=queue)
+        msg = "%s added to %s queue" % (message.split(":")[0], queue)
+        logger.info(msg)
+        queued = True
+    except amqplib_error_types as e:
+        if is_amqplib_connection_error(e):
+            # Could not connect / interrupted connection
+            queued = False
+        # Unknown error mode : don't hide it.
+        raise
+    finally:
+        channel.close()
+    return queued

@@ -306,28 +306,6 @@ class Retracer:
         self._sandboxes[release] = (sandbox, cache)
         return self._sandboxes[release]
 
-    def move_to_failed_queue(self, msg):
-        if self.failed:
-            # It failed its 2nd retrace attempt, admit defeat and don't try
-            # again.
-            self.processed(msg)
-            return
-
-        # We've processed this. Delete it off the MQ.
-        log("ack'ing message from main queue")
-        msg.channel.basic_ack(msg.delivery_tag)
-        # We don't call self.processed here because that would remove the core
-        # file from the storage provider, and we want to retain it.
-
-        # Add it to the failed to retrace queue.
-        queue = "failed_retrace_%s" % self.architecture
-        msg.channel.queue_declare(queue=queue, durable=True, auto_delete=False)
-        body = amqp.Message(msg.body)
-        # Persistent
-        body.properties["delivery_mode"] = 2
-        msg.channel.basic_publish(body, exchange="", routing_key=queue)
-        log("pushed message to failed queue")
-
     def failed_to_process(self, msg, oops_id, old=False):
         # Try to remove the core file from the storage provider
         oops_id, provider = self.msg_body.split(":", 1)
@@ -711,7 +689,8 @@ class Retracer:
                     # we don't want to see this OOPS again so process it
                     self.processed(msg)
                 else:
-                    self.move_to_failed_queue(msg)
+                    amqp_utils.enqueue(msg.body, "failed_retrace_%s" % self.architecture)
+                    log("pushed message to failed queue")
                     if not self.failed:
                         action = "moving to failed queue."
                 log(m % (proc.returncode, action))
