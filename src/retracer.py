@@ -32,6 +32,7 @@ import sys
 import tempfile
 import time
 import traceback
+from pathlib import Path
 from subprocess import PIPE, Popen
 
 import amqp
@@ -71,10 +72,10 @@ def log(message, level=logging.INFO):
     logger.log(level, message)
 
 
-def rm_eff(path):
+def rm_eff(path: Path):
     """Remove ignoring -ENOENT."""
     try:
-        os.remove(path)
+        shutil.rmtree(str(path))
     except OSError as e:
         if e.errno != 2:
             raise
@@ -357,11 +358,10 @@ class Retracer:
 
     def write_swift_bucket_to_disk(self, key):
         fmt = f"-swift.{key}.oopsid"
-        fd, path = tempfile.mkstemp(fmt)
-        os.close(fd)
+        path = Path(tempfile.mkdtemp(fmt))
         try:
             _, body = self.swift.get_object(config.swift_bucket, key, resp_chunk_size=65536)
-            with open(path, "wb") as fp:
+            with open(path / "crash", "wb") as fp:
                 for chunk in body:
                     fp.write(chunk)
             return path
@@ -439,27 +439,24 @@ class Retracer:
         if "UnreportableReason" in list(col.keys()):
             unreportable_reason = col["UnreportableReason"]
 
-        path = self.write_bucket_to_disk(oops_id)
+        work_path = self.write_bucket_to_disk(oops_id)
 
-        if path == "Missing":
-            log("Ack'ing OOPS with missing core file.")
-            msg.channel.basic_ack(msg.delivery_tag)
-            return
-        if not path or not os.path.exists(path):
-            log("Could not find %s" % path)
+        if not work_path or not work_path.exists():
+            log("Could not find %s" % work_path)
             self.failed_to_process(msg, oops_id)
             return
 
-        core_file = "%s.core" % path
+        core_file = work_path / "core"
+        report_path = work_path / "crash"
+
         try:
             with open(core_file, "wb") as fp:
                 log("Decompressing to %s" % core_file)
-                with open(path) as path_fp:
+                with open(report_path) as path_fp:
                     for block in CompressedValue.decode_compressed_stream(
                         _base64_decoder(path_fp)
                     ):
                         fp.write(block)
-            rm_eff(path)
         except Exception as e:
             log("Failed to decompress core: %s" % str(e))
             # We couldn't decompress this, so there's no value in trying again.
@@ -469,7 +466,7 @@ class Retracer:
             metrics.meter("retrace.failed.%s" % self.architecture)
             metrics.meter("retrace.failure.decompression")
             metrics.meter("retrace.failure.decompression.%s" % self.architecture)
-            rm_eff(core_file)
+            rm_eff(work_path)
             return
 
         # confirm that gdb thinks the core file is good
@@ -486,7 +483,7 @@ class Retracer:
             metrics.meter("retrace.failed.%s" % self.architecture)
             metrics.meter("retrace.failure.gdb_core_check")
             metrics.meter("retrace.failure.gdb_core_check.%s" % self.architecture)
-            rm_eff(core_file)
+            rm_eff(work_path)
             return
 
         report = Report()
@@ -525,7 +522,7 @@ class Retracer:
         # the end of the line.
         #    log('Requeueing an Ubuntu 18.04 %s crash.' % srcpackage)
         #    self.requeue(msg, oops_id)
-        #    rm_eff(core_file)
+        #    rm_eff(path)
         #    return
 
         invalid = re.search(bad, release) or len(release) > 1024
@@ -533,10 +530,9 @@ class Retracer:
             metrics.meter("retrace.failed.invalid")
         if not release or invalid or not retraceable:
             self.processed(msg)
-            rm_eff(core_file)
+            rm_eff(work_path)
             return
 
-        report_path = "%s.crash" % path
         with open(report_path, "wb") as fp:
             report.write(fp)
 
@@ -612,7 +608,6 @@ class Retracer:
                 log("Removing %s" % cache)
                 shutil.rmtree(cache)
                 os.mkdir(cache)
-            rm_eff(report_path)
 
         try:
             if proc.returncode != 0:
@@ -675,7 +670,7 @@ class Retracer:
                         self.requeue(msg, oops_id)
                         # don't record it as a failure in the metrics as it is
                         # going to be retried
-                        rm_eff("%s.new" % report_path)
+                        rm_eff(work_path)
                         # return immediately to prevent moving the crash to
                         # the failed queue
                         self._processing_callback = False
@@ -683,6 +678,7 @@ class Retracer:
                 elif proc.returncode == -15:
                     log("apport-retrace was killed by retracer restart.")
                     self._processing_callback = False
+                    rm_eff(work_path)
                     return
                 # apport-retrace will exit 0 even on a failed retrace unless
                 # something has gone wrong at a lower level, as was the case
@@ -746,7 +742,7 @@ class Retracer:
                 metrics.meter("retrace.failed.%s" % architecture)
                 metrics.meter("retrace.failed.%s.%s" % (release, architecture))
                 self.save_crash(report, oops_id, core_file)
-                rm_eff("%s.new" % report_path)
+                rm_eff(work_path)
                 # TODO 2024-12-16: Skia: let's see what to do with that later,
                 # but for now we don't want the retracer to choke on this.
                 # raise ApportException(err)
@@ -764,6 +760,7 @@ class Retracer:
                 metrics.meter("retrace.failed.%s" % architecture)
                 metrics.meter("retrace.failed.%s.%s" % (release, architecture))
                 self._processing_callback = False
+                rm_eff(work_path)
                 return
 
             log("Writing back to Cassandra")
@@ -831,10 +828,10 @@ class Retracer:
                             self.requeue(msg, oops_id)
                             # don't record it as a failure in the metrics as it is
                             # going to be retried
-                            rm_eff("%s.new" % report_path)
                             # return immediately to prevent moving the crash to
                             # the failed queue
                             self._processing_callback = False
+                            rm_eff(work_path)
                             return
                         else:
                             log("Gave up requeueing after %s attempts." % count)
@@ -898,9 +895,6 @@ class Retracer:
                     for line in report["RetraceOutdatedPackages"].splitlines():
                         log("%s (%s)" % (line, release))
             else:
-                # we aren't adding the report back to the stacktrace_cf so put
-                # the CoreDump back in the report in case we save it
-                report["CoreDump"] = (core_file,)
                 if "Stacktrace" not in report and crash_signature:
                     log("Stacktrace not in retraced report with a crash_sig.")
                     if unreportable_reason:
@@ -1112,11 +1106,9 @@ class Retracer:
                     log("Recounting %s" % crash_signature)
                     self.recount(crash_signature, msg.channel)
         finally:
-            rm_eff("%s" % report_path)
-            rm_eff("%s.new" % report_path)
-            rm_eff(core_file)
+            rm_eff(work_path)
 
-        log("Done processing %s" % path)
+        log("Done processing %s" % work_path)
         self.processed(msg)
         self._processing_callback = False
         # If stop now has been set then we should stop working.
