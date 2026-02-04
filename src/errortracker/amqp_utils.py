@@ -66,7 +66,7 @@ def get_connection():
         raise
 
 
-def enqueue(message, queue):
+def enqueue(message: str, queue: str):
     channel = get_connection().channel()
     if not channel:
         return False
@@ -79,8 +79,7 @@ def enqueue(message, queue):
         # Persistent
         body.properties["delivery_mode"] = 2
         channel.basic_publish(body, exchange="", routing_key=queue)
-        msg = "%s added to %s queue" % (message.split(":")[0], queue)
-        logger.info(msg)
+        logger.info("%s added to %s queue", message, queue)
         queued = True
     except amqplib_error_types as e:
         if is_amqplib_connection_error(e):

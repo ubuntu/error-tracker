@@ -683,7 +683,7 @@ class Retracer:
                     self.remove(oops_id)
                     self.update_time_to_retrace(msg)
                 else:
-                    amqp_utils.enqueue(msg.body, "failed_retrace_%s" % self.architecture)
+                    amqp_utils.enqueue(f"{oops_id}:swift", "failed_retrace_%s" % self.architecture)
                     log("pushed message to failed queue")
                     if not self.failed:
                         action = "moving to failed queue."
