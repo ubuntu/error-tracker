@@ -102,17 +102,18 @@ def submit(request, system_token):
         metrics.meter("invalid.empty_report")
         return "Empty report.", 400
 
+    try:
+        whoopsie_version = request.headers["X-Whoopsie-Version"]
+    except KeyError:
+        whoopsie_version = "unknown-whoopsie-version"
+
     # Write the SHA512 hash of the system UUID in with the report.
     if system_token:
         data["SystemIdentifier"] = system_token
     else:
         # we want to try and find out which releases are sending reports with
         # a missing SystemIdentifier
-        try:
-            whoopsie_version = request.headers["X-Whoopsie-Version"]
-            metrics.meter("missing.missing_system_token_%s" % whoopsie_version.replace(".", "_"))
-        except KeyError:
-            pass
+        metrics.meter("missing.missing_system_token_%s" % whoopsie_version.replace(".", "_"))
         metrics.meter("missing.missing_system_token")
 
     release = data.get("DistroRelease", "")
@@ -139,15 +140,11 @@ def submit(request, system_token):
             crash_id = f"{date}:{exec_path}:{proc_status}"
             crash_id = hashlib.md5(crash_id.encode()).hexdigest()
             if crash_id in reported_crash_ids:
-                return "Crash already reported.", 409
-            try:
-                whoopsie_version = request.headers["X-Whoopsie-Version"]
+                metrics.meter("invalid.duplicate_report")
                 metrics.meter(
                     "invalid.duplicate_report.whoopsie_%s" % whoopsie_version.replace(".", "_")
                 )
-            except KeyError:
-                pass
-            metrics.meter("invalid.duplicate_report")
+                return "Crash already reported.", 409
         except IndexError:
             pass
     # according to debian policy neither the package or version should have
