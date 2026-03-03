@@ -12,10 +12,11 @@ This repository contains two distinct projects that work together:
 **Before finishing any task**, always:
 
 1. Run `ruff check --preview .` from the root of the repository to lint the code
-2. Consider if the test coverage needs updating
-3. Update `README.md` if the change adds/removes/renames configuration options, services, or user-facing features
-4. Update `.github/copilot-instructions.md` if the change affects structure, conventions, workflow, etc.
-5. Provide a **draft commit message** using Conventional Commits format
+2. If the sandboxed environment allows it, run the `pytest` test suite as described in the "Running locally" section.
+3. Consider if the test coverage needs updating
+4. Update `README.md` if the change adds/removes/renames configuration options, services, or user-facing features
+5. Update `.github/copilot-instructions.md` if the change affects structure, conventions, workflow, etc.
+6. Provide a **draft commit message** using Conventional Commits format
 
 ---
 
@@ -98,6 +99,19 @@ The application relies on:
 - **RabbitMQ** — message queue between `daisy` (receiver) and `retracer` (processor)
 - **OpenStack Swift** — object storage for coredump files
 
+### Test Architecture
+
+There are two layers of testing:
+
+1. **Unit/functional tests** (`src/tests/`) — pytest-based tests that require Cassandra, RabbitMQ, and Swift running locally. These test individual components (submission, retracing, Cassandra operations, OOPS processing).
+
+2. **Integration/spread tests** (`tests/errortracker/`) — run inside LXD VMs via the `spread` test framework. This is how CI runs all tests. There are two spread suites:
+   - `tests/errortracker/functional/` — runs pytest inside a VM with all services
+   - `tests/errortracker/integration/` — full end-to-end scenario (daisy + retracer + whoopsie)
+
+3. **Charm tests** (`charm/tests/`) — integration tests for the Juju charm deployment using `jubilant`.
+
+
 ### Running locally
 
 See `README.md` for full instructions. The short version:
@@ -147,3 +161,30 @@ The charm is a **machine charm** targeting `ubuntu@24.04`. It deploys the Error 
 
 1. `install`/`upgrade-charm` event: copies the repo to `~ubuntu/error-tracker`, installs apt dependencies
 2. `config-changed` event: writes `local_config.py`, sets up Cassandra schema, configures and restarts systemd units for enabled components
+
+---
+
+## Making Changes — Practical Guidance
+
+### Charm Development
+
+- The charm is built with `charmcraft pack -v`
+- Charm dependencies are listed in `pyproject.toml` under `[dependency-groups] charm-deps`
+- Binary Python packages for the charm are pinned in `charmcraft.yaml` under `charm-binary-python-packages`
+- To update charm deps: run `uv sync --group charm-deps && uv pip freeze` and update the list in `charmcraft.yaml`
+
+### Errors and Workarounds
+
+- **Cassandra OperationTimedOut**: Cassandra can hang unexpectedly. Kill and restart the container.
+- **Tests require external services**: Unit tests cannot run without Cassandra, RabbitMQ, and Swift. In constrained environments, rely on linting (`ruff check --preview .`) for validation and push to CI for full test runs.
+- **Spread tests run in LXD VMs**: The spread test framework launches LXD virtual machines. This requires LXD and charmcraft snaps and will not work in containerized/sandboxed CI environments without nested virtualization.
+- **Charm build requires disk space**: The `build-and-test-charm` CI job frees disk space before building because the charm pack process can be disk-intensive.
+- **GDB workaround in integration tests**: The integration test (`tests/errortracker/integration/task.sh`) creates `/usr/lib/debug/.dwz` to work around a GDB bug (LP#1818918) that affects apport retracing.
+
+
+### Validating Changes
+
+1. **Always lint first**: `ruff check --preview .` — this is fast and catches most issues
+2. **Check woke compliance**: Ensure no inclusive language violations (see `.woke.yaml`)
+3. **Push to CI**: For test validation, push changes and let the CI spread tests run
+4. **Review CI logs**: Use GitHub Actions workflow logs if tests fail — the spread tests provide detailed output including service logs on failure
