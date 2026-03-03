@@ -167,7 +167,7 @@ function mean_time_between_failures_request(url, external_legend, constrain) {
             var oneDay = 86400000;
             for (obj in data.objects) {
                 var vals = data.objects[obj].values;
-                if (vals.length > 0 && vals[vals.length - 1].x < releaseDay) {
+                if (vals && vals.length > 0 && vals[vals.length - 1].x < releaseDay) {
                     /* If the graph doesn't include the release day, expand the
                      * range to show it. Use three days past so that the label
                      * fits. */
@@ -185,7 +185,7 @@ function mean_time_between_failures_request(url, external_legend, constrain) {
             container.transition().duration(500).call(chart);
 
             /* If we don't have any data */
-            if (vals.length <= 0) {
+            if (vals && vals.length <= 0) {
                 return chart;
             }
 
@@ -240,7 +240,7 @@ function mean_time_between_failures_request(url, external_legend, constrain) {
     });
 }
 
-function mean_time_between_failures_graph(means) {
+function mean_time_between_failures_graph() {
     YUI().use('node', 'event-key', 'event-valuechange', 'event-outside', function(Y) {
         function mean_time_between_failures_changed() {
             var selected_release;

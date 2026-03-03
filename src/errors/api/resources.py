@@ -169,20 +169,19 @@ class ResultObject(object):
 
 
 class ErrorsResource(Resource):
-    # Wrap the view dispatch with a statsd timing.
-    @measure_view
-    def dispatch(self, *args, **kwargs):
-        return Resource.dispatch(self, *args, **kwargs)
+    pass
+    # def dispatch(self, *args, **kwargs):
+    #     return Resource.dispatch(self, *args, **kwargs)
 
-    def _handle_500(self, request, exception):
-        # Create an OOPS report, then reply with a json-formatted error
-        # message.
-        import traceback
+    # def _handle_500(self, request, exception):
+    #     # Create an OOPS report, then reply with a json-formatted error
+    #     # message.
+    #     import traceback
 
-        formatted = traceback.format_exc(exception)
-        exc_info = (type(exception), exception.args[0], formatted)
-        request.environ["oops.context"]["exc_info"] = exc_info
-        return Resource._handle_500(self, request, exception)
+    #     formatted = traceback.format_exc(exception)
+    #     exc_info = (type(exception), exception.args[0], formatted)
+    #     request.environ["oops.context"]["exc_info"] = exc_info
+    #     return Resource._handle_500(self, request, exception)
 
 
 class ErrorsMeta:
@@ -338,7 +337,7 @@ class MostCommonProblemsResource(ErrorsResource):
     class Meta(ErrorsMeta):
         resource_name = "most-common-problems"
 
-    def _handle_request(self, bundle, start, finish):
+    def obj_get_list(self, bundle):
         release = bundle.request.GET.get("release", None)
         rootfs_build_version = bundle.request.GET.get("rootfs_build_version", None)
         channel_name = bundle.request.GET.get("channel_name", None)
@@ -349,8 +348,10 @@ class MostCommonProblemsResource(ErrorsResource):
         version = bundle.request.GET.get("version", None)
         pkg_arch = bundle.request.GET.get("pkg_arch", None)
         period = bundle.request.GET.get("period", None)
-        from_date = str(bundle.request.GET.get("from", "")).translate(None, "/-")
-        to_date = str(bundle.request.GET.get("to", "")).translate(None, "/-")
+        start = 0
+        finish = int(bundle.request.GET.get("limit", "30"))
+        from_date = str(bundle.request.GET.get("from", "")).replace("/", "").replace("-", "")
+        to_date = str(bundle.request.GET.get("to", "")).replace("/", "").replace("-", "")
         user = bundle.request.GET.get("user", None)
         first_appearance = bundle.request.GET.get("first_appearance", False)
         snap = bundle.request.GET.get("snap", None)
@@ -449,9 +450,7 @@ class MostCommonProblemsResource(ErrorsResource):
             if first_appearance:
                 if m.get("FirstSeen", "") != version:
                     continue
-            if isinstance(bucket, str):
-                bucket = bucket.encode("utf-8")
-            hashed = sha1(bucket).hexdigest()
+            hashed = sha1(bucket.encode()).hexdigest()
             if cassie.get_problem_for_hash(hashed):
                 href = "problem/%s" % hashed
             else:
@@ -463,12 +462,12 @@ class MostCommonProblemsResource(ErrorsResource):
                     {
                         "rank": rank,
                         "count": count,
-                        "package": srcpkg.decode("utf-8"),
+                        "package": srcpkg,
                         "first_seen": m.get("FirstSeen", ""),
                         "last_seen": last_seen,
                         "first_seen_release": m.get("FirstSeenRelease", ""),
                         "last_seen_release": m.get("LastSeenRelease", ""),
-                        "function": bucket.decode("utf-8"),
+                        "function": bucket,
                         "web_link": href,
                         "report": report,
                     }
@@ -477,13 +476,6 @@ class MostCommonProblemsResource(ErrorsResource):
             rank += 1
 
         return results
-
-    def obj_get_list(self, bundle):
-        class wrapped(list):
-            def __getslice__(klass, start, finish):
-                return self._handle_request(bundle, start, finish)
-
-        return wrapped()
 
 
 class CreateBugResource(ErrorsResource):
@@ -551,12 +543,8 @@ class BinaryPackageVersionsResource(ErrorsResource):
             if ubuntu_version.startswith("Ubuntu "):
                 ubuntu_version = ubuntu_version.replace("Ubuntu ", "")
 
-        class wrapped(list):
-            def __getslice__(self, start, finish):
-                results = launchpad.get_versions_for_binary(binary_package, ubuntu_version)
-                return [ResultObject({"versions": results})]
-
-        return wrapped()
+        results = launchpad.get_versions_for_binary(binary_package, ubuntu_version)
+        return [ResultObject({"versions": results})]
 
 
 class SystemImageVersionsResource(ErrorsResource):

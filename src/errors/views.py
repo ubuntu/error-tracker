@@ -9,6 +9,7 @@ from errors import cassie, version
 from errors.auth import can_see_stacktraces
 from errors.metrics import measure_view
 from errortracker.launchpad import bug_get_master_id
+from errortracker import config
 
 
 def common_c():
@@ -65,7 +66,7 @@ def bucket(request, bucketid=None, hashed=None):
         "traceback": traceback,
         "report": report,
         "report_master": bug_get_master_id(report),
-        "allow_bug_filing": settings.ALLOW_BUG_FILING,
+        "allow_bug_filing": config.allow_bug_filing,
     }
     if failuredata:
         c["retrace_failure_reason"] = failuredata.get("Reason", "")
@@ -88,7 +89,7 @@ def oops(request, oopsid):
 
 @measure_view
 def main(request):
-    c = {"allow_bug_filing": settings.ALLOW_BUG_FILING}
+    c = {"allow_bug_filing": config.allow_bug_filing}
     # hacks for request being empty with django 1.11.11 after passing to render
     c["authenticated"] = request.user.is_authenticated
     c["username"] = request.user.username
