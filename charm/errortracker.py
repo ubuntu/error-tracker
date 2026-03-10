@@ -171,7 +171,7 @@ User=ubuntu
 Group=ubuntu
 Environment=PYTHONPATH={REPO_LOCATION}/src
 ExecStart=python3 {REPO_LOCATION}/src/retracer.py --config-dir {REPO_LOCATION}/src/retracer/config --sandbox-dir {HOME}/cache --cleanup-debs --cleanup-sandbox --architecture %i --core-storage {HOME}/var --verbose {failed}
-PrivateTmp=disconnected
+PrivateTmp=yes
 Restart=on-failure
 
 [Install]
