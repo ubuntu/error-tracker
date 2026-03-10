@@ -13,10 +13,6 @@ import swiftclient
 
 from errortracker import amqp_utils, cassandra, config, swift_utils, utils
 
-limit = None
-if len(sys.argv) == 2:
-    limit = int(sys.argv[1])
-
 swift_client = swift_utils.get_swift_client()
 bucket = config.swift_bucket
 
@@ -47,7 +43,7 @@ def remove_core(bucket, core):
             print("%s not found in swift" % core, file=sys.stderr)
 
 
-for container in swift_client.get_container(container=bucket, limit=limit):
+for container in swift_client.get_container(container=bucket, full_listing=True):
     # the dict is the metadata for the container
     if isinstance(container, dict):
         continue
