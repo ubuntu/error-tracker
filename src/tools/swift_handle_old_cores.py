@@ -25,7 +25,8 @@ atexit.register(connection.close)
 atexit.register(channel.close)
 
 now = datetime.now(timezone.utc)
-abitago = now - timedelta(7)
+one_week_ago = now - timedelta(days=7)
+one_month_ago = now - timedelta(days=30)
 count = 0
 queued_count = 0
 removed_count = 0
@@ -89,9 +90,14 @@ for container in swift_client.get_container(container=bucket, full_listing=True)
             remove_core(bucket, uuid)
             continue
         core_date = datetime.strptime(core["last_modified"], "%Y-%m-%dT%H:%M:%S.%f%z")
+        # a backlog of more than one month doesn't make sense
+        if core_date < one_month_ago:
+            print("dropping too old core (%s) %s" % (core_date, uuid))
+            remove_core(bucket, uuid)
+            continue
         # it may still be in the queue awaiting its first retrace attempt
-        if core_date > abitago:
-            print("skipping too new core %s" % uuid)
+        if core_date > one_week_ago:
+            print("skipping too new core (%s) %s" % (core_date, uuid))
             continue
         # don't use resources retrying these arches
         if arch in ["", "ppc64el", "arm64", "armhf"]:
@@ -106,7 +112,7 @@ for container in swift_client.get_container(container=bucket, full_listing=True)
         # Persistent
         body.properties["delivery_mode"] = 2
         channel.basic_publish(body, exchange="", routing_key=queue)
-        print("published %s to %s queue" % (uuid, arch))
+        print("published %s to %s queue (received %s)" % (uuid, arch, core_date))
         queued_count += 1
 
     print(
