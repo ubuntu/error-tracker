@@ -23,7 +23,7 @@ Start with the Python dependencies
 # For 'daisy' only
 sudo apt install apport-retrace python3-amqp python3-bson python3-cassandra python3-flask python3-mock python3-pygit2 python3-pytest python3-pytest-cov python3-swiftclient ubuntu-dbgsym-keyring
 # Add this for 'errors'
-sudo apt install python3-django-tastypie python3-numpy
+sudo apt install python3-django-tastypie python3-numpy python3-social-django
 ```
 
 Then start a local Cassandra, RabbitMQ and swift (`docker` should work fine too):
