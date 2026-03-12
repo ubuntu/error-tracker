@@ -33,7 +33,7 @@
                     </span>
                 {% else %}
                     {% if 'login-failed=true' not in request_full_path %}
-                    <span id="login-link"><a href="{{ login_url }}">Log in</a></span>
+                    <span id="login-link"><a href="{% url 'social:begin' 'launchpad' %}">Log in</a></span>
                     {% endif %}
                 {% endif %}
             </div>

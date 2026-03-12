@@ -31,6 +31,14 @@ USE_I18N = False
 # calendars according to the current locale
 USE_L10N = False
 
+# Database is only used to store OpenID state
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": "/tmp/errors.sqlite",
+    }
+}
+
 # Absolute path to the directory static files should be collected to.
 # Don't put anything in this directory yourself; store your static files
 # in apps' "static/" subdirectories and in STATICFILES_DIRS.
@@ -74,7 +82,7 @@ MIDDLEWARE_CLASSES = (
 )
 
 AUTHENTICATION_BACKENDS = (
-    "django_openid_auth.auth.OpenIDBackend",
+    "social_core.backends.launchpad.LaunchpadOpenId",
     "django.contrib.auth.backends.ModelBackend",
 )
 
@@ -118,32 +126,15 @@ INSTALLED_APPS = (
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
     "errors",
-    # "django_openid_auth",
+    "social_django",
 )
 
 # Force HTTPS when the X-Forwarded-Proto header is set to https
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-OPENID_CREATE_USERS = True
-OPENID_UPDATE_DETAILS_FROM_SREG = True
-OPENID_USE_EMAIL_FOR_USERNAME = True
-OPENID_STRICT_USERNAMES = True
-OPENID_FOLLOW_RENAMES = True
-LOGIN_URL = "/openid/login/"
+LOGIN_URL = "/login/launchpad/"
 LOGIN_REDIRECT_URL = "/"
-OPENID_SSO_SERVER_URL = "https://login.ubuntu.com/"
-OPENID_TRUST_ROOT = config.openid_trust_root
-OPENID_LAUNCHPAD_TEAMS_MAPPING = {
-    "daisy-pluckers": "daisy-pluckers",
-    "canonical-ubuntu-platform": "canonical-ubuntu-platform",
-    "canonical-losas": "canonical-losas",
-    "canonical-product-strategy": "canonical-product-strategy",
-    "canonical-hw-cert": "canonical-hw-cert",
-    "canonical-hwe-team": "canonical-hwe-team",
-    "online-accounts": "online-accounts",
-    "error-tracker-access": "error-tracker-access",
-}
-OPENID_SREG_REQUIRED_FIELDS = ["nickname"]
+SOCIAL_AUTH_LOGIN_ERROR_URL = "/login-failed"
 # A sample logging configuration. The only tangible logging
 # performed by this configuration is to send an email to
 # the site admins on every HTTP 500 error.

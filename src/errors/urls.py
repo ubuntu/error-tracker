@@ -22,7 +22,7 @@ urlpatterns = [
     re_path(r"^status/?$", views.status),
     re_path(r"^user/(.*)$", views.user),
     re_path(r"^api/", include("errors.api.urls")),
-    # url(r"^openid/", include("django_openid_auth.urls")),
+    re_path(r"^", include("social_django.urls", namespace="social")),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 # If we get a request for static content, handle it. This will happen if Apache

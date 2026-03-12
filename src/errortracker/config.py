@@ -52,7 +52,6 @@ swift_bucket = "cores"
 failure_storage = None
 
 errors_secret_key = "hellotheregeneralkenobi"
-openid_trust_root = "openidyouwillsoonbegone"
 allow_bug_filing = True
 lp_oauth_token = "todofixme"
 lp_oauth_secret = "todofixme"
