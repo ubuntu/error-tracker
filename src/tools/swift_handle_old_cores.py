@@ -44,78 +44,86 @@ def remove_core(bucket, core):
             print("%s not found in swift" % core, file=sys.stderr)
 
 
-for container in swift_client.get_container(container=bucket, full_listing=True):
-    # the dict is the metadata for the container
-    if isinstance(container, dict):
-        continue
-    oops_lookup = session.prepare(
-        f'SELECT value FROM {session.keyspace}."OOPS" WHERE key=? and column1=?'
-    )
-    for core in container:
-        uuid = core["name"]
-        count += 1
-        try:
-            arch = session.execute(oops_lookup, [uuid.encode(), "Architecture"]).one()["value"]
-        except (IndexError, TypeError, KeyError):
-            arch = ""
-        if not arch:
-            print("could not find architecture for %s" % uuid, file=sys.stderr)
-            remove_core(bucket, uuid)
+def main():
+    global count, queued_count
+    for container in swift_client.get_container(container=bucket, full_listing=True):
+        # the dict is the metadata for the container
+        if isinstance(container, dict):
             continue
-        try:
-            release = session.execute(oops_lookup, [uuid.encode(), "DistroRelease"]).one()["value"]
-        except (IndexError, TypeError):
-            release = ""
-        if not release:
-            print("could not find release for %s" % uuid, file=sys.stderr)
-            remove_core(bucket, uuid)
-            continue
-        if not utils.retraceable_release(release):
-            print(
-                "Unretraceable or EoL release (%s) in %s" % (uuid, release),
-                file=sys.stderr,
-            )
-            remove_core(bucket, uuid)
-            continue
-        try:
-            fail_reason = session.execute(
-                oops_lookup, [uuid.encode(), "RetraceFailureReason"]
-            ).one()["value"]
-        except (IndexError, TypeError):
-            fail_reason = ""
-        # these were already retraced these but the core wasn't removed for
-        # some reason
-        if fail_reason:
-            print("RetraceFailureReason found for %s" % uuid, file=sys.stderr)
-            remove_core(bucket, uuid)
-            continue
-        core_date = datetime.strptime(core["last_modified"], "%Y-%m-%dT%H:%M:%S.%f%z")
-        # a backlog of more than one month doesn't make sense
-        if core_date < one_month_ago:
-            print("dropping too old core (%s) %s" % (core_date, uuid))
-            remove_core(bucket, uuid)
-            continue
-        # it may still be in the queue awaiting its first retrace attempt
-        if core_date > one_week_ago:
-            print("skipping too new core (%s) %s" % (core_date, uuid))
-            continue
-        # don't use resources retrying these arches
-        if arch in ["", "ppc64el", "arm64", "armhf"]:
-            print("architecture less important for %s" % uuid, file=sys.stderr)
-            remove_core(bucket, uuid)
-            continue
+        oops_lookup = session.prepare(
+            f'SELECT value FROM {session.keyspace}."OOPS" WHERE key=? and column1=?'
+        )
+        for core in container:
+            uuid = core["name"]
+            count += 1
+            try:
+                arch = session.execute(oops_lookup, [uuid.encode(), "Architecture"]).one()["value"]
+            except (IndexError, TypeError, KeyError):
+                arch = ""
+            if not arch:
+                print("could not find architecture for %s" % uuid, file=sys.stderr)
+                remove_core(bucket, uuid)
+                continue
+            try:
+                release = session.execute(oops_lookup, [uuid.encode(), "DistroRelease"]).one()[
+                    "value"
+                ]
+            except (IndexError, TypeError):
+                release = ""
+            if not release:
+                print("could not find release for %s" % uuid, file=sys.stderr)
+                remove_core(bucket, uuid)
+                continue
+            if not utils.retraceable_release(release):
+                print(
+                    "Unretraceable or EoL release (%s) in %s" % (uuid, release),
+                    file=sys.stderr,
+                )
+                remove_core(bucket, uuid)
+                continue
+            try:
+                fail_reason = session.execute(
+                    oops_lookup, [uuid.encode(), "RetraceFailureReason"]
+                ).one()["value"]
+            except (IndexError, TypeError):
+                fail_reason = ""
+            # these were already retraced these but the core wasn't removed for
+            # some reason
+            if fail_reason:
+                print("RetraceFailureReason found for %s" % uuid, file=sys.stderr)
+                remove_core(bucket, uuid)
+                continue
+            core_date = datetime.strptime(core["last_modified"], "%Y-%m-%dT%H:%M:%S.%f%z")
+            # a backlog of more than one month doesn't make sense
+            if core_date < one_month_ago:
+                print("dropping too old core (%s) %s" % (core_date, uuid))
+                remove_core(bucket, uuid)
+                continue
+            # it may still be in the queue awaiting its first retrace attempt
+            if core_date > one_week_ago:
+                print("skipping too new core (%s) %s" % (core_date, uuid))
+                continue
+            # don't use resources retrying these arches
+            if arch in ["", "ppc64el", "arm64", "armhf"]:
+                print("architecture less important for %s" % uuid, file=sys.stderr)
+                remove_core(bucket, uuid)
+                continue
 
-        queue = "retrace_%s" % arch
-        channel.queue_declare(queue=queue, durable=True, auto_delete=False)
-        # msg:provider
-        body = amqp.Message("%s:swift" % uuid)
-        # Persistent
-        body.properties["delivery_mode"] = 2
-        channel.basic_publish(body, exchange="", routing_key=queue)
-        print("published %s to %s queue (received %s)" % (uuid, arch, core_date))
-        queued_count += 1
+            queue = "retrace_%s" % arch
+            channel.queue_declare(queue=queue, durable=True, auto_delete=False)
+            # msg:provider
+            body = amqp.Message("%s:swift" % uuid)
+            # Persistent
+            body.properties["delivery_mode"] = 2
+            channel.basic_publish(body, exchange="", routing_key=queue)
+            print("published %s to %s queue (received %s)" % (uuid, arch, core_date))
+            queued_count += 1
 
-    print(
-        "Finished, reviewed %i cores (%i removed, %i requeued)."
-        % (count, removed_count, queued_count)
-    )
+        print(
+            "Finished, reviewed %i cores (%i removed, %i requeued)."
+            % (count, removed_count, queued_count)
+        )
+
+
+if __name__ == "__main__":
+    main()
