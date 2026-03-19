@@ -10,112 +10,145 @@ from datetime import datetime, timedelta, timezone
 
 import amqp
 import swiftclient
+from cassandra.cqlengine.query import DoesNotExist
 
-from errortracker import amqp_utils, cassandra, config, swift_utils, utils
+from errortracker import amqp_utils, cassandra, cassandra_schema, config, swift_utils, utils
 
 swift_client = swift_utils.get_swift_client()
-bucket = config.swift_bucket
 
 cassandra.setup_cassandra()
-session = cassandra.cassandra_session()
 
 connection = amqp_utils.get_connection()
 channel = connection.channel()
 atexit.register(connection.close)
 atexit.register(channel.close)
 
-now = datetime.now(timezone.utc)
-one_week_ago = now - timedelta(days=7)
-one_month_ago = now - timedelta(days=30)
-count = 0
-queued_count = 0
-removed_count = 0
+NOW = datetime.now(timezone.utc)
+ONE_WEEK_AGO = NOW - timedelta(days=7)
+ONE_MONTH_AGO = NOW - timedelta(days=30)
+
+REMOVE = 0
+SKIP = 1
+QUEUE = 2
 
 
-def remove_core(bucket, core):
-    global removed_count
+def remove_core(uuid):
     try:
-        swift_client.delete_object(bucket, core)
-        removed_count += 1
-        print("removed %s from swift" % core, file=sys.stderr)
+        swift_client.delete_object(config.swift_bucket, uuid)
+        print("removed %s from swift" % uuid, file=sys.stderr)
     except swiftclient.client.ClientException as e:
         if "404 Not Found" in str(e):
             # It may have already been removed
-            print("%s not found in swift" % core, file=sys.stderr)
+            print("%s not found in swift" % uuid, file=sys.stderr)
 
 
-for container in swift_client.get_container(container=bucket, full_listing=True):
-    # the dict is the metadata for the container
-    if isinstance(container, dict):
-        continue
-    oops_lookup = session.prepare(
-        f'SELECT value FROM {session.keyspace}."OOPS" WHERE key=? and column1=?'
-    )
-    for core in container:
-        uuid = core["name"]
-        count += 1
-        try:
-            arch = session.execute(oops_lookup, [uuid.encode(), "Architecture"]).one()["value"]
-        except (IndexError, TypeError, KeyError):
-            arch = ""
-        if not arch:
-            print("could not find architecture for %s" % uuid, file=sys.stderr)
-            remove_core(bucket, uuid)
-            continue
-        try:
-            release = session.execute(oops_lookup, [uuid.encode(), "DistroRelease"]).one()["value"]
-        except (IndexError, TypeError):
-            release = ""
-        if not release:
-            print("could not find release for %s" % uuid, file=sys.stderr)
-            remove_core(bucket, uuid)
-            continue
+def handle_core(uuid, core_date):
+    global channel, connection
+    try:
+        arch = cassandra_schema.OOPS.get(key=uuid.encode(), column1="Architecture").value
+    except DoesNotExist:
+        print("could not find architecture for %s" % uuid, file=sys.stderr)
+        return REMOVE
+    try:
+        release = cassandra_schema.OOPS.get(key=uuid.encode(), column1="DistroRelease").value
         if not utils.retraceable_release(release):
             print(
                 "Unretraceable or EoL release (%s) in %s" % (uuid, release),
                 file=sys.stderr,
             )
-            remove_core(bucket, uuid)
-            continue
-        try:
-            fail_reason = session.execute(
-                oops_lookup, [uuid.encode(), "RetraceFailureReason"]
-            ).one()["value"]
-        except (IndexError, TypeError):
-            fail_reason = ""
+            return REMOVE
+    except DoesNotExist:
+        print("could not find release for %s" % uuid, file=sys.stderr)
+        return REMOVE
+    try:
+        fail_reason = cassandra_schema.OOPS.get(
+            key=uuid.encode(), column1="RetraceFailureReason"
+        ).value
         # these were already retraced these but the core wasn't removed for
         # some reason
         if fail_reason:
             print("RetraceFailureReason found for %s" % uuid, file=sys.stderr)
-            remove_core(bucket, uuid)
-            continue
-        core_date = datetime.strptime(core["last_modified"], "%Y-%m-%dT%H:%M:%S.%f%z")
-        # a backlog of more than one month doesn't make sense
-        if core_date < one_month_ago:
-            print("dropping too old core (%s) %s" % (core_date, uuid))
-            remove_core(bucket, uuid)
-            continue
-        # it may still be in the queue awaiting its first retrace attempt
-        if core_date > one_week_ago:
-            print("skipping too new core (%s) %s" % (core_date, uuid))
-            continue
-        # don't use resources retrying these arches
-        if arch in ["", "ppc64el", "arm64", "armhf"]:
-            print("architecture less important for %s" % uuid, file=sys.stderr)
-            remove_core(bucket, uuid)
-            continue
+            return REMOVE
+    except DoesNotExist:
+        pass
+    # a backlog of more than one month doesn't make sense
+    if core_date < ONE_MONTH_AGO:
+        print("dropping too old core (%s) %s" % (core_date, uuid))
+        return REMOVE
+    # it may still be in the queue awaiting its first retrace attempt
+    if core_date > ONE_WEEK_AGO:
+        print("skipping too new core (%s) %s" % (core_date, uuid))
+        return SKIP
+    # don't use resources retrying these arches
+    if arch not in ["amd64", "arm64"]:
+        print("less important architecture for %s" % uuid, file=sys.stderr)
+        return REMOVE
 
-        queue = "retrace_%s" % arch
-        channel.queue_declare(queue=queue, durable=True, auto_delete=False)
-        # msg:provider
-        body = amqp.Message("%s:swift" % uuid)
-        # Persistent
-        body.properties["delivery_mode"] = 2
+    queue = "retrace_%s" % arch
+    # msg:provider
+    body = amqp.Message("%s:swift" % uuid)
+    # Persistent
+    body.properties["delivery_mode"] = 2
+    try:
         channel.basic_publish(body, exchange="", routing_key=queue)
-        print("published %s to %s queue (received %s)" % (uuid, arch, core_date))
-        queued_count += 1
+    except OSError:
+        # don't bother with retry loops here, next run will handle it
+        print("skipped, failed to publish (broken pipe) %s" % uuid)
+        connection = amqp_utils.get_connection()
+        channel = connection.channel()
+        return SKIP
+    print("published %s to %s queue (received %s)" % (uuid, arch, core_date))
+    return QUEUE
 
-    print(
-        "Finished, reviewed %i cores (%i removed, %i requeued)."
-        % (count, removed_count, queued_count)
-    )
+
+def main():
+    count = 0
+    queued_count = 0
+    removed_count = 0
+    skipped_count = 0
+    deduplicate_count = 0
+    queued = set()
+    for arch in ["amd64", "arm64"]:
+        queue = f"retrace_{arch}"
+        channel.queue_declare(queue=queue, durable=True, auto_delete=False)
+        messages = list()
+        while True:
+            msg = channel.basic_get(queue)
+            if msg is None:
+                break
+            uuid = msg.body.split(":")[0]
+            queued.add(uuid)
+        for msg in messages:
+            channel.basic_reject(msg.delivery_tag, requeue=True)
+    print(f"Current queue length: {len(queued)}")
+    for container in swift_client.get_container(container=config.swift_bucket, full_listing=True):
+        # the dict is the metadata for the container
+        if isinstance(container, dict):
+            continue
+        try:
+            for core in container:
+                count += 1
+                uuid = core["name"]
+                if uuid in queued:
+                    print("already in queue (%s)" % uuid)
+                    deduplicate_count += 1
+                    continue
+                core_date = datetime.strptime(core["last_modified"], "%Y-%m-%dT%H:%M:%S.%f%z")
+                ret = handle_core(uuid, core_date)
+                if ret == QUEUE:
+                    queued_count += 1
+                elif ret == SKIP:
+                    skipped_count += 1
+                elif ret == REMOVE:
+                    remove_core(uuid)
+                    removed_count += 1
+        except KeyboardInterrupt:
+            print("Stopping on user input")
+
+        print(
+            f"Finished, reviewed {count} cores ({removed_count} removed, {queued_count} requeued, {skipped_count} skipped, {deduplicate_count} deduplicated)."
+        )
+
+
+if __name__ == "__main__":
+    main()
