@@ -233,7 +233,7 @@ WantedBy=multi-user.target
             "et-swift-handle-old-cores",
             "Error Tracker - Swift - Handle old cores",
             f"{REPO_LOCATION}/src/tools/swift_handle_old_cores.py",
-            "*-*-* *:45:00",  # every hour at minute 45
+            "*-*-* 06:45:00",  # every day at 06:45
         )
 
     def configure_web(self):
