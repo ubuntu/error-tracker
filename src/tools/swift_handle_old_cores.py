@@ -106,8 +106,21 @@ def main():
     queued_count = 0
     removed_count = 0
     skipped_count = 0
+    deduplicate_count = 0
+    queued = set()
     for arch in ["amd64", "arm64"]:
-        channel.queue_declare(queue=f"retrace_{arch}", durable=True, auto_delete=False)
+        queue = f"retrace_{arch}"
+        channel.queue_declare(queue=queue, durable=True, auto_delete=False)
+        messages = list()
+        while True:
+            msg = channel.basic_get(queue)
+            if msg is None:
+                break
+            uuid = msg.body.split(":")[0]
+            queued.add(uuid)
+        for msg in messages:
+            channel.basic_reject(msg.delivery_tag, requeue=True)
+    print(f"Current queue length: {len(queued)}")
     for container in swift_client.get_container(container=config.swift_bucket, full_listing=True):
         # the dict is the metadata for the container
         if isinstance(container, dict):
@@ -116,6 +129,10 @@ def main():
             for core in container:
                 count += 1
                 uuid = core["name"]
+                if uuid in queued:
+                    print("already in queue (%s)" % uuid)
+                    deduplicate_count += 1
+                    continue
                 core_date = datetime.strptime(core["last_modified"], "%Y-%m-%dT%H:%M:%S.%f%z")
                 ret = handle_core(uuid, core_date)
                 if ret == QUEUE:
@@ -129,7 +146,7 @@ def main():
             print("Stopping on user input")
 
         print(
-            f"Finished, reviewed {count} cores ({removed_count} removed, {queued_count} requeued, {skipped_count} skipped)."
+            f"Finished, reviewed {count} cores ({removed_count} removed, {queued_count} requeued, {skipped_count} skipped, {deduplicate_count} deduplicated)."
         )
 
 
