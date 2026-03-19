@@ -43,6 +43,7 @@ def remove_core(uuid):
 
 
 def handle_core(uuid, core_date):
+    global channel, connection
     try:
         arch = cassandra_schema.OOPS.get(key=uuid.encode(), column1="Architecture").value
     except DoesNotExist:
@@ -88,7 +89,14 @@ def handle_core(uuid, core_date):
     body = amqp.Message("%s:swift" % uuid)
     # Persistent
     body.properties["delivery_mode"] = 2
-    channel.basic_publish(body, exchange="", routing_key=queue)
+    try:
+        channel.basic_publish(body, exchange="", routing_key=queue)
+    except OSError:
+        # don't bother with retry loops here, next run will handle it
+        print("skipped, failed to publish (broken pipe) %s" % uuid)
+        connection = amqp_utils.get_connection()
+        channel = connection.channel()
+        return SKIP
     print("published %s to %s queue (received %s)" % (uuid, arch, core_date))
     return QUEUE
 
