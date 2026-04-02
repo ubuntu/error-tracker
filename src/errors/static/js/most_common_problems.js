@@ -147,7 +147,7 @@ function(Y) {
             }
             return o.value;
         }
-        if (reports_state_fixed_master[o.data.report][0]) {
+        if (reports_state_fixed_master && reports_state_fixed_master[o.data.report] && reports_state_fixed_master[o.data.report][0]) {
             /* If the problem has appeared in the most recent published version
              */
             if (latest) {
@@ -238,7 +238,7 @@ function(Y) {
     var bugFormatter = function(o) {
         var failed = o.data['function'].indexOf('failed:') == 0;
         var unknown = o.data['package'] == 'unknown package';
-        if (o.value || !user_is_authenticated || failed) {
+        if (reports_state_fixed_master && (o.value || !user_is_authenticated || failed)) {
             bug_id = o.value;
             /* show master bug if bug is a duplicate */
             state = reports_state_fixed_master[bug_id];
