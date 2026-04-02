@@ -51,7 +51,6 @@ src/                  # Error Tracker application source
     amqp_utils.py     #     RabbitMQ/AMQP utilities
     config.py         #     Configuration handling
     utils.py          #     Shared utilities
-  populate-test-data.sh #   Script to put test data into a local Cassandra (for development)
   retracer/           #   Symbolic retracer (turns addresses into stack frames)
     config/           #     Per-release retracer configuration
   retracer.py         #   Retracer entry point
@@ -102,7 +101,7 @@ The application relies on:
 
 ### Test Architecture
 
-There are multiple layers of testing:
+There are two layers of testing:
 
 1. **Unit/functional tests** (`src/tests/`) — pytest-based tests that require Cassandra, RabbitMQ, and Swift running locally. These test individual components (submission, retracing, Cassandra operations, OOPS processing).
 

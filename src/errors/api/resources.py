@@ -20,6 +20,8 @@ from tastypie.serializers import Serializer
 from errors import cassie
 from errortracker import config, launchpad
 
+from ..metrics import measure_view
+
 release_color_mapping = OrderedDict()
 
 # If you add or change colors here, also update the colors in
@@ -167,7 +169,20 @@ class ResultObject(object):
 
 
 class ErrorsResource(Resource):
-    pass
+    # Wrap the view dispatch with a statsd timing.
+    @measure_view
+    def dispatch(self, *args, **kwargs):
+        return Resource.dispatch(self, *args, **kwargs)
+
+    def _handle_500(self, request, exception):
+        # Create an OOPS report, then reply with a json-formatted error
+        # message.
+        import traceback
+
+        formatted = traceback.format_exc(exception)
+        exc_info = (type(exception), exception.args[0], formatted)
+        request.environ["oops.context"]["exc_info"] = exc_info
+        return Resource._handle_500(self, request, exception)
 
 
 class ErrorsMeta:
@@ -189,11 +204,16 @@ class RetraceResultResource(ErrorsResource):
         resource_name = "retracers-results"
 
     def obj_get_list(self, bundle):
-        limit = int(bundle.request.GET.get("limit", self._meta.limit))
-        return [
-            ResultObject({"date": date, "value": val})
-            for date, val in cassie.get_retracer_counts(0, limit)
-        ]
+        # The results are wrapped in the slice operation for a list to follow
+        # the pattern of lazy evalution that tastypie uses for talking to ORMs.
+        # The point at which tastypie attempts to slice a list is the first
+        # point that the pagination data is known.
+        class wrapped(list):
+            def __getslice__(self, start, finish):
+                for date, val in cassie.get_retracer_counts(start, finish):
+                    yield ResultObject({"date": date, "value": val})
+
+        return wrapped()
 
     def obj_get(self, request, **kwargs):
         date = kwargs["pk"]
@@ -209,11 +229,12 @@ class RetraceAverageProcessingTimeResource(ErrorsResource):
         resource_name = "retracers-average-processing-time"
 
     def obj_get_list(self, bundle):
-        limit = int(bundle.request.GET.get("limit", self._meta.limit))
-        return [
-            ResultObject({"date": date, "value": result})
-            for date, result in cassie.get_retracer_means(0, limit)
-        ]
+        class wrapped(list):
+            def __getslice__(self, start, finish):
+                for date, result in cassie.get_retracer_means(start, finish):
+                    yield ResultObject({"date": date, "value": result})
+
+        return wrapped()
 
 
 class InstanceCountResource(ErrorsResource):
@@ -225,24 +246,22 @@ class InstanceCountResource(ErrorsResource):
         resource_name = "instances-count"
 
     def obj_get_list(self, bundle):
-        limit = int(bundle.request.GET.get("limit", self._meta.limit))
-        results = []
-        for release in release_color_mapping:
-            release_results = [
-                {"date": date, "value": result}
-                for date, result in cassie.get_crash_count(0, limit, release)
-            ]
-            if release_results:
-                results.append(
-                    ResultObject(
-                        {
+        class wrapped(list):
+            def __getslice__(self, start, finish):
+                for release in release_color_mapping:
+                    results = []
+                    counts = cassie.get_crash_count(start, finish, release)
+                    for date, result in counts:
+                        results.append({"date": date, "value": result})
+                    if results:
+                        result = {
                             "release": release,
-                            "value": release_results,
+                            "value": results,
                             "color": release_color_mapping[release],
                         }
-                    )
-                )
-        return results
+                        yield ResultObject(result)
+
+        return wrapped()
 
 
 class ProblemCountResource(ErrorsResource):
@@ -253,11 +272,12 @@ class ProblemCountResource(ErrorsResource):
         resource_name = "problems-count"
 
     def obj_get_list(self, bundle):
-        limit = int(bundle.request.GET.get("limit", self._meta.limit))
-        return [
-            ResultObject({"date": date, "value": result})
-            for date, result in cassie.get_total_buckets_by_day(0, limit)
-        ]
+        class wrapped(list):
+            def __getslice__(self, start, finish):
+                for date, result in cassie.get_total_buckets_by_day(start, finish):
+                    yield ResultObject({"date": date, "value": result})
+
+        return wrapped()
 
 
 class DayOopsResource(ErrorsResource):
@@ -318,7 +338,7 @@ class MostCommonProblemsResource(ErrorsResource):
     class Meta(ErrorsMeta):
         resource_name = "most-common-problems"
 
-    def obj_get_list(self, bundle):
+    def _handle_request(self, bundle, start, finish):
         release = bundle.request.GET.get("release", None)
         rootfs_build_version = bundle.request.GET.get("rootfs_build_version", None)
         channel_name = bundle.request.GET.get("channel_name", None)
@@ -329,10 +349,8 @@ class MostCommonProblemsResource(ErrorsResource):
         version = bundle.request.GET.get("version", None)
         pkg_arch = bundle.request.GET.get("pkg_arch", None)
         period = bundle.request.GET.get("period", None)
-        start = 0
-        finish = int(bundle.request.GET.get("limit", "30"))
-        from_date = str(bundle.request.GET.get("from", "")).replace("/", "").replace("-", "")
-        to_date = str(bundle.request.GET.get("to", "")).replace("/", "").replace("-", "")
+        from_date = str(bundle.request.GET.get("from", "")).translate(None, "/-")
+        to_date = str(bundle.request.GET.get("to", "")).translate(None, "/-")
         user = bundle.request.GET.get("user", None)
         first_appearance = bundle.request.GET.get("first_appearance", False)
         snap = bundle.request.GET.get("snap", None)
@@ -431,7 +449,9 @@ class MostCommonProblemsResource(ErrorsResource):
             if first_appearance:
                 if m.get("FirstSeen", "") != version:
                     continue
-            hashed = sha1(bucket.encode()).hexdigest()
+            if isinstance(bucket, str):
+                bucket = bucket.encode("utf-8")
+            hashed = sha1(bucket).hexdigest()
             if cassie.get_problem_for_hash(hashed):
                 href = "problem/%s" % hashed
             else:
@@ -443,12 +463,12 @@ class MostCommonProblemsResource(ErrorsResource):
                     {
                         "rank": rank,
                         "count": count,
-                        "package": srcpkg,
+                        "package": srcpkg.decode("utf-8"),
                         "first_seen": m.get("FirstSeen", ""),
                         "last_seen": last_seen,
                         "first_seen_release": m.get("FirstSeenRelease", ""),
                         "last_seen_release": m.get("LastSeenRelease", ""),
-                        "function": bucket,
+                        "function": bucket.decode("utf-8"),
                         "web_link": href,
                         "report": report,
                     }
@@ -457,6 +477,13 @@ class MostCommonProblemsResource(ErrorsResource):
             rank += 1
 
         return results
+
+    def obj_get_list(self, bundle):
+        class wrapped(list):
+            def __getslice__(klass, start, finish):
+                return self._handle_request(bundle, start, finish)
+
+        return wrapped()
 
 
 class CreateBugResource(ErrorsResource):
@@ -496,7 +523,7 @@ class CreateBugResource(ErrorsResource):
                     if r[0].startswith("Ubuntu ")
                 ]
             )
-            hashed = sha1(bucket.encode()).hexdigest()
+            hashed = sha1(bucket).hexdigest()
             if not cassie.get_problem_for_hash(hashed):
                 hashed = ""
             report, url = launchpad.create_bug(bucket, src, releases, hashed, lastseen)
@@ -524,8 +551,12 @@ class BinaryPackageVersionsResource(ErrorsResource):
             if ubuntu_version.startswith("Ubuntu "):
                 ubuntu_version = ubuntu_version.replace("Ubuntu ", "")
 
-        results = launchpad.get_versions_for_binary(binary_package, ubuntu_version)
-        return [ResultObject({"versions": results})]
+        class wrapped(list):
+            def __getslice__(self, start, finish):
+                results = launchpad.get_versions_for_binary(binary_package, ubuntu_version)
+                return [ResultObject({"versions": results})]
+
+        return wrapped()
 
 
 class SystemImageVersionsResource(ErrorsResource):
@@ -537,9 +568,16 @@ class SystemImageVersionsResource(ErrorsResource):
         resource_name = "system-image-versions"
 
     def obj_get_list(self, bundle):
+        # image_type can be one of rootfs_build, channel, device_name, or
+        # device_image
         image_type = bundle.request.GET.get("image_type", None)
-        results = cassie.get_system_image_versions(image_type)
-        return [ResultObject({"versions": results})]
+
+        class wrapped(list):
+            def __getslice__(self, start, finish):
+                results = cassie.get_system_image_versions(image_type)
+                return [ResultObject({"versions": results})]
+
+        return wrapped()
 
 
 # TODO make SystemCrashesResource and InstanceResource obj_get only.
@@ -558,28 +596,30 @@ class SystemCrashesResource(ErrorsResource):
         resource_name = "reports-for-system"
 
     def obj_get_list(self, bundle):
-        system_id = bundle.request.GET.get("system", None)
-        cursor = bundle.request.GET.get("start", None)
-        cols = ["Date", "ProblemType", "Package", "ExecutablePath"]
-        crashes = cassie.get_user_crashes(system_id, start=cursor)
-        results = []
-        for crash, ts in crashes:
-            d = cassie.get_crash(str(crash), columns=cols)
-            program = split_package_and_version(d.get("Package", ""))[0]
-            if not program:
-                program = d.get("ExecutablePath", "")
-            results.append(
-                ResultObject(
-                    {
-                        "timestamp": ts,
-                        "instance": crash,
-                        "occurred": d.get("Date", ""),
-                        "problemtype": d.get("ProblemType", ""),
-                        "program": program,
-                    }
-                )
-            )
-        return results
+        class wrapped(list):
+            def __getslice__(klass, start, finish):
+                system_id = bundle.request.GET.get("system", None)
+                start = bundle.request.GET.get("start", None)
+                cols = ["Date", "ProblemType", "Package", "ExecutablePath"]
+                crashes = cassie.get_user_crashes(system_id, start=start)
+                # TODO: use a cassandra function that does a multiget of the
+                # crashes
+                for crash, ts in crashes:
+                    d = cassie.get_crash(str(crash), columns=cols)
+                    program = split_package_and_version(d.get("Package", ""))[0]
+                    if not program:
+                        program = d.get("ExecutablePath", "")
+                    yield ResultObject(
+                        {
+                            "timestamp": ts,
+                            "instance": crash,
+                            "occurred": d.get("Date", ""),
+                            "problemtype": d.get("ProblemType", ""),
+                            "program": program,
+                        }
+                    )
+
+        return wrapped()
 
 
 class RateOfCrashesResource(ErrorsResource):
@@ -603,17 +643,22 @@ class RateOfCrashesResource(ErrorsResource):
         release = bundle.request.GET.get("release", None)
         exclude_proposed = bundle.request.GET.get("exclude_proposed", None)
         absolute_uri = bundle.request.build_absolute_uri("/")
-        result = cassie.get_package_crash_rate(
-            release,
-            src_package,
-            old_version,
-            new_version,
-            phased_update_percentage,
-            date,
-            absolute_uri,
-            exclude_proposed,
-        )
-        return [ResultObject(result)]
+
+        class wrapped(list):
+            def __getslice__(self, start, finish):
+                result = cassie.get_package_crash_rate(
+                    release,
+                    src_package,
+                    old_version,
+                    new_version,
+                    phased_update_percentage,
+                    date,
+                    absolute_uri,
+                    exclude_proposed,
+                )
+                yield ResultObject(result)
+
+        return wrapped()
 
 
 class PackageVersionNewBuckets(ErrorsResource):
@@ -623,7 +668,7 @@ class PackageVersionNewBuckets(ErrorsResource):
     class Meta(ErrorsMeta):
         resource_name = "package-version-new-buckets"
 
-    def _handle_request(self, bundle):
+    def _handle_request(self, bundle, start, finish):
         src_package = bundle.request.GET.get("package", None)
         previous_version = bundle.request.GET.get("previous_version", None)
         new_version = bundle.request.GET.get("new_version", None)
@@ -638,17 +683,23 @@ class PackageVersionNewBuckets(ErrorsResource):
         results = []
         buckets = cassie.get_package_new_buckets(src_package, previous_version, new_version)
         for bucket in buckets:
-            hashed = sha1(bucket.encode()).hexdigest()
+            if isinstance(bucket, str):
+                bucket = bucket.encode("utf-8")
+            hashed = sha1(bucket).hexdigest()
             if cassie.get_problem_for_hash(hashed):
                 href = "problem/%s" % hashed
             else:
                 href = "bucket/?id=%s" % quote(bucket)
             href = "%s%s" % (bundle.request.build_absolute_uri("/"), href)
-            results.append(ResultObject({"function": bucket, "web_link": href}))
+            results.append(ResultObject({"function": bucket.decode("utf-8"), "web_link": href}))
         return results
 
     def obj_get_list(self, bundle):
-        return self._handle_request(bundle)
+        class wrapped(list):
+            def __getslice__(klass, start, finish):
+                return self._handle_request(bundle, start, finish)
+
+        return wrapped()
 
 
 class InstanceResource(ErrorsResource):
@@ -660,8 +711,13 @@ class InstanceResource(ErrorsResource):
 
     def obj_get_list(self, bundle):
         oopsid = bundle.request.GET.get("id", None)
-        results = cassie.get_crash(oopsid)
-        return [ResultObject({"instance": results})]
+
+        class wrapped(list):
+            def __getslice__(self, start, finish):
+                results = cassie.get_crash(oopsid)
+                return [ResultObject({"instance": results})]
+
+        return wrapped()
 
 
 class AverageCrashesResource(ErrorsResource):
@@ -673,88 +729,91 @@ class AverageCrashesResource(ErrorsResource):
         resource_name = "average-crashes"
 
     def obj_get_list(self, bundle):
-        release = bundle.request.GET.get("release", None)
-        package = bundle.request.GET.get("package", None)
-        version = bundle.request.GET.get("version", None)
-        field_parts = []
-        package and field_parts.append(package)
-        version and field_parts.append(version)
-        field = ":".join(field_parts)
-        if not release:
-            # releases = sorted(release_color_mapping.items())
-            # By default only display non-EoL releases to make the
-            # legend fit better interim fix for LP: #1073560.
-            releases = [
-                (r, release_color_mapping[r])
-                for r in release_color_mapping
-                if r
-                not in [
-                    "Ubuntu 12.04",
-                    "Ubuntu 12.10",
-                    "Ubuntu 13.04",
-                    "Ubuntu 13.10",
-                    "Ubuntu 14.04",
-                    "Ubuntu 14.10",
-                    "Ubuntu 15.04",
-                    "Ubuntu 15.10",
-                    "Ubuntu 16.04",
-                    "Ubuntu 16.10",
-                    "Ubuntu 17.04",
-                    "Ubuntu 17.10",
-                    "Ubuntu 18.10",
-                    "Ubuntu 19.04",
-                    "Ubuntu 19.10",
-                    "Ubuntu 20.10",
-                    "Ubuntu 21.04",
-                    "Ubuntu 21.10",
-                    "Ubuntu 22.10",
-                    "Ubuntu 23.04",
-                    "Ubuntu 23.10",
-                ]
-            ]
-        else:
-            if release in release_color_mapping:
-                releases = [(release, release_color_mapping[release])]
-            else:
-                releases = [(release, "#000000")]
+        class wrapped(list):
+            def __getslice__(klass, start, finish):
+                release = bundle.request.GET.get("release", None)
+                package = bundle.request.GET.get("package", None)
+                version = bundle.request.GET.get("version", None)
+                fields = []
+                package and fields.append(package)
+                version and fields.append(version)
+                field = ":".join(fields)
+                if not release:
+                    # releases = sorted(release_color_mapping.items())
+                    # By default only display non-EoL releases to make the
+                    # legend fit better interim fix for LP: #1073560.
+                    releases = []
+                    for release in release_color_mapping:
+                        if release not in [
+                            "Ubuntu 12.04",
+                            "Ubuntu 12.10",
+                            "Ubuntu 13.04",
+                            "Ubuntu 13.10",
+                            "Ubuntu 14.04",
+                            "Ubuntu 14.10",
+                            "Ubuntu 15.04",
+                            "Ubuntu 15.10",
+                            "Ubuntu 16.04",
+                            "Ubuntu 16.10",
+                            "Ubuntu 17.04",
+                            "Ubuntu 17.10",
+                            "Ubuntu 18.10",
+                            "Ubuntu 19.04",
+                            "Ubuntu 19.10",
+                            "Ubuntu 20.10",
+                            "Ubuntu 21.04",
+                            "Ubuntu 21.10",
+                            "Ubuntu 22.10",
+                            "Ubuntu 23.04",
+                            "Ubuntu 23.10",
+                        ]:
+                            releases.append((release, release_color_mapping[release]))
+                else:
+                    if release in release_color_mapping:
+                        releases = [(release, release_color_mapping[release])]
+                    else:
+                        releases = [(release, "#000000")]
 
-        output = []
-        for r, color in releases:
-            f = "%s:%s" % (r, field) if field else r
-            if r != "Ubuntu 12.04":
-                standards_color = precise_standards_color_mapping[r]
-                problems = cassie.get_average_crashes(f, r, 360)
-                recoverables = cassie.get_average_crashes("RecoverableProblem:" + f, r, 360)
+                for release, color in releases:
+                    if field:
+                        f = "%s:%s" % (release, field)
+                    else:
+                        f = release
+                    if release != "Ubuntu 12.04":
+                        standards_color = precise_standards_color_mapping[release]
+                        problems = cassie.get_average_crashes(f, release, 360)
+                        recoverables = cassie.get_average_crashes(
+                            "RecoverableProblem:" + f, release, 360
+                        )
 
-                # Combine the Crash and RecoverableProblem data.
-                combined = {}
-                for item in problems:
-                    combined[item[0]] = item[1]
-                for item in recoverables:
-                    if item[0] in combined:
-                        combined[item[0]] -= item[1]
-                combined = sorted(
-                    list(combined.items()), key=cmp_to_key(lambda x, y: x[0] <= y[0])
-                )
+                        # Combine the Crash and RecoverableProblem data.
+                        results = {}
+                        for item in problems:
+                            results[item[0]] = item[1]
+                        for item in recoverables:
+                            if item[0] in results:
+                                results[item[0]] -= item[1]
+                        results = sorted(
+                            list(results.items()), key=cmp_to_key(lambda x, y: x[0] <= y[0])
+                        )
 
-                res = [{"x": result[0] * 1000, "y": result[1]} for result in combined]
-                output.append(
-                    ResultObject(
-                        {
-                            "key": "%s (by 12.04 standards)" % r,
+                        res = [{"x": result[0] * 1000, "y": result[1]} for result in results]
+                        d = {
+                            "key": "%s (by 12.04 standards)" % release,
                             "values": res,
                             "color": standards_color,
                         }
-                    )
-                )
+                        yield ResultObject(d)
 
-                res = [{"x": result[0] * 1000, "y": result[1]} for result in problems]
-                output.append(ResultObject({"key": r, "values": res, "color": color}))
-            else:
-                results = cassie.get_average_crashes(f, r, 360)
-                res = [{"x": result[0] * 1000, "y": result[1]} for result in results]
-                output.append(ResultObject({"key": r, "values": res, "color": color}))
-        return output
+                        res = [{"x": result[0] * 1000, "y": result[1]} for result in problems]
+                        d = {"key": release, "values": res, "color": color}
+                        yield ResultObject(d)
+                    else:
+                        results = cassie.get_average_crashes(f, release, 360)
+                        res = [{"x": result[0] * 1000, "y": result[1]} for result in results]
+                        yield ResultObject({"key": release, "values": res, "color": color})
+
+        return wrapped()
 
 
 class AverageInstancesResource(ErrorsResource):
@@ -766,13 +825,16 @@ class AverageInstancesResource(ErrorsResource):
         resource_name = "average-instances"
 
     def obj_get_list(self, bundle):
-        bucketid = unquote(bundle.request.GET.get("id", None))
-        results = []
-        for release, color in release_color_mapping.items():
-            raw = cassie.get_average_instances(bucketid, release, 360)
-            values = [{"x": i[0] * 1000, "y": i[1]} for i in raw]
-            results.append(ResultObject({"key": release, "values": values, "color": color}))
-        return results
+        class wrapped(list):
+            def __getslice__(klass, start, finish):
+                bucketid = unquote(bundle.request.GET.get("id", None))
+                for release, color in release_color_mapping.items():
+                    r = cassie.get_average_instances(bucketid, release, 360)
+                    values = [{"x": i[0] * 1000, "y": i[1]} for i in r]
+                    d = {"key": release, "values": values, "color": color}
+                    yield ResultObject(d)
+
+        return wrapped()
 
 
 class ReportsStateResource(ErrorsResource):
@@ -902,28 +964,28 @@ class InstancesResource(ErrorsResource):
         resource_name = "instances"
 
     def obj_get_list(self, bundle):
-        bucketid = unquote(bundle.request.GET.get("id", None))
-        cursor = bundle.request.GET.get("start", None)
-        cols = ["DistroRelease", "Package", "Architecture"]
-        gen = cassie.get_crashes_for_bucket(bucketid, start=cursor)
-        results = []
-        for oops in gen:
-            ts = (oops.time - 0x01B21DD213814000) * 100 / 1e9
-            ts = datetime.datetime.utcfromtimestamp(ts)
-            d = cassie.get_crash(str(oops), columns=cols)
-            ver = split_package_and_version(d.get("Package", ""))[1]
-            results.append(
-                ResultObject(
-                    {
-                        "timestamp": ts,
-                        "incident": oops,
-                        "package_version": ver,
-                        "ubuntu_version": d.get("DistroRelease", ""),
-                        "architecture": d.get("Architecture", ""),
-                    }
-                )
-            )
-        return results
+        class wrapped(list):
+            def __getslice__(klass, start, finish):
+                bucketid = unquote(bundle.request.GET.get("id", None))
+                start = bundle.request.GET.get("start", None)
+                cols = ["DistroRelease", "Package", "Architecture"]
+                gen = cassie.get_crashes_for_bucket(bucketid, start=start)
+                for oops in gen:
+                    ts = (oops.time - 0x01B21DD213814000) * 100 / 1e9
+                    ts = datetime.datetime.utcfromtimestamp(ts)
+                    d = cassie.get_crash(str(oops), columns=cols)
+                    ver = split_package_and_version(d.get("Package", ""))[1]
+                    yield ResultObject(
+                        {
+                            "timestamp": ts,
+                            "incident": oops,
+                            "package_version": ver,
+                            "ubuntu_version": d.get("DistroRelease", ""),
+                            "architecture": d.get("Architecture", ""),
+                        }
+                    )
+
+        return wrapped()
 
 
 class VersionsResource(ErrorsResource):
@@ -988,31 +1050,36 @@ class VersionsResource(ErrorsResource):
         results[version]._data["total"] += total
 
     def obj_get_list(self, bundle):
-        bucketid = bundle.request.GET.get("id", None)
-        vers = cassie.get_versions_for_bucket(bucketid)
-        src_pkg = cassie.get_source_package_for_bucket(bucketid)
-        results = {}
-        # store package versions for later sorting
-        versions = []
-        for ver in vers:
-            release, version = ver
-            total = vers[ver]
-            if release in codenames:
-                codename = codenames[release]
-            else:
-                codename = "derivatives"
-            versions.append(version)
-            self.update(results, version, release, codename, total, src_pkg)
-            # Produce totals for all Ubuntu releases as the last row.
-            self.update(results, "All versions", release, codename, total)
-        versions.sort(key=cmp_to_key(apt.apt_pkg.version_compare))
-        if vers:
-            versions.append("All versions")
-            oresults = OrderedDict()
-            for version in versions:
-                oresults[version] = results[version]
-            return list(oresults.values())
-        return []
+        class wrapped(list):
+            def __getslice__(klass, start, finish):
+                bucketid = bundle.request.GET.get("id", None)
+                vers = cassie.get_versions_for_bucket(bucketid)
+                src_pkg = cassie.get_source_package_for_bucket(bucketid)
+                results = {}
+                # store package versions for later sorting
+                versions = []
+                for ver in vers:
+                    release, version = ver
+                    total = vers[ver]
+                    if release in codenames:
+                        codename = codenames[release]
+                    else:
+                        codename = "derivatives"
+                    versions.append(version)
+                    self.update(results, version, release, codename, total, src_pkg)
+                    # Produce totals for all Ubuntu releases as the last row.
+                    self.update(results, "All versions", release, codename, total)
+                versions.sort(key=cmp_to_key(apt.apt_pkg.version_compare))
+                if vers:
+                    versions.append("All versions")
+                    oresults = OrderedDict()
+                    for version in versions:
+                        oresults[version] = results[version]
+                    return list(oresults.values())
+                else:
+                    return {}
+
+        return wrapped()
 
 
 class CrashSignaturesForBug(ErrorsResource):
@@ -1023,6 +1090,10 @@ class CrashSignaturesForBug(ErrorsResource):
 
     def obj_get_list(self, bundle):
         bug = bundle.request.GET.get("bug", None)
-        limit = int(bundle.request.GET.get("limit", self._meta.limit))
-        results = cassie.get_signatures_for_bug(bug)
-        return [ResultObject({"signatures": results[:limit]})]
+
+        class wrapped(list):
+            def __getslice__(self, start, finish):
+                results = cassie.get_signatures_for_bug(bug)
+                return [ResultObject({"signatures": results[start:finish]})]
+
+        return wrapped()

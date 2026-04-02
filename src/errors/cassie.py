@@ -171,6 +171,8 @@ def get_bucket_counts(
                 count = row.value
                 if not show_failed and column.startswith("failed"):
                     continue
+                if isinstance(column, str):
+                    column = column.encode("utf-8")
                 try:
                     existing = results[column]
                 except KeyError:

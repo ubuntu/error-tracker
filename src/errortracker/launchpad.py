@@ -30,6 +30,8 @@ else:
     _oauth_realm = "https://api.launchpad.net"
     _launchpad_base = "https://api.launchpad.net/devel"
 
+# TODO: replace hardcoding of 'ubuntu' in all these urls e.g. so we can use
+# ubuntu-rtm too
 _get_published_binaries_url = (
     _launchpad_base + "/ubuntu/+archive/primary"
     "?ws.op=getPublishedBinaries&binary_name=%s"
@@ -288,12 +290,17 @@ def pocket_for_binaries(specific_packages):
             # None, as packages like Skype will always return None and we
             # shouldn't keep asking.
             _cache[package, version, release] = "%s" % (pocket)
-        result.append(pocket)
+    result.append(pocket)
     return result
 
 
 def _get_pocket_for_binary_version(package, version, release):
-    url = _get_published_binaries_url % urllib.parse.quote(package)
+    if release == "Ubuntu RTM 14.09":
+        url = _get_published_binaries_url.replace("/ubuntu/", "/ubuntu-rtm/") % urllib.parse.quote(
+            package
+        )
+    else:
+        url = _get_published_binaries_url % urllib.parse.quote(package)
     # the package version may be Superseded or Obsolete
     url = url.replace("&status=Published", "")
     url += "&version=" + urllib.parse.quote_plus(version)
