@@ -31,17 +31,11 @@
     var loggedin_user = '';
     {% endif %}
     /* used in most_common_problems.js */
-    var allow_bug_filing = {{ allow_bug_filing }};
-
-    var means = {
-        {% for release, m in means.items %}
-            '{{ release }}' : [
-                {% for period, count in m %}
-                    { x: {{ period }} * 1000, y: {{ count }} },
-                {% endfor %}
-            ],
-        {% endfor %}
-    };
+    {% if allow_bug_filing %}
+    var allow_bug_filing = true
+    {% else %}
+    var allow_bug_filing = false
+    {% endif %}
 
     YUI().use('event', 'querystring', 'node', function(Y) {
         Y.on('load', function() {
@@ -64,7 +58,7 @@
                 Y.one('#notes').setStyle('display', 'block');
                 Y.one('#note-message').setHTML(msg);
             }
-            mean_time_between_failures_graph(means);
+            mean_time_between_failures_graph();
             most_common_problems_table(loggedin_user);
         });
     });

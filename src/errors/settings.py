@@ -7,21 +7,11 @@ cassandra.setup_cassandra()
 
 ALLOWED_HOSTS = ["*"]
 
-# DATABASES = config.django_databases
-
 PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 
-DEBUG = False
+DEBUG = True
 
-ADMINS = ()
-
-MANAGERS = ADMINS
-
-# Full import path of a serializer class to use for serializing session data.
-# Global default for this switched to JSONSerializer with Django 1.6
-# c.f.
-# https://stackoverflow.com/questions/24229397/django-object-is-not-json-serializable-error-after-upgrading-django-to-1-6-5
-SESSION_SERIALIZER = "django.contrib.sessions.serializers.PickleSerializer"
+WSGI_APPLICATION = "errors.wsgi.application"
 
 # If you set this to False, Django will make some optimizations so as not
 # to load the internationalization machinery.
@@ -43,16 +33,11 @@ DATABASES = {
 # Don't put anything in this directory yourself; store your static files
 # in apps' "static/" subdirectories and in STATICFILES_DIRS.
 # Example: "/home/media/media.lawrence.com/static/"
-STATIC_ROOT = "%s" % os.path.join(PROJECT_ROOT, "../static")
+STATIC_ROOT = os.path.join(PROJECT_ROOT, "../static")
 
 # URL prefix for static files.
 # Example: "http://media.lawrence.com/static/"
 STATIC_URL = "/static/"
-
-# URL prefix for admin static files -- CSS, JavaScript and images.
-# Make sure to use a trailing slash.
-# Examples: "http://foo.com/static/admin/", "/static/admin/".
-ADMIN_MEDIA_PREFIX = "/static/admin/"
 
 # Additional locations of static files
 STATICFILES_DIRS = [
@@ -73,7 +58,7 @@ STATICFILES_FINDERS = [
 # Make this unique, and don't share it with anybody.
 SECRET_KEY = config.errors_secret_key
 
-MIDDLEWARE_CLASSES = (
+MIDDLEWARE = (
     "django.middleware.common.CommonMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -121,10 +106,6 @@ INSTALLED_APPS = (
     "django.contrib.sites",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # Uncomment the next line to enable the admin:
-    # 'django.contrib.admin',
-    # Uncomment the next line to enable admin documentation:
-    # 'django.contrib.admindocs',
     "errors",
     "social_django",
 )
