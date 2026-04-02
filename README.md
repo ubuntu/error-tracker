@@ -61,6 +61,8 @@ errors:
 ./run-errors.sh
 ```
 
+If you need test data in Cassandra, you can run the `./populate-test-data.sh` in that same folder.
+
 From there, you can manually upload a crash with the following, from any folder
 containing a `.crash` file with its corresponding `.upload` file:
 ```
