@@ -67,7 +67,7 @@ MIDDLEWARE = (
 )
 
 AUTHENTICATION_BACKENDS = (
-    "social_core.backends.launchpad.LaunchpadOpenId",
+    "errors.backends.LaunchpadTeamsOpenId",
     "django.contrib.auth.backends.ModelBackend",
 )
 
@@ -116,6 +116,19 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 LOGIN_URL = "/login/launchpad/"
 LOGIN_REDIRECT_URL = "/"
 SOCIAL_AUTH_LOGIN_ERROR_URL = "/login-failed"
+
+SOCIAL_AUTH_PIPELINE = (
+    "social_core.pipeline.social_auth.social_details",
+    "social_core.pipeline.social_auth.social_uid",
+    "social_core.pipeline.social_auth.auth_allowed",
+    "social_core.pipeline.social_auth.social_user",
+    "social_core.pipeline.user.get_username",
+    "social_core.pipeline.user.create_user",
+    "social_core.pipeline.social_auth.associate_user",
+    "social_core.pipeline.social_auth.load_extra_data",
+    "social_core.pipeline.user.user_details",
+    "errors.pipeline.assign_groups",
+)
 # A sample logging configuration. The only tangible logging
 # performed by this configuration is to send an email to
 # the site admins on every HTTP 500 error.
