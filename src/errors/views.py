@@ -27,8 +27,6 @@ def user(request, user_token):
 @measure_view
 @can_see_stacktraces
 def bucket(request, bucketid=None, hashed=None):
-    if bucketid:
-        bucketid = bucketid.encode("UTF-8")
     if not bucketid:
         bucketid = request.GET.get("id", "").encode("UTF-8")
     if not bucketid:
@@ -58,7 +56,7 @@ def bucket(request, bucketid=None, hashed=None):
         title = "Problem in %s" % source_package
     c = {
         "title": title,
-        "bucket": bucketid.decode("utf-8"),
+        "bucket": bucketid,
         "source_package": source_package,
         "stacktrace": stacktrace,
         "thread_stacktrace": thread_stacktrace,

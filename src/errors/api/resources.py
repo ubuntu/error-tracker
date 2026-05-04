@@ -994,9 +994,7 @@ class VersionsResource(ErrorsResource):
         results = {}
         # store package versions for later sorting
         versions = []
-        for ver in vers:
-            release, version = ver
-            total = vers[ver]
+        for (release, version), total in vers.items():
             if release in codenames:
                 codename = codenames[release]
             else:

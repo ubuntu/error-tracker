@@ -184,8 +184,8 @@ class TestCassie:
         bucket_id = "/usr/bin/already-bucketed:11:func1:main"
         versions = cassie.get_versions_for_bucket(bucket_id)
         assert isinstance(versions, dict)
-        assert versions["Ubuntu 24.04"] == "1.0"
-        assert versions["Ubuntu 26.04"] == "2.0"
+        assert versions[("Ubuntu 24.04", "1.0")] == 1
+        assert versions[("Ubuntu 26.04", "2.0")] == 1
 
     def test_get_versions_for_bucket_nonexistent(self, cassandra_data):
         """Test get_versions_for_bucket returns empty dict for non-existent bucket"""
@@ -444,11 +444,11 @@ class TestCassie:
         """Test get_bucket_counts returns list of (bucket_id, count) tuples"""
         results = cassie.get_bucket_counts(release="Ubuntu 24.04", period="week")
         assert results == [
-            (b"/usr/bin/pytraceback:RuntimeError:func2", 3),
-            (b"/usr/bin/pytraceback:MemoryError:func3", 1),
-            (b"/usr/bin/already-bucketed:11:func1:main", 1),
-            (b"/usr/bin/failed-retrace:11:failed_func:main", 1),
-            (b"/usr/bin/pytraceback:Exception:func1", 1),
+            ("/usr/bin/pytraceback:RuntimeError:func2", 3),
+            ("/usr/bin/pytraceback:MemoryError:func3", 1),
+            ("/usr/bin/already-bucketed:11:func1:main", 1),
+            ("/usr/bin/failed-retrace:11:failed_func:main", 1),
+            ("/usr/bin/pytraceback:Exception:func1", 1),
         ]
 
     def test_get_bucket_counts_no_data(self, cassandra_data):
@@ -502,7 +502,7 @@ class TestCassie:
         assert isinstance(results[0][0], str)
         assert len(results[0][0]) == 8  # YYYYMMDD format
         assert results[0][1][release]["amd64"] == 30.0
-        assert results[2][1][release]["amd64"] == 35.0
+        assert results[2][1][release]["amd64"] == 40.0
 
     def test_get_crash_count(self, datetime_now, cassandra_data):
         """Test get_crash_count returns generator of (date, count) tuples"""

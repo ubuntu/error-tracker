@@ -164,20 +164,17 @@ def get_bucket_counts(
 
     results = {}
     for key in keys:
-        try:
-            rows = DayBucketsCount.objects.filter(key=key.encode()).all()
-            for row in rows:
-                column = row.column1
-                count = row.value
-                if not show_failed and column.startswith("failed"):
-                    continue
-                try:
-                    existing = results[column]
-                except KeyError:
-                    existing = 0
-                results[column] = count + existing
-        except DoesNotExist:
-            continue
+        rows = list(DayBucketsCount.objects.filter(key=key.encode()).all())
+        for row in rows:
+            column = row.column1
+            count = row.value
+            if not show_failed and column.startswith("failed"):
+                continue
+            try:
+                existing = results[column]
+            except KeyError:
+                existing = 0
+            results[column] = count + existing
 
     return sorted(list(results.items()), key=lambda x: x[1], reverse=True)
 
@@ -494,7 +491,7 @@ def get_versions_for_bucket(bucketid: str):
         rows = BucketVersionsCount.objects.filter(key=bucketid).all()
         result = {}
         for row in rows:
-            result[row.column1] = row.column2
+            result[(row.column1, row.column2)] = row.value
         return result
     except DoesNotExist:
         return {}
@@ -759,7 +756,7 @@ def get_signatures_for_bug(bug: int):
         return []
 
 
-def bucket_exists(bucketid):
+def bucket_exists(bucketid: str):
     try:
         count = Bucket.objects.filter(key=bucketid).limit(1).count()
         return count > 0
