@@ -48,20 +48,20 @@ Or start each individual process (from the `./src` folder):
 
 daisy:
 ```
-./run-daisy.sh
+make run-daisy
 ```
 
 retracer:
 ```
-./run-retracer.sh
+make run-retracer
 ```
 
 errors:
 ```
-./run-errors.sh
+make run-errors
 ```
 
-If you need test data in Cassandra, you can run the `./populate-test-data.sh` in that same folder.
+If you need test data in Cassandra, you can run `make populate-test-data` in that same folder.
 
 From there, you can manually upload a crash with the following, from any folder
 containing a `.crash` file with its corresponding `.upload` file:

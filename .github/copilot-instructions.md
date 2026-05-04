@@ -51,13 +51,10 @@ src/                  # Error Tracker application source
     amqp_utils.py     #     RabbitMQ/AMQP utilities
     config.py         #     Configuration handling
     utils.py          #     Shared utilities
-  populate-test-data.sh #   Script to put test data into a local Cassandra (for development)
+  Makefile            #   Makefile with targets: run-daisy, run-errors, run-retracer, populate-test-data
   retracer/           #   Symbolic retracer (turns addresses into stack frames)
     config/           #     Per-release retracer configuration
   retracer.py         #   Retracer entry point
-  run-daisy.sh        #   Script to start daisy locally
-  run-errors.sh       #   Script to start errors locally
-  run-retracer.sh     #   Script to start retracer locally
   tools/              #   Maintenance and housekeeping scripts
   tests/              #   Application tests
 
