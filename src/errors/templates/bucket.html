@@ -23,6 +23,11 @@
     {% else %}
     var user_is_authenticated = false;
     {% endif %}
+    {% if allow_bug_filing %}
+    var allow_bug_filing = true
+    {% else %}
+    var allow_bug_filing = false
+    {% endif %}
 
     YUI().use('event', 'datatable', 'datatable-sort', 'datasource-get',
               'datasource-jsonschema', 'datatable-datasource',
@@ -54,7 +59,7 @@
             }
             /* use js to format bucket since elif first appeared in django 1.4 */
             Y.one('.bucket').setHTML(formatSignature(bucket));
-            if (Y.one('#createbug') && {{ allow_bug_filing }}) {
+            if (Y.one('#createbug') && allow_bug_filing) {
                 Y.one('#createbug').setHTML(bugFormatter(report));
             }
 
