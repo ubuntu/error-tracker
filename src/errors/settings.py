@@ -67,7 +67,7 @@ MIDDLEWARE = (
 )
 
 AUTHENTICATION_BACKENDS = (
-    "errors.backends.LaunchpadTeamsOpenId",
+    "errors.auth.LaunchpadTeamsOpenId",
     "django.contrib.auth.backends.ModelBackend",
 )
 
@@ -127,7 +127,7 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.social_auth.associate_user",
     "social_core.pipeline.social_auth.load_extra_data",
     "social_core.pipeline.user.user_details",
-    "errors.pipeline.assign_groups",
+    "errors.auth.assign_groups",
 )
 # A sample logging configuration. The only tangible logging
 # performed by this configuration is to send an email to
