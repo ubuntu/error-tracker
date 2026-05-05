@@ -21,28 +21,28 @@ def test_deploy(
 ):
     juju.deploy(
         charm=charm_path,
-        app="daisy",
+        app="web",
         config={
             "configuration": error_tracker_config,
-            "enable_daisy": True,
+            "enable_daisy": False,
             "enable_retracer": False,
             "enable_timers": False,
-            "enable_web": False,
+            "enable_web": True,
         },
     )
 
-    juju.wait(lambda status: jubilant.all_active(status, "daisy"), timeout=600)
+    juju.wait(lambda status: jubilant.all_active(status, "web"), timeout=600)
 
-    check_config(juju, amqp, cassandra, swift, "daisy/0")
+    check_config(juju, amqp, cassandra, swift, "web/0")
 
 
 def test_http(juju: jubilant.Juju):
-    external_hostname = "daisy.internal"
+    external_hostname = "errors.internal"
     juju.deploy(HAPROXY, channel="2.8/edge", config={"external-hostname": external_hostname})
     juju.deploy(SSC, channel="1/edge")
 
     juju.integrate(HAPROXY + ":certificates", SSC + ":certificates")
-    juju.integrate("daisy:route_daisy", HAPROXY)
+    juju.integrate("web:route_web", HAPROXY)
     juju.wait(lambda status: jubilant.all_active(status, HAPROXY, SSC), timeout=1800)
 
     haproxy_ip = juju.status().apps[HAPROXY].units[f"{HAPROXY}/0"].public_address
@@ -58,12 +58,11 @@ def test_http(juju: jubilant.Juju):
         reraise=True,
     ):
         with attempt:
-            response = session.post(
-                f"https://{haproxy_ip}/random_machine_id",
+            response = session.get(
+                f"https://{haproxy_ip}/",
                 headers={"Host": external_hostname},
-                data=b"Hello there",
                 verify=False,
                 timeout=30,
             )
-            assert response.status_code == 400
-            assert "Invalid BSON" in response.text
+            assert response.status_code == 200
+            assert "We collect hundreds of thousands of error reports daily" in response.text

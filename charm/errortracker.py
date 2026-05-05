@@ -50,6 +50,7 @@ class ErrorTracker:
         self.enable_daisy = True
         self.enable_web = True
         self.daisy_port = 8000
+        self.web_port = 9000
 
     def install(self):
         self._install_deps()
@@ -238,3 +239,47 @@ WantedBy=multi-user.target
 
     def configure_web(self):
         logger.info("Configuring web")
+        logger.info("Installing additional web dependencies")
+        check_call(
+            [
+                "apt-get",
+                "install",
+                "-y",
+                "python3-django",
+                "python3-django-tastypie",
+                "python3-numpy",
+                "python3-openid-teams",
+                "python3-social-django",
+                "python3-uwsgidecorators",
+                "uwsgi-plugin-python3",
+            ]
+        )
+        systemd_unit_location = Path("/") / "etc" / "systemd" / "system"
+        systemd_unit_location.mkdir(parents=True, exist_ok=True)
+        (systemd_unit_location / "et-web.service").write_text(
+            f"""
+[Unit]
+Description=Error Tracker web
+After=network.target
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory={REPO_LOCATION}/src
+ExecStartPre={REPO_LOCATION}/src/errors/manage.py migrate --no-input
+ExecStartPre={REPO_LOCATION}/src/errors/manage.py collectstatic --no-input --clear
+ExecStart=bash -c 'exec uwsgi --plugins python3 --http-socket 0.0.0.0:{self.web_port} --wsgi-file {REPO_LOCATION}/src/errors/wsgi.py --static-map "/static={REPO_LOCATION}/src/static/" --chdir {REPO_LOCATION}/src/ --die-on-term --master --env PYTHONPATH={REPO_LOCATION}/src/ --max-requests 4000 --max-worker-lifetime 21600 --processes "$(($(nproc) * 2))"'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+"""
+        )
+
+        check_call(["systemctl", "daemon-reload"])
+
+        logger.info("enabling systemd units")
+        check_call(["systemctl", "enable", "et-web"])
+
+        logger.info("restarting systemd units")
+        check_call(["systemctl", "restart", "et-web"])

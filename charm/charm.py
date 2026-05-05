@@ -26,6 +26,12 @@ class ErrorTrackerCharm(ops.CharmBase):
             ports=[self._error_tracker.daisy_port],
             relation_name="route_daisy",
         )
+        self.route_web = HaproxyRouteRequirer(
+            self,
+            service="web",
+            ports=[self._error_tracker.web_port],
+            relation_name="route_web",
+        )
 
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.install, self._on_install)
@@ -62,15 +68,18 @@ class ErrorTrackerCharm(ops.CharmBase):
         # This is a bit annoying, but also doesn't have a very big impact in
         # practice. This charm has no configuration where it's supposed to store
         # data, so it's always very easy to remove a unit and recreate.
+        ports = []
         if enable_daisy:
             self._error_tracker.configure_daisy()
-            self.unit.set_ports(self._error_tracker.daisy_port)
+            ports.append(self._error_tracker.daisy_port)
         if enable_retracer:
             self._error_tracker.configure_retracer(self.config.get("retracer_failed_queue"))
         if enable_timers:
             self._error_tracker.configure_timers()
         if enable_web:
             self._error_tracker.configure_web()
+            ports.append(self._error_tracker.web_port)
+        self.unit.set_ports(*ports)
 
         self.unit.set_workload_version(self._error_tracker.get_version())
         self.unit.status = ops.ActiveStatus("Ready")

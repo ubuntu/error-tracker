@@ -87,3 +87,7 @@ requires:
     interface: haproxy-route
     limit: 1
     optional: true
+  route_web:
+    interface: haproxy-route
+    limit: 1
+    optional: true
