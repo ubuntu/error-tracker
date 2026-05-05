@@ -25,18 +25,16 @@ USE_L10N = False
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": "/tmp/errors.sqlite",
+        "NAME": os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "errors.sqlite"),
     }
 }
 
 # Absolute path to the directory static files should be collected to.
 # Don't put anything in this directory yourself; store your static files
 # in apps' "static/" subdirectories and in STATICFILES_DIRS.
-# Example: "/home/media/media.lawrence.com/static/"
 STATIC_ROOT = os.path.join(PROJECT_ROOT, "../static")
 
 # URL prefix for static files.
-# Example: "http://media.lawrence.com/static/"
 STATIC_URL = "/static/"
 
 # Additional locations of static files
@@ -52,7 +50,6 @@ STATICFILES_DIRS = [
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
-    #    'django.contrib.staticfiles.finders.DefaultStorageFinder',
 ]
 
 # Make this unique, and don't share it with anybody.
@@ -73,13 +70,6 @@ AUTHENTICATION_BACKENDS = (
 
 ROOT_URLCONF = "errors.urls"
 
-# TEMPLATE_DIRS = (
-#    # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
-#    # Always use forward slashes, even on Windows.
-#    # Don't forget to use absolute paths, not relative paths.
-#    os.path.join(PROJECT_ROOT, 'templates'),
-# )
-
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -93,7 +83,6 @@ TEMPLATES = [
             "loaders": [
                 "django.template.loaders.filesystem.Loader",
                 "django.template.loaders.app_directories.Loader",
-                # 'django.template.loaders.eggs.Loader',
             ],
         },
     }
@@ -137,8 +126,3 @@ SOCIAL_AUTH_PIPELINE = (
 LOGGING = {
     "version": 1,
 }
-
-if config.allow_bug_filing == "True":
-    ALLOW_BUG_FILING = 1
-else:
-    ALLOW_BUG_FILING = 0
