@@ -1,6 +1,5 @@
 from urllib.parse import quote
 
-from django.conf import settings
 from django.contrib.auth import logout
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
@@ -8,6 +7,7 @@ from django.shortcuts import render
 from errors import cassie, version
 from errors.auth import can_see_stacktraces
 from errors.metrics import measure_view
+from errortracker import config
 from errortracker.launchpad import bug_get_master_id
 
 
@@ -27,8 +27,6 @@ def user(request, user_token):
 @measure_view
 @can_see_stacktraces
 def bucket(request, bucketid=None, hashed=None):
-    if bucketid:
-        bucketid = bucketid.encode("UTF-8")
     if not bucketid:
         bucketid = request.GET.get("id", "").encode("UTF-8")
     if not bucketid:
@@ -58,14 +56,14 @@ def bucket(request, bucketid=None, hashed=None):
         title = "Problem in %s" % source_package
     c = {
         "title": title,
-        "bucket": bucketid.decode("utf-8"),
+        "bucket": bucketid,
         "source_package": source_package,
         "stacktrace": stacktrace,
         "thread_stacktrace": thread_stacktrace,
         "traceback": traceback,
         "report": report,
         "report_master": bug_get_master_id(report),
-        "allow_bug_filing": settings.ALLOW_BUG_FILING,
+        "allow_bug_filing": config.allow_bug_filing,
     }
     if failuredata:
         c["retrace_failure_reason"] = failuredata.get("Reason", "")
@@ -88,7 +86,7 @@ def oops(request, oopsid):
 
 @measure_view
 def main(request):
-    c = {"allow_bug_filing": settings.ALLOW_BUG_FILING}
+    c = {"allow_bug_filing": config.allow_bug_filing}
     # hacks for request being empty with django 1.11.11 after passing to render
     c["authenticated"] = request.user.is_authenticated
     c["username"] = request.user.username

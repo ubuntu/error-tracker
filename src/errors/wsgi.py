@@ -1,30 +1,33 @@
+"""
+WSGI config for errors project.
+
+It exposes the WSGI callable as a module-level variable named ``application``.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/5.2/howto/deployment/wsgi/
+"""
+
 import os
 
-import oops_dictconfig
-from oops_wsgi import install_hooks, make_app
-from oops_wsgi.django import OOPSWSGIHandler
+from django.core.wsgi import get_wsgi_application
 
-from daisy import config
-from errors import metrics
-from errors.version_middleware import VersionMiddleware
+try:
+    from uwsgidecorators import postfork
+
+    from errortracker import cassandra
+
+    @postfork
+    def connect():
+        print("wsgi.py: connecting to Cassandra")
+        cassandra.setup_cassandra()
+except ImportError:
+    print(
+        "wsgi.py: Import of 'uwsgidecorators' failed, you might encounter weird hanging of Cassandra-related functions"
+    )
+    print(
+        "wsgi.py: see https://python-driver.readthedocs.io/en/stable/faq.html#why-do-connections-or-io-operations-timeout-in-my-wsgi-application"
+    )
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "errors.settings")
-import django
-from django.template.loader import render_to_string
 
-
-def error_renderer(report):
-    return str(render_to_string("500.html", report))
-
-
-django.setup()
-
-cfg = oops_dictconfig.config_from_dict(config.oops_config)
-install_hooks(cfg)
-cfg.template["reporter"] = "errors"
-kwargs = {
-    "oops_on_status": ["500"],
-    "error_render": error_renderer,
-}
-metrics.revno()
-application = VersionMiddleware(make_app(OOPSWSGIHandler(), cfg, **kwargs))
+application = get_wsgi_application()

@@ -1,8 +1,6 @@
-from django.conf import settings
 from django.conf.urls import include
-from django.conf.urls.static import static
+from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import re_path
-from django.views.static import serve
 
 from errors import views
 
@@ -23,9 +21,7 @@ urlpatterns = [
     re_path(r"^user/(.*)$", views.user),
     re_path(r"^api/", include("errors.api.urls")),
     re_path(r"^", include("social_django.urls", namespace="social")),
-] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+]
 
-# If we get a request for static content, handle it. This will happen if Apache
-# does not have an alias defined for /static, such as when we're using gunicorn
-# instead of Apache.
-urlpatterns += [re_path(r"^static/(?P<path>.*)$", serve, {"document_root": "static"})]
+# This will only be useful if DEBUG=True, so basically only for development
+urlpatterns += staticfiles_urlpatterns()

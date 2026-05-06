@@ -51,12 +51,10 @@ src/                  # Error Tracker application source
     amqp_utils.py     #     RabbitMQ/AMQP utilities
     config.py         #     Configuration handling
     utils.py          #     Shared utilities
+  Makefile            #   Makefile with targets: run-daisy, run-errors, run-retracer, populate-test-data
   retracer/           #   Symbolic retracer (turns addresses into stack frames)
     config/           #     Per-release retracer configuration
   retracer.py         #   Retracer entry point
-  run-daisy.sh        #   Script to start daisy locally
-  run-errors.sh       #   Script to start errors locally
-  run-retracer.sh     #   Script to start retracer locally
   tools/              #   Maintenance and housekeeping scripts
   tests/              #   Application tests
 
@@ -101,7 +99,7 @@ The application relies on:
 
 ### Test Architecture
 
-There are two layers of testing:
+There are multiple layers of testing:
 
 1. **Unit/functional tests** (`src/tests/`) — pytest-based tests that require Cassandra, RabbitMQ, and Swift running locally. These test individual components (submission, retracing, Cassandra operations, OOPS processing).
 

@@ -11,12 +11,10 @@ register = template.Library()
 def pygmentize(code, lang):
     if code is not None:
         try:
-            lexer = get_lexer_by_name(lang, encoding="utf-8", stripall=True, startinline=True)
+            lexer = get_lexer_by_name(lang, stripall=True, startinline=True)
         except ClassNotFound:
             lexer = get_lexer_by_name("text")
-        formatter = HtmlFormatter(
-            encoding="utf-8", style="colorful", cssclass="highlight", lineanchors="line"
-        )
+        formatter = HtmlFormatter(style="colorful", cssclass="highlight", lineanchors="line")
         return highlight(code, lexer, formatter)
     else:
         return code

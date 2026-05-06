@@ -23,7 +23,7 @@ Start with the Python dependencies
 # For 'daisy' only
 sudo apt install apport-retrace python3-amqp python3-bson python3-cassandra python3-flask python3-mock python3-pygit2 python3-pytest python3-pytest-cov python3-swiftclient ubuntu-dbgsym-keyring
 # Add this for 'errors'
-sudo apt install python3-django-tastypie python3-numpy python3-social-django
+sudo apt install python3-django-tastypie python3-numpy python3-social-django python3-openid-teams
 ```
 
 Then start a local Cassandra, RabbitMQ and swift (`docker` should work fine too):
@@ -48,18 +48,20 @@ Or start each individual process (from the `./src` folder):
 
 daisy:
 ```
-./run-daisy.sh
+make daisy-run
 ```
 
 retracer:
 ```
-./run-retracer.sh
+make retracer-run
 ```
 
 errors:
 ```
-./run-errors.sh
+make errors-run
 ```
+
+If you need test data in Cassandra, you can run `make populate-test-data` in that same folder.
 
 From there, you can manually upload a crash with the following, from any folder
 containing a `.crash` file with its corresponding `.upload` file:

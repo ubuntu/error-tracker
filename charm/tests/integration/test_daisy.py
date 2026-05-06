@@ -37,7 +37,8 @@ def test_deploy(
 
 
 def test_http(juju: jubilant.Juju):
-    juju.deploy(HAPROXY, channel="2.8/edge", config={"external-hostname": "daisy.internal"})
+    external_hostname = "daisy.internal"
+    juju.deploy(HAPROXY, channel="2.8/edge", config={"external-hostname": external_hostname})
     juju.deploy(SSC, channel="1/edge")
 
     juju.integrate(HAPROXY + ":certificates", SSC + ":certificates")
@@ -45,7 +46,6 @@ def test_http(juju: jubilant.Juju):
     juju.wait(lambda status: jubilant.all_active(status, HAPROXY, SSC), timeout=1800)
 
     haproxy_ip = juju.status().apps[HAPROXY].units[f"{HAPROXY}/0"].public_address
-    external_hostname = "daisy.internal"
 
     session = Session()
     session.mount("https://", DNSResolverHTTPSAdapter(external_hostname, haproxy_ip))
