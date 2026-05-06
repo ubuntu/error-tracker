@@ -1,9 +1,7 @@
 # Django settings for errors project.
 import os
 
-from errortracker import cassandra, config
-
-cassandra.setup_cassandra()
+from errortracker import config
 
 ALLOWED_HOSTS = ["*"]
 
