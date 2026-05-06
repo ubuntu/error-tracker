@@ -48,17 +48,17 @@ Or start each individual process (from the `./src` folder):
 
 daisy:
 ```
-make run-daisy
+make daisy-run
 ```
 
 retracer:
 ```
-make run-retracer
+make retracer-run
 ```
 
 errors:
 ```
-make run-errors
+make errors-run
 ```
 
 If you need test data in Cassandra, you can run `make populate-test-data` in that same folder.
