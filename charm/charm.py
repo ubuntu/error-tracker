@@ -144,6 +144,10 @@ class ErrorTrackerCharm(ops.CharmBase):
                 service="errors",
                 ports=[self._error_tracker.errors_port],
                 hostname=errors_hostname,
+                header_rewrite_expressions=[
+                    ("X-Forwarded-Proto", "https if { ssl_fc }"),
+                    ("X-Forwarded-For", "%[src]"),
+                ],
             )
 
 
