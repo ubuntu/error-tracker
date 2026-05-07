@@ -271,6 +271,7 @@ ExecStartPre={REPO_LOCATION}/src/errors/manage.py collectstatic --no-input --cle
 ExecStart=bash -c 'exec uwsgi \\
           --plugins python3 \\
           --http-socket 0.0.0.0:{self.errors_port} \\
+          --log-x-forwarded-for \\
           --wsgi-file {REPO_LOCATION}/src/errors/wsgi.py \\
           --static-map "/static={REPO_LOCATION}/src/static/" \\
           --chdir {REPO_LOCATION}/src/ \\
