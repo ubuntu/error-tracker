@@ -67,6 +67,8 @@ local_config.py
 db.sqlite3
 db.sqlite3-journal
 src/static
+src/errors/errors.sqlite
+src/errors/.errors_secret_key
 
 # Flask stuff:
 instance/
