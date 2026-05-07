@@ -58,6 +58,29 @@ def services(juju: jubilant.Juju) -> None:
     )
     juju.deploy("rabbitmq-server")
     juju.deploy(charm="ubuntu", app="swift")
+
+    # Swift is ready first
+    juju.wait(lambda status: jubilant.all_active(status, "swift"), timeout=600)
+    juju.exec("sudo", "apt-get", "install", "-Uy", "docker.io", unit="swift/0")
+    juju.exec(
+        "docker",
+        "run",
+        "--name",
+        "swift",
+        "--network",
+        "host",
+        "--rm",
+        "-d",
+        "docker.io/openstackswift/saio",
+        unit="swift/0",
+    )
+
+    # Then comes RabbitMQ
+    juju.wait(lambda status: jubilant.all_active(status, "rabbitmq-server"), timeout=600)
+    # Useful to push arbitrary messages in test cases.
+    juju.exec("sudo", "apt-get", "install", "-y", "amqp-tools", unit="rabbitmq-server/0")
+
+    # Make sure everything is ready
     juju.wait(
         lambda status: jubilant.all_active(status, "cassandra", "rabbitmq-server", "swift"),
         timeout=900,
@@ -82,9 +105,6 @@ def cassandra(juju: jubilant.Juju, services) -> dict[str, str]:
 def amqp(juju: jubilant.Juju, services) -> dict[str, str]:
     amqp_host = juju.status().get_units("rabbitmq-server")["rabbitmq-server/0"].public_address
     logger.info("RabbitMQ address: " + amqp_host)
-
-    # Useful to push arbitrary messages in test cases.
-    juju.exec("sudo", "apt-get", "install", "-y", "amqp-tools", unit="rabbitmq-server/0")
 
     # Set up rabbitmq test user
     juju.exec("sudo", "rabbitmqctl", "add_user", "test", "test", unit="rabbitmq-server/0")
@@ -116,19 +136,6 @@ def swift(juju: jubilant.Juju, services) -> dict[str, str]:
     swift_host = juju.status().get_units("swift")["swift/0"].public_address
     logger.info("swift address: " + swift_host)
 
-    juju.exec("sudo", "apt-get", "install", "-Uy", "docker.io", unit="swift/0")
-    juju.exec(
-        "docker",
-        "run",
-        "--name",
-        "swift",
-        "--network",
-        "host",
-        "--rm",
-        "-d",
-        "docker.io/openstackswift/saio",
-        unit="swift/0",
-    )
     return {
         "auth_url": f"http://{swift_host}:8080/auth/v1.0",
         "username": "test:tester",
