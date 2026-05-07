@@ -20,18 +20,6 @@ class ErrorTrackerCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self._error_tracker = ErrorTracker()
-        self.route_daisy = HaproxyRouteRequirer(
-            self,
-            service="daisy",
-            ports=[self._error_tracker.daisy_port],
-            relation_name="route_daisy",
-        )
-        self.route_web = HaproxyRouteRequirer(
-            self,
-            service="web",
-            ports=[self._error_tracker.web_port],
-            relation_name="route_web",
-        )
 
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.install, self._on_install)
@@ -82,6 +70,24 @@ class ErrorTrackerCharm(ops.CharmBase):
         self.unit.set_ports(*ports)
 
         self.unit.set_workload_version(self._error_tracker.get_version())
+
+        daisy_hostname = self.config.get("daisy_hostname")
+        errors_hostname = self.config.get("errors_hostname")
+        self.route_daisy = HaproxyRouteRequirer(
+            self,
+            service="daisy",
+            ports=[self._error_tracker.daisy_port],
+            relation_name="route_daisy",
+            hostname=daisy_hostname,
+        )
+        self.route_web = HaproxyRouteRequirer(
+            self,
+            service="web",
+            ports=[self._error_tracker.web_port],
+            relation_name="route_web",
+            hostname=errors_hostname,
+        )
+
         self.unit.status = ops.ActiveStatus("Ready")
 
 

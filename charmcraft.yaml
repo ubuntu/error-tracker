@@ -51,6 +51,16 @@ charm-libs:
 
 config:
   options:
+    daisy_hostname:
+      description: |
+        The hostname to use for daisy
+      default: "daisy.local"
+      type: string
+    errors_hostname:
+      description: |
+        The hostname to use for errors
+      default: "errors.local"
+      type: string
     enable_daisy:
       description: |
         Whether to enable the 'daisy' component of the Error Tracker

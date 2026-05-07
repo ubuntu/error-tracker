@@ -10,6 +10,8 @@ logger = logging.getLogger()
 HAPROXY = "haproxy"
 SSC = "self-signed-certificates"
 
+external_hostname = "errors.internal"
+
 
 def test_deploy(
     juju: jubilant.Juju,
@@ -24,6 +26,7 @@ def test_deploy(
         app="web",
         config={
             "configuration": error_tracker_config,
+            "errors_hostname": external_hostname,
             "enable_daisy": False,
             "enable_retracer": False,
             "enable_timers": False,
@@ -37,8 +40,7 @@ def test_deploy(
 
 
 def test_http(juju: jubilant.Juju):
-    external_hostname = "errors.internal"
-    juju.deploy(HAPROXY, channel="2.8/edge", config={"external-hostname": external_hostname})
+    juju.deploy(HAPROXY, channel="2.8/edge", config={"external-hostname": "haproxy.internal"})
     juju.deploy(SSC, channel="1/edge")
 
     juju.integrate(HAPROXY + ":certificates", SSC + ":certificates")
