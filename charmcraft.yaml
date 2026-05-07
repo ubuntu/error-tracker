@@ -48,6 +48,8 @@ parts:
 charm-libs:
   - lib: haproxy.haproxy_route
     version: "1"
+  - lib: traefik_k8s.ingress
+    version: "2"
 
 config:
   options:
@@ -99,5 +101,13 @@ requires:
     optional: true
   route_errors:
     interface: haproxy-route
+    limit: 1
+    optional: true
+  ingress_daisy:
+    interface: ingress
+    limit: 1
+    optional: true
+  ingress_errors:
+    interface: ingress
     limit: 1
     optional: true
