@@ -21,6 +21,10 @@ def test_deploy(
     error_tracker_config: str,
     charm_path: str,
 ):
+    """
+    Deploy everything at once, but don't integrate anything. This is just to
+    speed up CI by parallelizing deployment.
+    """
     juju.deploy(
         charm=charm_path,
         app="daisy",
@@ -33,6 +37,8 @@ def test_deploy(
             "enable_errors": False,
         },
     )
+    juju.deploy(HAPROXY, channel="2.8/edge", config={"external-hostname": "haproxy.internal"})
+    juju.deploy(SSC, channel="1/edge")
 
     juju.wait(lambda status: jubilant.all_active(status, "daisy"), timeout=600)
 
@@ -40,9 +46,6 @@ def test_deploy(
 
 
 def test_http(juju: jubilant.Juju):
-    juju.deploy(HAPROXY, channel="2.8/edge", config={"external-hostname": "haproxy.internal"})
-    juju.deploy(SSC, channel="1/edge")
-
     juju.integrate(HAPROXY + ":certificates", SSC + ":certificates")
     juju.integrate("daisy:route_daisy", HAPROXY)
     juju.wait(lambda status: jubilant.all_active(status, HAPROXY, SSC), timeout=1800)
