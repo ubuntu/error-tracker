@@ -58,15 +58,14 @@ def services(juju: jubilant.Juju) -> None:
     )
     juju.deploy("rabbitmq-server")
     juju.deploy(charm="ubuntu", app="swift")
+    juju.wait(
+        lambda status: jubilant.all_active(status, "cassandra", "rabbitmq-server", "swift"),
+        timeout=900,
+    )
 
 
 @pytest.fixture
 def cassandra(juju: jubilant.Juju, services) -> dict[str, str]:
-    juju.wait(
-        lambda status: jubilant.all_active(status, "cassandra"),
-        timeout=900,
-    )
-
     # Get Cassandra credentials
     task = juju.exec("cat", "/home/ubuntu/.cassandra/cqlshrc", unit="cassandra/0")
     logger.info("Cassandra config: " + task.stdout)
@@ -81,10 +80,6 @@ def cassandra(juju: jubilant.Juju, services) -> dict[str, str]:
 
 @pytest.fixture
 def amqp(juju: jubilant.Juju, services) -> dict[str, str]:
-    juju.wait(
-        lambda status: jubilant.all_active(status, "rabbitmq-server"),
-        timeout=600,
-    )
     amqp_host = juju.status().get_units("rabbitmq-server")["rabbitmq-server/0"].public_address
     logger.info("RabbitMQ address: " + amqp_host)
 
@@ -118,10 +113,6 @@ def amqp(juju: jubilant.Juju, services) -> dict[str, str]:
 
 @pytest.fixture
 def swift(juju: jubilant.Juju, services) -> dict[str, str]:
-    juju.wait(
-        lambda status: jubilant.all_active(status, "swift"),
-        timeout=600,
-    )
     swift_host = juju.status().get_units("swift")["swift/0"].public_address
     logger.info("swift address: " + swift_host)
 
