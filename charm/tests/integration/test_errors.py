@@ -55,19 +55,24 @@ def test_http(juju: jubilant.Juju):
     session = Session()
     session.mount("https://", DNSResolverHTTPSAdapter(external_hostname, haproxy_ip))
 
-    # Let give this test a few chances to succeed, as it can sometimes be a bit
-    # early and hit 503
-    for attempt in Retrying(
-        stop=stop_after_attempt(10),
-        wait=wait_exponential(min=5, max=30),
-        reraise=True,
-    ):
-        with attempt:
-            response = session.get(
-                f"https://{haproxy_ip}/",
-                headers={"Host": external_hostname},
-                verify=False,
-                timeout=30,
-            )
-            assert response.status_code == 200
-            assert "We collect hundreds of thousands of error reports daily" in response.text
+    for uri, content in [
+        ("/", "We collect hundreds of thousands of error reports daily"),
+        ("/static/css/main.css", "body {"),
+        ("/static/js/yui/build/yui/yui-min.js", "/* YUI 3.9.0 (build 5827)"),
+    ]:
+        # Let give this test a few chances to succeed, as it can sometimes be a bit
+        # early and hit 503
+        for attempt in Retrying(
+            stop=stop_after_attempt(10),
+            wait=wait_exponential(min=5, max=30),
+            reraise=True,
+        ):
+            with attempt:
+                response = session.get(
+                    f"https://{haproxy_ip}{uri}",
+                    headers={"Host": external_hostname},
+                    verify=False,
+                    timeout=30,
+                )
+                assert response.status_code == 200
+                assert content in response.text

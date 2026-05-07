@@ -51,8 +51,13 @@ swift_bucket = "cores"
 # Path used to keep some crashes in case of failure, for manual investigation
 failure_storage = None
 
-errors_secret_key = "hellotheregeneralkenobi"
+# Is the Django app running in debug mode
+errors_debug = True
+
+# Allow the Django app to fill bugs
 allow_bug_filing = True
+
+# Some variable still used by the launchpad.py module
 lp_oauth_token = "todofixme"
 lp_oauth_secret = "todofixme"
 lp_use_staging = True
