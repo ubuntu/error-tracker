@@ -145,7 +145,7 @@ The charm is a **machine charm** targeting `ubuntu@24.04`. It deploys the Error 
 | `enable_daisy`          | `true`  | Enable the daisy crash receiver service                   |
 | `enable_retracer`       | `true`  | Enable the retracer service                               |
 | `enable_timers`         | `true`  | Enable the housekeeping timer units                       |
-| `enable_web`            | `true`  | Enable the errors web frontend service                    |
+| `enable_errors`         | `true`  | Enable the errors web frontend service                    |
 | `configuration`         | `""`    | Full Python configuration file content for the app        |
 | `retracer_failed_queue` | `false` | Whether the retracer listens on the failed retracing queue|
 

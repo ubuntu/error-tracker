@@ -5,7 +5,7 @@ summary: The whole infrastructure collecting and processing crashes for Ubuntu
 description: |
   The Error Tracker is made of the following components:
     * daisy - receiving crashes
-    * web UI - displaying and visualizing data for developers
+    * errors - displaying and visualizing data for developers
     * timers - for processing and housekeeping tasks
     * retracer - to get symbolic stacktraces out of coredumps
 
@@ -76,9 +76,9 @@ config:
         Whether to enable the 'timers' component of the Error Tracker
       default: true
       type: boolean
-    enable_web:
+    enable_errors:
       description: |
-        Whether to enable the 'web' component of the Error Tracker
+        Whether to enable the 'errors' component of the Error Tracker
       default: true
       type: boolean
     configuration:
@@ -97,7 +97,7 @@ requires:
     interface: haproxy-route
     limit: 1
     optional: true
-  route_web:
+  route_errors:
     interface: haproxy-route
     limit: 1
     optional: true

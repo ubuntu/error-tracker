@@ -30,7 +30,7 @@ def test_deploy(
             "enable_daisy": True,
             "enable_retracer": False,
             "enable_timers": False,
-            "enable_web": False,
+            "enable_errors": False,
         },
     )
 

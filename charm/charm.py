@@ -46,7 +46,7 @@ class ErrorTrackerCharm(ops.CharmBase):
         enable_daisy = self.config.get("enable_daisy")
         enable_retracer = self.config.get("enable_retracer")
         enable_timers = self.config.get("enable_timers")
-        enable_web = self.config.get("enable_web")
+        enable_errors = self.config.get("enable_errors")
 
         config = self.config.get("configuration")
 
@@ -64,9 +64,9 @@ class ErrorTrackerCharm(ops.CharmBase):
             self._error_tracker.configure_retracer(self.config.get("retracer_failed_queue"))
         if enable_timers:
             self._error_tracker.configure_timers()
-        if enable_web:
-            self._error_tracker.configure_web()
-            ports.append(self._error_tracker.web_port)
+        if enable_errors:
+            self._error_tracker.configure_errors()
+            ports.append(self._error_tracker.errors_port)
         self.unit.set_ports(*ports)
 
         self.unit.set_workload_version(self._error_tracker.get_version())
@@ -80,11 +80,11 @@ class ErrorTrackerCharm(ops.CharmBase):
             relation_name="route_daisy",
             hostname=daisy_hostname,
         )
-        self.route_web = HaproxyRouteRequirer(
+        self.route_errors = HaproxyRouteRequirer(
             self,
-            service="web",
-            ports=[self._error_tracker.web_port],
-            relation_name="route_web",
+            service="errors",
+            ports=[self._error_tracker.errors_port],
+            relation_name="route_errors",
             hostname=errors_hostname,
         )
 
