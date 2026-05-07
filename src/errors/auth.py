@@ -54,8 +54,8 @@ class LaunchpadTeamsOpenId(LaunchpadOpenId):
 
         return details
 
-    def extra_data(self, user, uid, response, details, pipeline_kwargs):
-        data = super().extra_data(user, uid, response, details, pipeline_kwargs)
+    def extra_data(self, user, uid, response, details, **pipeline_kwargs):
+        data = super().extra_data(user, uid, response, details, **pipeline_kwargs)
         data["teams"] = details.get("teams", [])
         return data
 
