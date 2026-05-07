@@ -48,9 +48,9 @@ class ErrorTracker:
         self.enable_retracer = True
         self.enable_timers = True
         self.enable_daisy = True
-        self.enable_web = True
+        self.enable_errors = True
         self.daisy_port = 8000
-        self.web_port = 9000
+        self.errors_port = 9000
 
     def install(self):
         self._install_deps()
@@ -237,9 +237,9 @@ WantedBy=multi-user.target
             "*-*-* 06:45:00",  # every day at 06:45
         )
 
-    def configure_web(self):
-        logger.info("Configuring web")
-        logger.info("Installing additional web dependencies")
+    def configure_errors(self):
+        logger.info("Configuring errors")
+        logger.info("Installing additional errors dependencies")
         check_call(
             [
                 "apt-get",
@@ -256,10 +256,10 @@ WantedBy=multi-user.target
         )
         systemd_unit_location = Path("/") / "etc" / "systemd" / "system"
         systemd_unit_location.mkdir(parents=True, exist_ok=True)
-        (systemd_unit_location / "et-web.service").write_text(
+        (systemd_unit_location / "errors.service").write_text(
             f"""
 [Unit]
-Description=Error Tracker web
+Description=Error Tracker errors
 After=network.target
 
 [Service]
@@ -268,7 +268,7 @@ Group=ubuntu
 WorkingDirectory={REPO_LOCATION}/src
 ExecStartPre={REPO_LOCATION}/src/errors/manage.py migrate --no-input
 ExecStartPre={REPO_LOCATION}/src/errors/manage.py collectstatic --no-input --clear
-ExecStart=bash -c 'exec uwsgi --plugins python3 --http-socket 0.0.0.0:{self.web_port} --wsgi-file {REPO_LOCATION}/src/errors/wsgi.py --static-map "/static={REPO_LOCATION}/src/static/" --chdir {REPO_LOCATION}/src/ --die-on-term --master --env PYTHONPATH={REPO_LOCATION}/src/ --max-requests 4000 --max-worker-lifetime 21600 --processes "$(($(nproc) * 2))"'
+ExecStart=bash -c 'exec uwsgi --plugins python3 --http-socket 0.0.0.0:{self.errors_port} --wsgi-file {REPO_LOCATION}/src/errors/wsgi.py --static-map "/static={REPO_LOCATION}/src/static/" --chdir {REPO_LOCATION}/src/ --die-on-term --master --env PYTHONPATH={REPO_LOCATION}/src/ --max-requests 4000 --max-worker-lifetime 21600 --processes "$(($(nproc) * 2))"'
 Restart=always
 
 [Install]
@@ -279,7 +279,7 @@ WantedBy=multi-user.target
         check_call(["systemctl", "daemon-reload"])
 
         logger.info("enabling systemd units")
-        check_call(["systemctl", "enable", "et-web"])
+        check_call(["systemctl", "enable", "errors"])
 
         logger.info("restarting systemd units")
-        check_call(["systemctl", "restart", "et-web"])
+        check_call(["systemctl", "restart", "errors"])

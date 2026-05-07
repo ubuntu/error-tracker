@@ -5,7 +5,7 @@ summary: The whole infrastructure collecting and processing crashes for Ubuntu
 description: |
   The Error Tracker is made of the following components:
     * daisy - receiving crashes
-    * web UI - displaying and visualizing data for developers
+    * errors - displaying and visualizing data for developers
     * timers - for processing and housekeeping tasks
     * retracer - to get symbolic stacktraces out of coredumps
 
@@ -48,9 +48,21 @@ parts:
 charm-libs:
   - lib: haproxy.haproxy_route
     version: "1"
+  - lib: traefik_k8s.ingress
+    version: "2"
 
 config:
   options:
+    daisy_hostname:
+      description: |
+        The hostname to use for daisy
+      default: "daisy.local"
+      type: string
+    errors_hostname:
+      description: |
+        The hostname to use for errors
+      default: "errors.local"
+      type: string
     enable_daisy:
       description: |
         Whether to enable the 'daisy' component of the Error Tracker
@@ -66,9 +78,9 @@ config:
         Whether to enable the 'timers' component of the Error Tracker
       default: true
       type: boolean
-    enable_web:
+    enable_errors:
       description: |
-        Whether to enable the 'web' component of the Error Tracker
+        Whether to enable the 'errors' component of the Error Tracker
       default: true
       type: boolean
     configuration:
@@ -87,7 +99,15 @@ requires:
     interface: haproxy-route
     limit: 1
     optional: true
-  route_web:
+  route_errors:
     interface: haproxy-route
+    limit: 1
+    optional: true
+  ingress_daisy:
+    interface: ingress
+    limit: 1
+    optional: true
+  ingress_errors:
+    interface: ingress
     limit: 1
     optional: true

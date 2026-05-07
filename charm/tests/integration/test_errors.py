@@ -10,6 +10,8 @@ logger = logging.getLogger()
 HAPROXY = "haproxy"
 SSC = "self-signed-certificates"
 
+external_hostname = "errors.internal"
+
 
 def test_deploy(
     juju: jubilant.Juju,
@@ -21,28 +23,28 @@ def test_deploy(
 ):
     juju.deploy(
         charm=charm_path,
-        app="web",
+        app="errors",
         config={
             "configuration": error_tracker_config,
+            "errors_hostname": external_hostname,
             "enable_daisy": False,
             "enable_retracer": False,
             "enable_timers": False,
-            "enable_web": True,
+            "enable_errors": True,
         },
     )
 
-    juju.wait(lambda status: jubilant.all_active(status, "web"), timeout=600)
+    juju.wait(lambda status: jubilant.all_active(status, "errors"), timeout=600)
 
-    check_config(juju, amqp, cassandra, swift, "web/0")
+    check_config(juju, amqp, cassandra, swift, "errors/0")
 
 
 def test_http(juju: jubilant.Juju):
-    external_hostname = "errors.internal"
-    juju.deploy(HAPROXY, channel="2.8/edge", config={"external-hostname": external_hostname})
+    juju.deploy(HAPROXY, channel="2.8/edge", config={"external-hostname": "haproxy.internal"})
     juju.deploy(SSC, channel="1/edge")
 
     juju.integrate(HAPROXY + ":certificates", SSC + ":certificates")
-    juju.integrate("web:route_web", HAPROXY)
+    juju.integrate("errors:route_errors", HAPROXY)
     juju.wait(lambda status: jubilant.all_active(status, HAPROXY, SSC), timeout=1800)
 
     haproxy_ip = juju.status().apps[HAPROXY].units[f"{HAPROXY}/0"].public_address
