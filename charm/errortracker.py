@@ -268,7 +268,18 @@ Group=ubuntu
 WorkingDirectory={REPO_LOCATION}/src
 ExecStartPre={REPO_LOCATION}/src/errors/manage.py migrate --no-input
 ExecStartPre={REPO_LOCATION}/src/errors/manage.py collectstatic --no-input --clear
-ExecStart=bash -c 'exec uwsgi --plugins python3 --http-socket 0.0.0.0:{self.errors_port} --wsgi-file {REPO_LOCATION}/src/errors/wsgi.py --static-map "/static={REPO_LOCATION}/src/static/" --chdir {REPO_LOCATION}/src/ --die-on-term --master --env PYTHONPATH={REPO_LOCATION}/src/ --max-requests 4000 --max-worker-lifetime 21600 --processes "$(($(nproc) * 2))"'
+ExecStart=bash -c 'exec uwsgi \\
+          --plugins python3 \\
+          --http-socket 0.0.0.0:{self.errors_port} \\
+          --wsgi-file {REPO_LOCATION}/src/errors/wsgi.py \\
+          --static-map "/static={REPO_LOCATION}/src/static/" \\
+          --chdir {REPO_LOCATION}/src/ \\
+          --die-on-term \\
+          --master \\
+          --env PYTHONPATH={REPO_LOCATION}/src/ \\
+          --max-requests 4000 \\
+          --max-worker-lifetime 21600 \\
+          --processes "$(($(nproc) * 2))"'
 Restart=always
 
 [Install]
