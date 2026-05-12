@@ -1031,7 +1031,9 @@ class OopsLookupResource(ErrorsResource):
     data = fields.DictField(attribute="data", readonly=True)
 
     class Meta(ErrorsMeta):
-        resource_name = "oops-lookup"
+        resource_name = "oops"
+        authentication = SessionAuthentication()
+        authorization = DjangoAuthorization()
 
     def obj_get(self, bundle, **kwargs):
         oopsid = kwargs["pk"]
