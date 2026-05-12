@@ -1024,3 +1024,18 @@ class CrashSignaturesForBug(ErrorsResource):
         limit = int(bundle.request.GET.get("limit", self._meta.limit))
         results = cassie.get_signatures_for_bug(bug)
         return [ResultObject({"signatures": results[:limit]})]
+
+
+class OopsLookupResource(ErrorsResource):
+    oopsid = fields.CharField(attribute="oopsid", readonly=True)
+    data = fields.DictField(attribute="data", readonly=True)
+
+    class Meta(ErrorsMeta):
+        resource_name = "oops-lookup"
+
+    def obj_get(self, bundle, **kwargs):
+        oopsid = kwargs["pk"]
+        oops = cassie.get_crash(oopsid)
+        if not oops:
+            raise NotFound("OOPS with ID '%s' not found." % oopsid)
+        return ResultObject({"oopsid": oopsid, "data": oops})
