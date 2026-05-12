@@ -13,6 +13,7 @@ from .resources import (
     InstanceResource,
     InstancesResource,
     MostCommonProblemsResource,
+    OopsResource,
     PackageVersionIsMostRecent,
     PackageVersionNewBuckets,
     ProblemCountResource,
@@ -48,6 +49,7 @@ v1_api.register(CrashSignaturesForBug())
 v1_api.register(PackageVersionNewBuckets())
 v1_api.register(SystemImageVersionsResource())
 v1_api.register(ReleasePackageVersionPockets())
+v1_api.register(OopsResource())
 
 urlpatterns = [
     re_path(r"^", include(v1_api.urls)),
