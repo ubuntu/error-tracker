@@ -29,7 +29,7 @@
     var allow_bug_filing = false
     {% endif %}
 
-    YUI().use('event', 'datatable', 'datatable-sort', 'datasource-get',
+    YUI().use('event', 'datatable', 'datatable-sort', 'datasource-io',
               'datasource-jsonschema', 'datatable-datasource',
               'datatable-message', 'datatype-date', 'io-queue',
               'io-form', function (Y) {
@@ -173,7 +173,7 @@
                 {key: "total",
                  label: "Total", formatter: formatVers, allowHTML: true},
             ];
-            var versions_ds = new Y.DataSource.Get({
+            var versions_ds = new Y.DataSource.IO({
                 source: '/api/1.0/versions',
             });
             versions_ds.plug(Y.Plugin.DataSourceJSONSchema, {
@@ -286,7 +286,7 @@
             {key: "ubuntu_version", label: "Ubuntu release"},
             {key: "architecture", label: "Architecture"},
             ];
-            var dataSource = new Y.DataSource.Get({
+            var dataSource = new Y.DataSource.IO({
                 source: '/api/1.0/instances',
             });
             dataSource.plug(Y.Plugin.DataSourceJSONSchema, {
