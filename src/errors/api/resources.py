@@ -1047,6 +1047,11 @@ class BucketResource(ErrorsResource):
     bucket_id = fields.CharField(attribute="bucket_id", readonly=True)
     source_package = fields.CharField(attribute="source_package", readonly=True)
     metadata = fields.DictField(attribute="metadata", readonly=True)
+    traceback = fields.CharField(attribute="traceback", readonly=True, null=True)
+    stacktrace = fields.CharField(attribute="stacktrace", readonly=True, null=True)
+    thread_stacktrace = fields.CharField(
+        attribute="thread_stacktrace", readonly=True, null=True
+    )
 
     class Meta(ErrorsMeta):
         resource_name = "bucket"
@@ -1056,13 +1061,25 @@ class BucketResource(ErrorsResource):
         if not cassie.bucket_exists(bucket_id):
             raise NotFound("Bucket with ID '%s' not found." % bucket_id)
 
-        source_package = cassie.get_source_package_for_bucket(bucket_id) or "unknown package"
+        source_package = (
+            cassie.get_source_package_for_bucket(bucket_id) or "unknown package"
+        )
         metadata = cassie.get_metadata_for_bucket(bucket_id)
+        traceback = cassie.get_traceback_for_bucket(bucket_id)
+
+        if not traceback:
+            stacktrace, thread_stacktrace = cassie.get_stacktrace_for_bucket(bucket_id)
+        else:
+            stacktrace = None
+            thread_stacktrace = None
 
         return ResultObject(
             {
                 "bucket_id": bucket_id,
                 "source_package": source_package,
                 "metadata": metadata,
+                "traceback": traceback,
+                "stacktrace": stacktrace,
+                "thread_stacktrace": thread_stacktrace,
             }
         )
