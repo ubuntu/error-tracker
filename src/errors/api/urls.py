@@ -6,6 +6,7 @@ from .resources import (
     AverageCrashesResource,
     AverageInstancesResource,
     BinaryPackageVersionsResource,
+    BucketResource,
     CrashSignaturesForBug,
     CreateBugResource,
     DayOopsResource,
@@ -50,6 +51,7 @@ v1_api.register(PackageVersionNewBuckets())
 v1_api.register(SystemImageVersionsResource())
 v1_api.register(ReleasePackageVersionPockets())
 v1_api.register(OopsResource())
+v1_api.register(BucketResource())
 
 urlpatterns = [
     re_path(r"^", include(v1_api.urls)),
