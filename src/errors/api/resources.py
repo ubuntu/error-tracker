@@ -1041,3 +1041,28 @@ class OopsResource(ErrorsResource):
         if not oops:
             raise NotFound("OOPS with ID '%s' not found." % oopsid)
         return ResultObject({"oopsid": oopsid, "data": oops})
+
+
+class BucketResource(ErrorsResource):
+    bucket_id = fields.CharField(attribute="bucket_id", readonly=True)
+    source_package = fields.CharField(attribute="source_package", readonly=True)
+    metadata = fields.DictField(attribute="metadata", readonly=True)
+
+    class Meta(ErrorsMeta):
+        resource_name = "bucket"
+
+    def obj_get(self, bundle, **kwargs):
+        bucket_id = kwargs["pk"]
+        if not cassie.bucket_exists(bucket_id):
+            raise NotFound("Bucket with ID '%s' not found." % bucket_id)
+
+        source_package = cassie.get_source_package_for_bucket(bucket_id) or "unknown package"
+        metadata = cassie.get_metadata_for_bucket(bucket_id)
+
+        return ResultObject(
+            {
+                "bucket_id": bucket_id,
+                "source_package": source_package,
+                "metadata": metadata,
+            }
+        )
