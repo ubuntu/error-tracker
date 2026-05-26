@@ -90,7 +90,7 @@ var milestones = [
     {date: "April 23, 2026", milestone: "26.04"},
     /* Stonking */
     {date: "September 24, 2026", milestone: "26.10 Beta"},
-    {date: "October 22, 2026", milestone: "26.10"}
+    {date: "October 15, 2026", milestone: "26.10"}
 ];
 
 /* Set up milestone dates to be processed into ticks and milestone names for
