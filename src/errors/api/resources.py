@@ -59,6 +59,7 @@ release_color_mapping["Ubuntu 24.10"] = "#05b8ea"  # blue
 release_color_mapping["Ubuntu 25.04"] = "#7e2f8e"  # violet
 release_color_mapping["Ubuntu 25.10"] = "#ff0900"  # red
 release_color_mapping["Ubuntu 26.04"] = "#ffae00"  # orange
+release_color_mapping["Ubuntu 26.10"] = "#ffe81a"  # yellow
 
 precise_standards_color_mapping = {
     "Ubuntu 12.10": "#8edbf4",
@@ -89,6 +90,7 @@ precise_standards_color_mapping = {
     "Ubuntu 25.04": "#00faed",
     "Ubuntu 25.10": "#9859a5",
     "Ubuntu 26.04": "#fabd39",
+    "Ubuntu 26.10": "#f5efbc",
 }
 # mapping of releases to codenames
 codenames = {
@@ -122,6 +124,7 @@ codenames = {
     "Ubuntu 25.04": "plucky",
     "Ubuntu 25.10": "questing",
     "Ubuntu 26.04": "resolute",
+    "Ubuntu 26.10": "stonking",
 }
 
 
@@ -960,6 +963,7 @@ class VersionsResource(ErrorsResource):
     plucky = fields.IntegerField(attribute="plucky", **kwargs)
     questing = fields.IntegerField(attribute="questing", **kwargs)
     resolute = fields.IntegerField(attribute="resolute", **kwargs)
+    stonking = fields.IntegerField(attribute="stonking", **kwargs)
     derivatives = fields.IntegerField(attribute="derivatives", **kwargs)
     total = fields.IntegerField(attribute="total", **kwargs)
 

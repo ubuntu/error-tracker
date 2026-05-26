@@ -230,6 +230,8 @@ function(Y) {
             color = '#ff0900';
         } else if (selected_release == 'Ubuntu 26.04') {
             color = '#ffae00';
+        } else if (selected_release == 'Ubuntu 26.10') {
+            color = '#ffe81a';
         }
         o.value = "<div class=\"chart-wrap\"><span class=\"chart-text\">" + o.value + "</span><div class=\"chart\" style=\"width: " + scale(o.value / current_max) + "px; background-color: " + color + "\">&nbsp;</div></div>";
         return o.value;
