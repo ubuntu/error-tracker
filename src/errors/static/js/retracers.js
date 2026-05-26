@@ -11,7 +11,8 @@ function mangle_data(response, result_types) {
                     'Ubuntu 16.04', 'Ubuntu 18.04',
                     'Ubuntu 20.04', 'Ubuntu 22.04',
                     'Ubuntu 24.04', 'Ubuntu 25.04',
-                    'Ubuntu 25.10', 'Ubuntu 26.04'];
+                    'Ubuntu 25.10', 'Ubuntu 26.04',
+                    'Ubuntu 26.10'];
 
     // If you add or change colors here, also update the colors
     // in api/resources.py and static/js/most_common_problems.js.

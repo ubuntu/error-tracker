@@ -76,6 +76,8 @@ def check_average_crashes():
         "Ubuntu 25.10",
         "Ubuntu 26.04 (by 24.04 standards)",
         "Ubuntu 26.04",
+        "Ubuntu 26.10 (by 24.04 standards)",
+        "Ubuntu 26.10",
     ]
     if releases != [x["key"] for x in data["objects"]]:
         return False
