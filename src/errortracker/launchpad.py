@@ -19,7 +19,7 @@ if (
 ):
     raise ImportError("You must set lp_oauth_token and lp_oauth_secret in local_config")
 
-if config.lp_use_staging == "True":
+if config.lp_use_staging:
     _create_bug_url = "https://api.qastaging.launchpad.net/devel/bugs"
     _ubuntu_target = "https://api.qastaging.launchpad.net/devel/ubuntu"
     _oauth_realm = "https://api.qastaging.launchpad.net"
@@ -628,7 +628,7 @@ def create_bug(signature, source="", releases=[], hashed=None, lastseen=""):
     response.read()
     try:
         number = response.headers["Location"].rsplit("/", 1)[1]
-        if config.lp_use_staging == "True":
+        if config.lp_use_staging:
             return (number, "https://qastaging.launchpad.net/bugs/" + number)
         else:
             return (number, "https://bugs.launchpad.net/bugs/" + number)
