@@ -491,7 +491,9 @@ def is_valid_source_version(src_package, version):
         urllib.parse.quote_plus(version),
     )
     json_data = json_request(url)
-    if "total_size" not in list(json_data.keys()):
+    if not isinstance(json_data, dict):
+        return False
+    if "total_size" not in json_data:
         return False
     if json_data["total_size"] == 0:
         return False
