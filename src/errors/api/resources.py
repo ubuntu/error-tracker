@@ -180,7 +180,7 @@ class ErrorsMeta:
     include_resource_uri = False
     allowed_methods = ["get"]
     # The default number of rows to fetch from Cassandra
-    limit = 7
+    limit = 0
     max_limit = 30 * 12
 
 
