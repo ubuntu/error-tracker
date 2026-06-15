@@ -10,6 +10,7 @@ from urllib.parse import quote, unquote
 
 import apt
 from django.core.serializers import json
+from lazr.restfulclient.errors import HTTPError as LPHTTPError
 from tastypie import fields
 from tastypie.authentication import Authentication, SessionAuthentication
 from tastypie.authorization import Authorization, DjangoAuthorization
@@ -349,7 +350,7 @@ class MostCommonProblemsResource(ErrorsResource):
             else:
                 try:
                     subscribed_pkgs = launchpad.get_subscribed_packages(user)
-                except HTTPError:
+                except (HTTPError, KeyError, LPHTTPError):
                     raise NotFound("%s was not found." % user)
 
                 for sub_pkg in subscribed_pkgs:
