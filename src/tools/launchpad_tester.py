@@ -33,7 +33,7 @@ from errortracker import launchpad
 
 
 def _public_functions():
-    """Return {name: function} for every public function defined here."""
+    """Return {name: function} for every public function in errortracker.launchpad."""
     functions = {}
     for name, obj in inspect.getmembers(launchpad, inspect.isfunction):
         # Skip private helpers (e.g. _get_launchpad) and anything imported
