@@ -401,6 +401,31 @@ class Retracer:
             return False
         return True
 
+    def check_retraceable(self, report, unreportable_reason):
+        release = report.get("DistroRelease", "")
+        bad = "[^-a-zA-Z0-9_.() ]+"
+        retraceable = utils.retraceable_release(release)
+        if not retraceable:
+            metrics.meter("retrace.failed.notretraceable")
+            if release in utils.EOL_RELEASES:
+                metrics.meter("retrace.failed.eolrelease")
+                log("Not retraced due to EoL release: %s" % release)
+        package = report.get("Package", "")
+        # there will not be a debug symbol version of the package
+        if not utils.retraceable_package(package):
+            log("Not retraced due to foreign origin.")
+            if unreportable_reason:
+                log("UnreportableReason is: %s" % unreportable_reason)
+            metrics.meter("retrace.failed.foreign")
+            retraceable = False
+
+        invalid = re.search(bad, release) or len(release) > 1024
+        if invalid:
+            metrics.meter("retrace.failed.invalid")
+        if not release or invalid or not retraceable:
+            return False
+        return True
+
     @prefix_log_with_amqp_message
     def callback(self, msg):
         self._processing_callback = True
@@ -485,21 +510,6 @@ class Retracer:
         # these will not change after retracing
         architecture = report.get("Architecture", "")
         release = report.get("DistroRelease", "")
-        bad = "[^-a-zA-Z0-9_.() ]+"
-        retraceable = utils.retraceable_release(release)
-        if not retraceable:
-            metrics.meter("retrace.failed.notretraceable")
-            if release in utils.EOL_RELEASES:
-                metrics.meter("retrace.failed.eolrelease")
-                log("Not retraced due to EoL release: %s" % release)
-        package = report.get("Package", "")
-        # there will not be a debug symbol version of the package
-        if not utils.retraceable_package(package):
-            log("Not retraced due to foreign origin.")
-            if unreportable_reason:
-                log("UnreportableReason is: %s" % unreportable_reason)
-            metrics.meter("retrace.failed.foreign")
-            retraceable = False
         # srcpackage = report.get('SourcePackage', '')
         # if srcpackage in ['kodi', 'mysql-workbench'] and release == 'Ubuntu 18.04':
         # 2018-06-13 gdb is hanging trying to retrace these so put them at
@@ -509,10 +519,7 @@ class Retracer:
         #    rm_eff(path)
         #    return
 
-        invalid = re.search(bad, release) or len(release) > 1024
-        if invalid:
-            metrics.meter("retrace.failed.invalid")
-        if not release or invalid or not retraceable:
+        if not self.check_retraceable(report, unreportable_reason):
             self.remove(oops_id)
             self.update_time_to_retrace(msg)
             rm_eff(work_path)
