@@ -202,6 +202,7 @@ WantedBy=multi-user.target
                 "install",
                 "-y",
                 "gdb",
+                "python3-launchpadlib",
             ]
         )
 
@@ -247,6 +248,7 @@ WantedBy=multi-user.target
                 "-y",
                 "python3-django",
                 "python3-django-tastypie",
+                "python3-launchpadlib",
                 "python3-numpy",
                 "python3-openid-teams",
                 "python3-social-django",
