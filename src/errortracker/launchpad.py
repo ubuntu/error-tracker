@@ -19,7 +19,7 @@ if (
 ):
     raise ImportError("You must set lp_oauth_token and lp_oauth_secret in local_config")
 
-if config.lp_use_staging == "True":
+if config.lp_use_staging:
     _create_bug_url = "https://api.qastaging.launchpad.net/devel/bugs"
     _ubuntu_target = "https://api.qastaging.launchpad.net/devel/ubuntu"
     _oauth_realm = "https://api.qastaging.launchpad.net"
@@ -491,7 +491,9 @@ def is_valid_source_version(src_package, version):
         urllib.parse.quote_plus(version),
     )
     json_data = json_request(url)
-    if "total_size" not in list(json_data.keys()):
+    if not isinstance(json_data, dict):
+        return False
+    if "total_size" not in json_data:
         return False
     if json_data["total_size"] == 0:
         return False
@@ -626,7 +628,7 @@ def create_bug(signature, source="", releases=[], hashed=None, lastseen=""):
     response.read()
     try:
         number = response.headers["Location"].rsplit("/", 1)[1]
-        if config.lp_use_staging == "True":
+        if config.lp_use_staging:
             return (number, "https://qastaging.launchpad.net/bugs/" + number)
         else:
             return (number, "https://bugs.launchpad.net/bugs/" + number)

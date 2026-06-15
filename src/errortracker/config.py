@@ -57,6 +57,9 @@ errors_debug = True
 # Allow the Django app to fill bugs
 allow_bug_filing = True
 
+# API keys for the instance API endpoint
+api_keys = []
+
 # Some variable still used by the launchpad.py module
 lp_oauth_token = "todofixme"
 lp_oauth_secret = "todofixme"
