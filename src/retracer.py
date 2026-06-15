@@ -364,6 +364,20 @@ class Retracer:
             with open(failed_crash, "wb") as fp:
                 report.write(fp)
 
+    def build_report(self, col):
+        report = Report()
+
+        for k in col:
+            try:
+                report[k] = col[k]
+            except (AssertionError, ValueError):
+                # apport raises an ValueError if a key is invalid
+                # e.g. /usr/bin/media-hub-server became a key somehow,
+                # and this doesn't need to be part of the report used
+                # for retracing
+                continue
+        return report
+
     @prefix_log_with_amqp_message
     def callback(self, msg):
         self._processing_callback = True
@@ -455,17 +469,7 @@ class Retracer:
             rm_eff(work_path)
             return
 
-        report = Report()
-
-        for k in col:
-            try:
-                report[k] = col[k]
-            except (AssertionError, ValueError):
-                # apport raises an ValueError if a key is invalid
-                # e.g. /usr/bin/media-hub-server became a key somehow,
-                # and this doesn't need to be part of the report used
-                # for retracing
-                continue
+        report = self.build_report(col)
 
         # these will not change after retracing
         architecture = report.get("Architecture", "")
