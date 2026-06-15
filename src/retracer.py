@@ -426,6 +426,81 @@ class Retracer:
             return False
         return True
 
+    def run_apport_retrace(self, report_path, core_file, release, architecture):
+        try:
+            retrace_msg = "Retracing {}".format(self.msg_body)
+            sandbox, cache = self.setup_cache(self.sandbox_dir, release)
+            day_key = time.strftime("%Y%m%d", time.gmtime())
+
+            retracing_start_time = time.time()
+            # the easiest way to test not using a sandbox is to make it another
+            # command line option like don't use sandbox even though we will
+            # provide it on the cli
+            cmd = [
+                "timeout",
+                "45m",
+                "python3",
+                self.apport_retrace_path,
+                report_path,
+                "--core-file",
+                core_file,
+                "--remove-core",
+                "--sandbox",
+                self.config_dir,
+                "--gdb-sandbox",
+                "--output",
+                "%s.new" % report_path,
+            ]
+            if sandbox:
+                retrace_msg += " with sandbox-dir %s" % sandbox
+                cmd.extend(["--sandbox-dir", sandbox])
+            if cache:
+                retrace_msg += " with cache %s" % cache
+                cmd.extend(["-C", cache])
+            if not self.stacktrace_source:
+                cmd.extend(["--no-stacktrace-source"])
+            if self.verbose:
+                cmd.append("-v")
+            log(retrace_msg)
+            # use our own crashdb config with all supported architectures
+            env = os.environ.copy()
+            env["APPORT_CRASHDB_CONF"] = os.path.join(self.config_dir, "crashdb.conf")
+            http_proxy = env.get("retracer_http_proxy")
+            if http_proxy:
+                env.update({"http_proxy": http_proxy})
+            proc = Popen(
+                cmd,
+                env=env,
+                stdout=PIPE,
+                stderr=PIPE,
+                universal_newlines=True,
+                preexec_fn=os.setpgrp,
+            )
+            out, err = proc.communicate()
+        except:
+            rm_eff("%s.new" % report_path)
+            log("Failure in retrace set up for {}".format(self.msg_body))
+            log(traceback.format_exc())
+            metrics.meter("retrace.failed")
+            metrics.meter("retrace.failed.%s" % release)
+            metrics.meter("retrace.failed.%s" % architecture)
+            metrics.meter("retrace.failed.%s.%s" % (release, architecture))
+            metrics.meter("retrace.failed.to_setup")
+            metrics.meter("retrace.failed.to_setup.%s" % release)
+            metrics.meter("retrace.failed.to_setup.%s" % architecture)
+            metrics.meter("retrace.failed.to_setup.%s.%s" % (release, architecture))
+            raise
+        finally:
+            if sandbox and self.cleanup_sandbox:
+                log("Removing %s" % sandbox)
+                shutil.rmtree(sandbox)
+                os.mkdir(sandbox)
+            if cache and self.cleanup_debs:
+                log("Removing %s" % cache)
+                shutil.rmtree(cache)
+                os.mkdir(cache)
+        return proc, out, err, day_key, retracing_start_time
+
     @prefix_log_with_amqp_message
     def callback(self, msg):
         self._processing_callback = True
@@ -528,78 +603,9 @@ class Retracer:
         with open(report_path, "wb") as fp:
             report.write(fp)
 
-        try:
-            retrace_msg = "Retracing {}".format(self.msg_body)
-            sandbox, cache = self.setup_cache(self.sandbox_dir, release)
-            day_key = time.strftime("%Y%m%d", time.gmtime())
-
-            retracing_start_time = time.time()
-            # the easiest way to test not using a sandbox is to make it another
-            # command line option like don't use sandbox even though we will
-            # provide it on the cli
-            cmd = [
-                "timeout",
-                "45m",
-                "python3",
-                self.apport_retrace_path,
-                report_path,
-                "--core-file",
-                core_file,
-                "--remove-core",
-                "--sandbox",
-                self.config_dir,
-                "--gdb-sandbox",
-                "--output",
-                "%s.new" % report_path,
-            ]
-            if sandbox:
-                retrace_msg += " with sandbox-dir %s" % sandbox
-                cmd.extend(["--sandbox-dir", sandbox])
-            if cache:
-                retrace_msg += " with cache %s" % cache
-                cmd.extend(["-C", cache])
-            if not self.stacktrace_source:
-                cmd.extend(["--no-stacktrace-source"])
-            if self.verbose:
-                cmd.append("-v")
-            log(retrace_msg)
-            # use our own crashdb config with all supported architectures
-            env = os.environ.copy()
-            env["APPORT_CRASHDB_CONF"] = os.path.join(self.config_dir, "crashdb.conf")
-            http_proxy = env.get("retracer_http_proxy")
-            if http_proxy:
-                env.update({"http_proxy": http_proxy})
-            proc = Popen(
-                cmd,
-                env=env,
-                stdout=PIPE,
-                stderr=PIPE,
-                universal_newlines=True,
-                preexec_fn=os.setpgrp,
-            )
-            out, err = proc.communicate()
-        except:
-            rm_eff("%s.new" % report_path)
-            log("Failure in retrace set up for {}".format(self.msg_body))
-            log(traceback.format_exc())
-            metrics.meter("retrace.failed")
-            metrics.meter("retrace.failed.%s" % release)
-            metrics.meter("retrace.failed.%s" % architecture)
-            metrics.meter("retrace.failed.%s.%s" % (release, architecture))
-            metrics.meter("retrace.failed.to_setup")
-            metrics.meter("retrace.failed.to_setup.%s" % release)
-            metrics.meter("retrace.failed.to_setup.%s" % architecture)
-            metrics.meter("retrace.failed.to_setup.%s.%s" % (release, architecture))
-            raise
-        finally:
-            if sandbox and self.cleanup_sandbox:
-                log("Removing %s" % sandbox)
-                shutil.rmtree(sandbox)
-                os.mkdir(sandbox)
-            if cache and self.cleanup_debs:
-                log("Removing %s" % cache)
-                shutil.rmtree(cache)
-                os.mkdir(cache)
+        proc, out, err, day_key, retracing_start_time = self.run_apport_retrace(
+            report_path, core_file, release, architecture
+        )
 
         try:
             if proc.returncode != 0:
