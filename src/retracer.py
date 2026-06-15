@@ -378,6 +378,20 @@ class Retracer:
                 continue
         return report
 
+    def decompress_core(self, report_path, core_file):
+        try:
+            with open(core_file, "wb") as fp:
+                log("Decompressing to %s" % core_file)
+                with open(report_path) as path_fp:
+                    for block in CompressedValue.decode_compressed_stream(
+                        _base64_decoder(path_fp)
+                    ):
+                        fp.write(block)
+        except Exception as e:
+            log("Failed to decompress core: %s" % str(e))
+            return False
+        return True
+
     @prefix_log_with_amqp_message
     def callback(self, msg):
         self._processing_callback = True
@@ -430,16 +444,7 @@ class Retracer:
         core_file = work_path / "core"
         report_path = work_path / "crash"
 
-        try:
-            with open(core_file, "wb") as fp:
-                log("Decompressing to %s" % core_file)
-                with open(report_path) as path_fp:
-                    for block in CompressedValue.decode_compressed_stream(
-                        _base64_decoder(path_fp)
-                    ):
-                        fp.write(block)
-        except Exception as e:
-            log("Failed to decompress core: %s" % str(e))
+        if not self.decompress_core(report_path, core_file):
             # We couldn't decompress this, so there's no value in trying again.
             self.remove(oops_id)
             self.update_time_to_retrace(msg)
