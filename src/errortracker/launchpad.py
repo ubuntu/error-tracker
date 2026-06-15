@@ -1,5 +1,6 @@
 import sys
 from functools import cmp_to_key
+from urllib.parse import quote
 
 import apt
 from launchpadlib import uris
@@ -519,8 +520,6 @@ def create_bug(signature, source="", releases=[], hashed=None, lastseen=""):
     )
 
     if not hashed:
-        from urllib.parse import quote
-
         href = "https://errors.ubuntu.com/bucket/?id=%s" % quote(signature)
     else:
         href = "https://errors.ubuntu.com/problem/%s" % hashed
