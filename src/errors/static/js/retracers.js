@@ -7,12 +7,11 @@ function y_axis_tick_format(d) {
 }
 function mangle_data(response, result_types) {
     var retrace_data = [];
-    var releases = ['Ubuntu 12.04', 'Ubuntu 14.04',
-                    'Ubuntu 16.04', 'Ubuntu 18.04',
-                    'Ubuntu 20.04', 'Ubuntu 22.04',
-                    'Ubuntu 24.04', 'Ubuntu 25.04',
-                    'Ubuntu 25.10', 'Ubuntu 26.04',
-                    'Ubuntu 26.10'];
+    var releases = ['Ubuntu 22.04',
+                    'Ubuntu 24.04',
+                    'Ubuntu 26.04',
+                    'Ubuntu 26.10'
+                   ];
 
     // If you add or change colors here, also update the colors
     // in api/resources.py and static/js/most_common_problems.js.
@@ -64,7 +63,7 @@ function mangle_data(response, result_types) {
 function retracers_graph () {
     YUI().use('node', 'io-base', 'json-parse', function (Y) {
         // FIXME: Tastypie suddenly doesn't like 0 as a parameter here.
-        var uri = '/api/1.0/retracers-average-processing-time/?limit=32767&format=json';
+        var uri = '/api/1.0/retracers-average-processing-time/?limit=365&format=json';
         function complete (id, o, args) {
             var response = Y.JSON.parse(o.response);
             var arches = ['amd64', 'i386', 'armhf', 'arm64'];
@@ -92,7 +91,7 @@ function retracers_graph () {
 function retracers_results_graph () {
     YUI().use('node', 'io-base', 'json-parse', function (Y) {
         // FIXME: Tastypie suddenly doesn't like 0 as a parameter here.
-        var uri = '/api/1.0/retracers-results/?limit=32767&format=json';
+        var uri = '/api/1.0/retracers-results/?limit=365&format=json';
         function complete (id, o, args) {
             var response = Y.JSON.parse(o.response);
             var types = ['success', 'failed'];
@@ -119,7 +118,7 @@ function retracers_results_graph () {
 
 function instances_graph () {
     YUI().use('node', 'io-base', 'json-parse', function (Y) {
-        var uri = '/api/1.0/instances-count/?limit=365&format=json';
+        var uri = '/api/1.0/instances-count/?limit=200&format=json';
         function complete (id, o, args) {
             var data = [];
             var response = Y.JSON.parse(o.response);
