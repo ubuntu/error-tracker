@@ -20,6 +20,7 @@ def user(request, user_token):
     # oopses indicates whether any crashes have been reported
     c = {"oopses": cassie.get_user_crashes(user_token, limit=1)}
     c["system_id"] = user_token
+    c["limit"] = int(request.GET.get("limit", 50))
     c.update(common_c())
     return render(request, "user.html", c)
 

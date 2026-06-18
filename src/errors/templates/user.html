@@ -13,6 +13,7 @@
               'io-form', function (Y) {
         Y.on('load', function () {
             var system_id = '{{ system_id }}';
+            var limit = '{{ limit }}';
             var cols = [
                 {key: "occurred", label: "Occurred", formatter: formatDates},
                 {key: "instance", label: "Received", formatter: formatExample, allowHTML: true},
@@ -41,7 +42,7 @@
                 datasource: dataSource,
             });
             table.render("#crashes");
-            table.datasource.load({request: '/?limit=50&system=' + system_id});
+            table.datasource.load({request: '/?limit=' + limit + '&system=' + system_id});
             /* Formatters */
             function formatDates(o) {
                 return o.value &&

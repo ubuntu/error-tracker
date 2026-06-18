@@ -564,8 +564,9 @@ class SystemCrashesResource(ErrorsResource):
     def obj_get_list(self, bundle):
         system_id = bundle.request.GET.get("system", None)
         cursor = bundle.request.GET.get("start", None)
+        limit = int(bundle.request.GET.get("limit", 50))
         cols = ["Date", "ProblemType", "Package", "ExecutablePath"]
-        crashes = cassie.get_user_crashes(system_id, start=cursor)
+        crashes = cassie.get_user_crashes(system_id, start=cursor, limit=limit)
         results = []
         for crash, ts in crashes:
             d = cassie.get_crash(str(crash), columns=cols)
