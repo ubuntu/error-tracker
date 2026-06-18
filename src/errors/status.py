@@ -4,13 +4,11 @@ function that begins with 'check_' will automatically be called as part of the
 '/status' URL.
 """
 
-import datetime
-import os
 from json import loads
 
 from django.test.client import Client
 
-from daisy import config
+from errortracker import config
 
 c = Client()
 
@@ -19,45 +17,6 @@ def check_average_crashes():
     response = c.get("/api/1.0/average-crashes/?format=json")
     data = loads(response.content)
     releases = [
-        "Ubuntu 12.04",
-        "Ubuntu 12.10 (by 12.04 standards)",
-        "Ubuntu 12.10",
-        "Ubuntu 13.04 (by 12.04 standards)",
-        "Ubuntu 13.04",
-        "Ubuntu 13.10 (by 12.04 standards)",
-        "Ubuntu 13.10",
-        "Ubuntu 14.04 (by 12.04 standards)",
-        "Ubuntu 14.04",
-        "Ubuntu 14.10 (by 14.04 standards)",
-        "Ubuntu 14.10",
-        "Ubuntu 15.04 (by 14.04 standards)",
-        "Ubuntu 15.04",
-        "Ubuntu 15.10 (by 14.04 standards)",
-        "Ubuntu 15.10",
-        "Ubuntu 16.04 (by 14.04 standards)",
-        "Ubuntu 16.04",
-        "Ubuntu 16.10 (by 16.04 standards)",
-        "Ubuntu 16.10",
-        "Ubuntu 17.04 (by 16.04 standards)",
-        "Ubuntu 17.04",
-        "Ubuntu 17.10 (by 16.04 standards)",
-        "Ubuntu 17.10",
-        "Ubuntu 18.04 (by 16.04 standards)",
-        "Ubuntu 18.04",
-        "Ubuntu 18.10 (by 18.04 standards)",
-        "Ubuntu 18.10",
-        "Ubuntu 19.04 (by 18.04 standards)",
-        "Ubuntu 19.04",
-        "Ubuntu 19.10 (by 18.04 standards)",
-        "Ubuntu 19.10",
-        "Ubuntu 20.04 (by 18.04 standards)",
-        "Ubuntu 20.04",
-        "Ubuntu 20.10 (by 20.04 standards)",
-        "Ubuntu 20.10",
-        "Ubuntu 21.04 (by 20.04 standards)",
-        "Ubuntu 21.04",
-        "Ubuntu 21.10 (by 20.04 standards)",
-        "Ubuntu 21.10",
         "Ubuntu 22.04 (by 20.04 standards)",
         "Ubuntu 22.04",
         "Ubuntu 22.10 (by 22.04 standards)",
@@ -88,6 +47,7 @@ def check_buckets():
     from django.contrib.auth.models import Group
     from django.test.client import RequestFactory
 
+    from .auth import allowed_teams
     from .views import bucket
 
     b = (
@@ -97,7 +57,7 @@ def check_buckets():
     rf = RequestFactory()
     req = rf.get("/bucket/", {"id": b})
     # TODO add a mocked version of a user without the correct permissions.
-    req.user = Group.objects.get(name="daisy-pluckers").user_set.all()[0]
+    req.user = Group.objects.get(name=allowed_teams[0]).user_set.all()[0]
     bucket(req)
     return True
 
@@ -114,10 +74,20 @@ def check_most_common_problems():
 
 
 def check_oops_reports():
-    today = datetime.date.today().strftime("%Y-%m-%d")
     try:
-        # If we get more than 25 oops reports, alert.
-        if len(os.listdir(os.path.join(config.oops_repository, today))) > 25:
+        # If we get more than 100 oops reports, alert.
+        from errortracker import swift_utils
+
+        if (
+            len(
+                list(
+                    swift_utils.get_swift_client().get_container(
+                        container=config.swift_bucket, full_listing=True
+                    )
+                )
+            )
+            > 100
+        ):
             return False
         else:
             return True
