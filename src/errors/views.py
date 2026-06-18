@@ -28,7 +28,7 @@ def user(request, user_token):
 @can_see_stacktraces
 def bucket(request, bucketid=None, hashed=None):
     if not bucketid:
-        bucketid = request.GET.get("id", "").encode("UTF-8")
+        bucketid = request.GET.get("id", "")
     if not bucketid:
         return HttpResponseRedirect("/")
 
