@@ -7,7 +7,7 @@
 {% block content %}
 {% if oopses %}
     <script type="text/javascript">
-    YUI().use('event', 'datatable', 'datatable-sort', 'datasource-get',
+    YUI().use('event', 'datatable', 'datatable-sort', 'datasource-io',
               'datasource-jsonschema', 'datatable-datasource',
               'datatable-message', 'datatype-date', 'io-queue',
               'io-form', function (Y) {
@@ -19,7 +19,7 @@
                 {key: "problemtype", label: "Problem Type"},
                 {key: "program", label: "Program"},
             ];
-            var dataSource = new Y.DataSource.Get({
+            var dataSource = new Y.DataSource.IO({
                 source: '/api/1.0/reports-for-system',
             });
 
