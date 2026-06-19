@@ -26,7 +26,13 @@ sudo apt install apport-retrace python3-amqp python3-bson python3-cassandra pyth
 sudo apt install python3-django-tastypie python3-numpy python3-social-django python3-openid-teams
 ```
 
-Then start a local Cassandra, RabbitMQ and swift (`docker` should work fine too):
+Then start a local Cassandra, RabbitMQ and swift:
+
+```
+cd src
+make services-run
+```
+or start them manually (`docker` should work fine too):
 ```
 podman run --name cassandra --network host --rm -d -e HEAP_NEWSIZE=10M -e MAX_HEAP_SIZE=200M docker.io/cassandra
 podman run --name rabbitmq --network host --rm -d docker.io/rabbitmq

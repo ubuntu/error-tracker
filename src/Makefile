@@ -2,7 +2,12 @@ BASE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 export PYTHONPATH := $(BASE_DIR)
 
-.PHONY: daisy-run errors-run errors-shell retracer-run populate-test-data
+.PHONY: services-run daisy-run errors-run errors-shell retracer-run populate-test-data
+
+services-run:
+	podman run --replace --name cassandra --network host --rm -d -e HEAP_NEWSIZE=10M -e MAX_HEAP_SIZE=200M docker.io/cassandra
+	podman run --replace --name rabbitmq --network host --rm -d docker.io/rabbitmq
+	podman run --replace --name swift --network host --rm -d docker.io/openstackswift/saio
 
 daisy-run:
 	python3 $(BASE_DIR)daisy/app.py
