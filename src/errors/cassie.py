@@ -401,7 +401,7 @@ def get_metadata_for_buckets(bucketids, release=None):
 def get_user_crashes(user_token: str, limit: int = 50, start=None):
     results = {}
     try:
-        query = UserOOPS.objects.filter(key=user_token.encode()).limit(limit)
+        query = UserOOPS.objects.filter(key=user_token.encode()).limit(limit).order_by("-column1")
 
         if start:
             # Filter to get items lower than start (reverse order)
