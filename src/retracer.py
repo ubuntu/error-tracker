@@ -364,97 +364,7 @@ class Retracer:
             with open(failed_crash, "wb") as fp:
                 report.write(fp)
 
-    @prefix_log_with_amqp_message
-    def callback(self, msg):
-        self._processing_callback = True
-        log("Processing.")
-        self.msg_body = ensure_str(msg.body)
-        oops_id, provider = self.msg_body.split(":", 1)
-        try:
-            col = cassandra_schema.OOPS.get_as_dict(key=oops_id.encode())
-        except cassandra_schema.DoesNotExist:
-            # We do not have enough information at this point to be able to
-            # remove this from the retracing row in the Indexes CF. Throw it
-            # back on the queue and hope that eventual consistency works its
-            # magic by then.
-            log("Unable to find in OOPS CF.")
-            self.requeue(msg, oops_id)
-
-            metrics.meter("could_not_find_oops")
-            return
-
-        # ack the message very early, to prevent them from staying forever in
-        # the queue in case the retracer gets OOM-killed
-        log("ack'ing message from queue")
-        msg.channel.basic_ack(msg.delivery_tag)
-
-        # There are some items still in amqp queue that have already been
-        # retraced, check for this and ack the message.
-        # N.B.: This only works in some cases because we don't mark a report as
-        # having been retraced e.g. there is no Retrace column in keys
-        if "RetraceFailureReason" in list(col.keys()) or "RetraceOutdatedPackages" in list(
-            col.keys()
-        ):
-            log("already retraced OOPS.")
-            # also try to remove the core file
-            self.remove(oops_id)
-            return
-
-        # Check to see if there is an UnreportableReason so we can log more
-        # information about failures to retrace.
-        unreportable_reason = ""
-        if "UnreportableReason" in list(col.keys()):
-            unreportable_reason = col["UnreportableReason"]
-
-        work_path = self.write_bucket_to_disk(oops_id)
-
-        if not work_path or not work_path.exists():
-            log("Could not find %s" % work_path)
-            self.failed_to_process(msg, oops_id)
-            return
-
-        core_file = work_path / "core"
-        report_path = work_path / "crash"
-
-        try:
-            with open(core_file, "wb") as fp:
-                log("Decompressing to %s" % core_file)
-                with open(report_path) as path_fp:
-                    for block in CompressedValue.decode_compressed_stream(
-                        _base64_decoder(path_fp)
-                    ):
-                        fp.write(block)
-        except Exception as e:
-            log("Failed to decompress core: %s" % str(e))
-            # We couldn't decompress this, so there's no value in trying again.
-            self.remove(oops_id)
-            self.update_time_to_retrace(msg)
-            # probably incomplete cores from armhf?
-            metrics.meter("retrace.failed")
-            metrics.meter("retrace.failed.%s" % self.architecture)
-            metrics.meter("retrace.failure.decompression")
-            metrics.meter("retrace.failure.decompression.%s" % self.architecture)
-            rm_eff(work_path)
-            return
-
-        # confirm that gdb thinks the core file is good
-        gdb_cmd = [self.gdb_path, "--batch", "--ex", "target core %s" % core_file]
-        proc = Popen(gdb_cmd, stdout=PIPE, stderr=PIPE, universal_newlines=True, errors="ignore")
-        (out, err) = proc.communicate()
-        if "is truncated: expected core file size" in err or "not a core dump" in err:
-            # Not a core file, there's no value in trying again.
-            self.remove(oops_id)
-            self.update_time_to_retrace(msg)
-            log("Not a core dump per gdb.")
-            if unreportable_reason:
-                log("UnreportableReason is: %s" % unreportable_reason)
-            metrics.meter("retrace.failed")
-            metrics.meter("retrace.failed.%s" % self.architecture)
-            metrics.meter("retrace.failure.gdb_core_check")
-            metrics.meter("retrace.failure.gdb_core_check.%s" % self.architecture)
-            rm_eff(work_path)
-            return
-
+    def build_report(self, col):
         report = Report()
 
         for k in col:
@@ -466,9 +376,32 @@ class Retracer:
                 # and this doesn't need to be part of the report used
                 # for retracing
                 continue
+        return report
 
-        # these will not change after retracing
-        architecture = report.get("Architecture", "")
+    def decompress_core(self, report_path, core_file):
+        try:
+            with open(core_file, "wb") as fp:
+                log("Decompressing to %s" % core_file)
+                with open(report_path) as path_fp:
+                    for block in CompressedValue.decode_compressed_stream(
+                        _base64_decoder(path_fp)
+                    ):
+                        fp.write(block)
+        except Exception as e:
+            log("Failed to decompress core: %s" % str(e))
+            return False
+        return True
+
+    def gdb_core_check(self, core_file):
+        # confirm that gdb thinks the core file is good
+        gdb_cmd = [self.gdb_path, "--batch", "--ex", "target core %s" % core_file]
+        proc = Popen(gdb_cmd, stdout=PIPE, stderr=PIPE, universal_newlines=True, errors="ignore")
+        (out, err) = proc.communicate()
+        if "is truncated: expected core file size" in err or "not a core dump" in err:
+            return False
+        return True
+
+    def check_retraceable(self, report, unreportable_reason):
         release = report.get("DistroRelease", "")
         bad = "[^-a-zA-Z0-9_.() ]+"
         retraceable = utils.retraceable_release(release)
@@ -485,27 +418,15 @@ class Retracer:
                 log("UnreportableReason is: %s" % unreportable_reason)
             metrics.meter("retrace.failed.foreign")
             retraceable = False
-        # srcpackage = report.get('SourcePackage', '')
-        # if srcpackage in ['kodi', 'mysql-workbench'] and release == 'Ubuntu 18.04':
-        # 2018-06-13 gdb is hanging trying to retrace these so put them at
-        # the end of the line.
-        #    log('Requeueing an Ubuntu 18.04 %s crash.' % srcpackage)
-        #    self.requeue(msg, oops_id)
-        #    rm_eff(path)
-        #    return
 
         invalid = re.search(bad, release) or len(release) > 1024
         if invalid:
             metrics.meter("retrace.failed.invalid")
         if not release or invalid or not retraceable:
-            self.remove(oops_id)
-            self.update_time_to_retrace(msg)
-            rm_eff(work_path)
-            return
+            return False
+        return True
 
-        with open(report_path, "wb") as fp:
-            report.write(fp)
-
+    def run_apport_retrace(self, report_path, core_file, release, architecture):
         try:
             retrace_msg = "Retracing {}".format(self.msg_body)
             sandbox, cache = self.setup_cache(self.sandbox_dir, release)
@@ -578,6 +499,113 @@ class Retracer:
                 log("Removing %s" % cache)
                 shutil.rmtree(cache)
                 os.mkdir(cache)
+        return proc, out, err, day_key, retracing_start_time
+
+    @prefix_log_with_amqp_message
+    def callback(self, msg):
+        self._processing_callback = True
+        log("Processing.")
+        self.msg_body = ensure_str(msg.body)
+        oops_id, provider = self.msg_body.split(":", 1)
+        try:
+            col = cassandra_schema.OOPS.get_as_dict(key=oops_id.encode())
+        except cassandra_schema.DoesNotExist:
+            # We do not have enough information at this point to be able to
+            # remove this from the retracing row in the Indexes CF. Throw it
+            # back on the queue and hope that eventual consistency works its
+            # magic by then.
+            log("Unable to find in OOPS CF.")
+            self.requeue(msg, oops_id)
+
+            metrics.meter("could_not_find_oops")
+            return
+
+        # ack the message very early, to prevent them from staying forever in
+        # the queue in case the retracer gets OOM-killed
+        log("ack'ing message from queue")
+        msg.channel.basic_ack(msg.delivery_tag)
+
+        # There are some items still in amqp queue that have already been
+        # retraced, check for this and ack the message.
+        # N.B.: This only works in some cases because we don't mark a report as
+        # having been retraced e.g. there is no Retrace column in keys
+        if "RetraceFailureReason" in list(col.keys()) or "RetraceOutdatedPackages" in list(
+            col.keys()
+        ):
+            log("already retraced OOPS.")
+            # also try to remove the core file
+            self.remove(oops_id)
+            return
+
+        # Check to see if there is an UnreportableReason so we can log more
+        # information about failures to retrace.
+        unreportable_reason = ""
+        if "UnreportableReason" in list(col.keys()):
+            unreportable_reason = col["UnreportableReason"]
+
+        work_path = self.write_bucket_to_disk(oops_id)
+
+        if not work_path or not work_path.exists():
+            log("Could not find %s" % work_path)
+            self.failed_to_process(msg, oops_id)
+            return
+
+        core_file = work_path / "core"
+        report_path = work_path / "crash"
+
+        if not self.decompress_core(report_path, core_file):
+            # We couldn't decompress this, so there's no value in trying again.
+            self.remove(oops_id)
+            self.update_time_to_retrace(msg)
+            # probably incomplete cores from armhf?
+            metrics.meter("retrace.failed")
+            metrics.meter("retrace.failed.%s" % self.architecture)
+            metrics.meter("retrace.failure.decompression")
+            metrics.meter("retrace.failure.decompression.%s" % self.architecture)
+            rm_eff(work_path)
+            return
+
+        # confirm that gdb thinks the core file is good
+        if not self.gdb_core_check(core_file):
+            # Not a core file, there's no value in trying again.
+            self.remove(oops_id)
+            self.update_time_to_retrace(msg)
+            log("Not a core dump per gdb.")
+            if unreportable_reason:
+                log("UnreportableReason is: %s" % unreportable_reason)
+            metrics.meter("retrace.failed")
+            metrics.meter("retrace.failed.%s" % self.architecture)
+            metrics.meter("retrace.failure.gdb_core_check")
+            metrics.meter("retrace.failure.gdb_core_check.%s" % self.architecture)
+            rm_eff(work_path)
+            return
+
+        report = self.build_report(col)
+
+        # these will not change after retracing
+        architecture = report.get("Architecture", "")
+        release = report.get("DistroRelease", "")
+        # srcpackage = report.get('SourcePackage', '')
+        # if srcpackage in ['kodi', 'mysql-workbench'] and release == 'Ubuntu 18.04':
+        # 2018-06-13 gdb is hanging trying to retrace these so put them at
+        # the end of the line.
+        #    log('Requeueing an Ubuntu 18.04 %s crash.' % srcpackage)
+        #    self.requeue(msg, oops_id)
+        #    rm_eff(path)
+        #    return
+
+        if not self.check_retraceable(report, unreportable_reason):
+            self.remove(oops_id)
+            self.update_time_to_retrace(msg)
+            rm_eff(work_path)
+            return
+
+        with open(report_path, "wb") as fp:
+            report.write(fp)
+
+        proc, out, err, day_key, retracing_start_time = self.run_apport_retrace(
+            report_path, core_file, release, architecture
+        )
 
         try:
             if proc.returncode != 0:
