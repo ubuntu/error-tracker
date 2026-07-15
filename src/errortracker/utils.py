@@ -1,9 +1,13 @@
 import logging
 import re
+from datetime import datetime
 
 import apt
+import distro_info
 
 from errortracker import oopses
+
+UDI = distro_info.UbuntuDistroInfo()
 
 EOL_RELEASES = {
     "Ubuntu 10.04": "lucid",
@@ -200,3 +204,18 @@ def blocklisted_device(system_token):
     if system_token in blocklist:
         return True
     return False
+
+
+def get_lts_series(result: str) -> str:
+    today = datetime.today().date()
+    return UDI.lts(today, result=result)
+
+
+def get_devel_series(result: str) -> str:
+    today = datetime.today().date()
+    try:
+        return UDI.devel(today, result=result)
+    # this can happen on release and before
+    # distro-info-data is SRU'ed
+    except distro_info.DistroDataOutdated:
+        return UDI.stable(result=result)

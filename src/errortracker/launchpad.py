@@ -8,7 +8,7 @@ from launchpadlib.credentials import AccessToken, Credentials
 from launchpadlib.launchpad import Launchpad
 from lazr.restfulclient.errors import HTTPError
 
-from errortracker import config
+from errortracker import config, utils
 
 if (
     not hasattr(config, "lp_oauth_token")
@@ -145,19 +145,7 @@ def get_codename_for_version(version):
 
 
 def get_devel_series_codename():
-    from datetime import datetime
-
-    import distro_info
-
-    di = distro_info.UbuntuDistroInfo()
-    today = datetime.today().date()
-    try:
-        codename = di.devel(today)
-    # this can happen on release and before
-    # distro-info-data is SRU'ed
-    except distro_info.DistroDataOutdated:
-        codename = di.stable()
-    return codename
+    return utils.get_devel_series(result="codename")
 
 
 def get_version_for_codename(codename):

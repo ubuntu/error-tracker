@@ -335,7 +335,14 @@ def bucket(oops_id, data, day_key):
             # retry amd64 crashes which failed to retrace for LTS and current
             # development releases, don't do it for every release b/c we have
             # a limited number of retracers
-            if arch == "amd64" and release in ("Ubuntu 26.04", "Ubuntu 26.10"):
+            important_series = [
+                f"Ubuntu {version.replace(' LTS', '')}"
+                for version in [
+                    utils.get_lts_series(result="release"),
+                    utils.get_devel_series(result="release"),
+                ]
+            ]
+            if arch == "amd64" and release in important_series:
                 retry = True
         if crash_sig and not retry:
             # The crash is a duplicate so we don't need this data.
