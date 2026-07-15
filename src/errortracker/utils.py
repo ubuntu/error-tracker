@@ -219,3 +219,13 @@ def get_devel_series(result: str) -> str:
     # distro-info-data is SRU'ed
     except distro_info.DistroDataOutdated:
         return UDI.stable(result=result)
+
+
+def get_supported_series(result: str) -> list[str]:
+    today = datetime.today().date()
+    return UDI.supported(today, result=result)
+
+
+def get_supported_esm_series(result: str) -> list[str]:
+    today = datetime.today().date()
+    return UDI.supported_esm(today, result=result)

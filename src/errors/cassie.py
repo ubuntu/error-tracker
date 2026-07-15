@@ -7,7 +7,7 @@ import distro_info
 import numpy
 from cassandra.util import datetime_from_uuid1
 
-from errortracker import cassandra, config
+from errortracker import cassandra, config, utils
 from errortracker.cassandra_schema import (
     OOPS,
     Bucket,
@@ -142,16 +142,15 @@ def get_bucket_counts(
     elif release:
         releases = [release]
     else:
-        # FIXME supported releases should not be hard-coded
+        # all supported-esm and supported releases
         releases = [
-            "Ubuntu 14.04",
-            "Ubuntu 16.04",
-            "Ubuntu 18.04",
-            "Ubuntu 20.04",
-            "Ubuntu 22.04",
-            "Ubuntu 24.04",
-            "Ubuntu 26.04",
-            "Ubuntu 26.10",
+            f"Ubuntu {version.replace(' LTS', '')}"
+            for version in sorted(
+                set(
+                    utils.get_supported_esm_series("release")
+                    + utils.get_supported_series("release")
+                )
+            )
         ]
 
     keys = []
