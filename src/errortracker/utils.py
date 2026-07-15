@@ -35,6 +35,7 @@ EOL_RELEASES = {
     "Ubuntu 23.10": "mantic",
     "Ubuntu 24.10": "oracular",
     "Ubuntu 25.04": "plucky",
+    "Ubuntu 25.10": "questing",
 }
 
 

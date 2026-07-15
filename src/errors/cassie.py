@@ -150,8 +150,6 @@ def get_bucket_counts(
             "Ubuntu 20.04",
             "Ubuntu 22.04",
             "Ubuntu 24.04",
-            "Ubuntu 25.04",
-            "Ubuntu 25.10",
             "Ubuntu 26.04",
             "Ubuntu 26.10",
         ]
