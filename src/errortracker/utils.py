@@ -229,3 +229,8 @@ def get_supported_series(result: str) -> list[str]:
 def get_supported_esm_series(result: str) -> list[str]:
     today = datetime.today().date()
     return UDI.supported_esm(today, result=result)
+
+
+def get_unsupported_series(result: str) -> list[str]:
+    today = datetime.today().date()
+    return UDI.unsupported(today, result=result)
