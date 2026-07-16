@@ -8,7 +8,7 @@ from json import loads
 
 from django.test.client import Client
 
-from errortracker import config
+from errortracker import config, utils
 
 c = Client()
 
@@ -16,16 +16,18 @@ c = Client()
 def check_average_crashes():
     response = c.get("/api/1.0/average-crashes/?format=json")
     data = loads(response.content)
-    releases = [
-        "Ubuntu 22.04 (by 20.04 standards)",
-        "Ubuntu 22.04",
-        "Ubuntu 24.04 (by 22.04 standards)",
-        "Ubuntu 24.04",
-        "Ubuntu 26.04 (by 24.04 standards)",
-        "Ubuntu 26.04",
-        "Ubuntu 26.10 (by 24.04 standards)",
-        "Ubuntu 26.10",
-    ]
+    old_ltses = [v for v in utils.get_unsupported_series(result="release") if "LTS" in v]
+    prev_lts_version = old_ltses[-1].replace(" LTS", "") if len(old_ltses) else None
+    releases = []
+    for version in utils.get_supported_series(result="release"):
+        is_lts = "LTS" in version
+        version = version.replace(" LTS", "")
+        releases += [
+            f"Ubuntu {version} (by {prev_lts_version or version} standards)",
+            f"Ubuntu {version}",
+        ]
+        if is_lts:
+            prev_lts_version = version
     if releases != [x["key"] for x in data["objects"]]:
         return False
     return True
