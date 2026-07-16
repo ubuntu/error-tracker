@@ -9,39 +9,6 @@ from errortracker import oopses
 
 UDI = distro_info.UbuntuDistroInfo()
 
-EOL_RELEASES = {
-    "Ubuntu 10.04": "lucid",
-    "Ubuntu 10.10": "maverick",
-    "Ubuntu 11.04": "natty",
-    "Ubuntu 11.10": "oneiric",
-    "Ubuntu 12.04": "precise",
-    "Ubuntu 12.10": "quantal",
-    "Ubuntu 13.04": "raring",
-    "Ubuntu 13.10": "saucy",
-    "Ubuntu 14.04": "trusty",
-    "Ubuntu RTM 14.09": "vivid",
-    "Ubuntu 14.10": "utopic",
-    "Ubuntu 15.04": "vivid",
-    "Ubuntu 15.10": "wily",
-    "Ubuntu 16.04": "xenial",
-    "Ubuntu 16.10": "yakkety",
-    "Ubuntu 17.04": "zesty",
-    "Ubuntu 17.10": "artful",
-    "Ubuntu 18.04": "bionic",
-    "Ubuntu 18.10": "cosmic",
-    "Ubuntu 19.04": "disco",
-    "Ubuntu 19.10": "eoan",
-    "Ubuntu 20.10": "groovy",
-    "Ubuntu 21.04": "hirsute",
-    "Ubuntu 21.10": "impish",
-    "Ubuntu 22.10": "kinetic",
-    "Ubuntu 23.04": "lunar",
-    "Ubuntu 23.10": "mantic",
-    "Ubuntu 24.10": "oracular",
-    "Ubuntu 25.04": "plucky",
-    "Ubuntu 25.10": "questing",
-}
-
 
 def get_fields_for_bucket_counters(problem_type, release, package, version, pkg_arch):
     fields = []
@@ -234,3 +201,13 @@ def get_supported_esm_series(result: str) -> list[str]:
 def get_unsupported_series(result: str) -> list[str]:
     today = datetime.today().date()
     return UDI.unsupported(today, result=result)
+
+
+EOL_RELEASES = {"Ubuntu RTM 14.09": "vivid"} | {
+    f"Ubuntu {version.replace(' LTS', '')}": codename
+    for version, codename in zip(
+        get_unsupported_series(result="release"),
+        get_unsupported_series(result="codename"),
+        strict=True,
+    )
+}
