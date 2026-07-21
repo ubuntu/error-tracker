@@ -782,13 +782,6 @@ def get_system_image_versions(image_type: str):
         return None
 
 
-def record_queue_length(queue: str, length: int):
-    now = datetime.datetime.now(datetime.timezone.utc)
-    timestamp = now.strftime("%Y%m%d%H%M")
-    column1 = f"{queue}:{timestamp}"
-    Indexes.create(key=b"retrace_queue_length", column1=column1, value=str(length).encode())
-
-
 def get_queue_lengths(hours: int = 48):
     now = datetime.datetime.now(datetime.timezone.utc)
     cutoff = now - datetime.timedelta(hours=hours)

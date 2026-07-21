@@ -3,10 +3,18 @@
 import argparse
 import datetime
 
-from errors import cassie
 from errortracker import amqp_utils, cassandra, cassandra_schema
 
 ARCHES = ["amd64", "arm64", "armhf", "i386"]
+
+
+def record_queue_length(queue: str, length: int):
+    now = datetime.datetime.now(datetime.timezone.utc)
+    timestamp = now.strftime("%Y%m%d%H%M")
+    column1 = f"{queue}:{timestamp}"
+    cassandra_schema.Indexes.create(
+        key=b"retrace_queue_length", column1=column1, value=str(length).encode()
+    )
 
 
 def prune_queue_lengths(days: int) -> int | None:
@@ -61,7 +69,7 @@ def main():
                 continue
             print(f"{queue}: {length}")
             if not args.dry_run:
-                cassie.record_queue_length(queue, length)
+                record_queue_length(queue, length)
 
 
 if __name__ == "__main__":
