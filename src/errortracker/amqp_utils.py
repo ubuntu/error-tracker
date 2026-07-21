@@ -66,6 +66,19 @@ def get_connection():
         raise
 
 
+def get_queue_length(queue: str) -> int | None:
+    channel = get_connection().channel()
+    if not channel:
+        return None
+    try:
+        _, message_count, _ = channel.queue_declare(queue=queue, passive=True)
+        return message_count
+    except amqplib_error_types + (amqp.exceptions.NotFound,):
+        return None
+    finally:
+        channel.close()
+
+
 def enqueue(message: str, queue: str):
     channel = get_connection().channel()
     if not channel:
@@ -75,7 +88,9 @@ def enqueue(message: str, queue: str):
         # We'll use this timestamp to measure how long it takes to process a
         # retrace, from receiving the core file to writing the data back to
         # Cassandra.
-        body = amqp.Message(message, timestamp=int(datetime.now(timezone.utc).timestamp()))
+        body = amqp.Message(
+            message, timestamp=int(datetime.now(timezone.utc).timestamp())
+        )
         # Persistent
         body.properties["delivery_mode"] = 2
         channel.basic_publish(body, exchange="", routing_key=queue)

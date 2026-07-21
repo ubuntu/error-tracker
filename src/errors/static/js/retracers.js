@@ -151,3 +151,48 @@ function instances_graph () {
         Y.io(uri);
     });
 }
+
+function retracers_queue_length_graph () {
+    YUI().use('node', 'io-base', 'json-parse', function (Y) {
+        var uri = '/api/1.0/retracer-queue-length/?hours=48&format=json';
+        function complete (id, o, args) {
+            var response = Y.JSON.parse(o.response);
+            var data = [];
+            for (var i in response.objects) {
+                var queue = response.objects[i];
+                var values = [];
+                for (var j in queue.values) {
+                    var ts = queue.values[j].timestamp;
+                    var year = ts.substring(0, 4);
+                    var month = ts.substring(4, 6);
+                    var day = ts.substring(6, 8);
+                    var hour = ts.substring(8, 10);
+                    var minute = ts.substring(10, 12);
+                    values.push({
+                        x: new Date(year, month - 1, day, hour, minute),
+                        y: queue.values[j].value
+                    });
+                }
+                data.push({
+                    values: values,
+                    key: queue.queue,
+                    color: '#7e2f8e'
+                });
+            }
+            nv.addGraph(function () {
+                var chart = nv.models.lineWithFocusChart();
+                chart.xAxis.tickFormat(x_axis_tick_format);
+                chart.x2Axis.tickFormat(x_axis_tick_format);
+                chart.forceY([0]);
+                chart.yAxis.axisLabel('Queue length')
+                var container = d3.select('#retracers svg').datum(data);
+
+                container.transition().duration(500).call(chart);
+                nv.utils.windowResize(chart.update);
+                return chart;
+            });
+        };
+        Y.on('io:complete', complete, Y, {});
+        Y.io(uri);
+    });
+}

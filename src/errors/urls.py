@@ -15,6 +15,7 @@ urlpatterns = [
     re_path(r"problem/(.*)$", views.problem),
     re_path(r"^retracers-average-processing-time/", views.retracers_average_processing_time),
     re_path(r"^retracers-results/", views.retracers_results),
+    re_path(r"^retracers-queue-length/", views.retracers_queue_length),
     re_path(r"^status/?$", views.status),
     re_path(r"^user/(.*)$", views.user),
     re_path(r"^api/", include("errors.api.urls")),

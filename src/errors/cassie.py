@@ -780,3 +780,30 @@ def get_system_image_versions(image_type: str):
         return list(versions)
     except DoesNotExist:
         return None
+
+
+def record_queue_length(queue: str, length: int):
+    now = datetime.datetime.now(datetime.timezone.utc)
+    timestamp = now.strftime("%Y%m%d%H%M")
+    column1 = f"{queue}:{timestamp}"
+    Indexes.create(key=b"retrace_queue_length", column1=column1, value=str(length).encode())
+
+
+def get_queue_lengths(hours: int = 48):
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cutoff = now - datetime.timedelta(hours=hours)
+    cutoff_str = cutoff.strftime("%Y%m%d%H%M")
+    try:
+        rows = Indexes.objects.filter(key=b"retrace_queue_length").all()
+        results = {}
+        for row in rows:
+            if row.column1 >= cutoff_str:
+                queue, ts = row.column1.split(":", 1)
+                if queue not in results:
+                    results[queue] = []
+                results[queue].append({"timestamp": ts, "value": int(row.value)})
+        for queue in results:
+            results[queue].sort(key=lambda x: x["timestamp"])
+        return results
+    except DoesNotExist:
+        return {}
