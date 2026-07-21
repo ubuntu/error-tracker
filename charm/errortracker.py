@@ -234,7 +234,7 @@ WantedBy=multi-user.target
         setup_systemd_timer(
             "et-record-queue-lengths",
             "Error Tracker - AMQP - Record queue lengths",
-            f"{REPO_LOCATION}/src/tools/record_queue_lengths.py",
+            f"{REPO_LOCATION}/src/tools/record_queue_lengths.py --prune-days 15",
             "*-*-* *:0/5:00",  # every five minutes
         )
 
