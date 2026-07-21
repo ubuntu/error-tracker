@@ -154,7 +154,7 @@ function instances_graph () {
 
 function retracers_queue_length_graph () {
     YUI().use('node', 'io-base', 'json-parse', function (Y) {
-        var uri = '/api/1.0/retracer-queue-length/?hours=48&format=json';
+        var uri = '/api/1.0/retracer-queue-length/?hours=336&format=json';
         function complete (id, o, args) {
             var response = Y.JSON.parse(o.response);
             var data = [];
