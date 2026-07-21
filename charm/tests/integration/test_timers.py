@@ -35,5 +35,7 @@ def test_deploy(
     task = juju.exec("systemctl", "list-units", "-o", "json", unit="timers/0")
     units = json.loads(task.stdout)
     et_units = [u for u in units if u["unit"].startswith("et-")]
-    assert len(et_units) == 5, "wrong number of error tracker systemd units"
-    assert all([u["active"] == "active" for u in et_units]), "not all systemd units are active"
+    assert len(et_units) == 6, "wrong number of error tracker systemd units"
+    assert all(
+        [u["active"] == "active" for u in et_units]
+    ), "not all systemd units are active"

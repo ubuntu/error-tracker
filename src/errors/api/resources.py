@@ -205,6 +205,29 @@ class RetraceResultResource(ErrorsResource):
         return ResultObject({"date": date, "value": value})
 
 
+class RetraceQueueLengthResource(ErrorsResource):
+    queue = fields.CharField(attribute="queue", readonly=True)
+    values = fields.ListField(attribute="values", readonly=True)
+
+    class Meta(ErrorsMeta):
+        resource_name = "retracer-queue-length"
+
+    def obj_get_list(self, bundle):
+        hours = int(bundle.request.GET.get("hours", 48))
+        data = cassie.get_queue_lengths(hours=hours)
+        results = []
+        for queue_name in sorted(data):
+            results.append(
+                ResultObject(
+                    {
+                        "queue": queue_name,
+                        "values": data[queue_name],
+                    }
+                )
+            )
+        return results
+
+
 class RetraceAverageProcessingTimeResource(ErrorsResource):
     date = fields.CharField(attribute="date")
     value = fields.DictField(attribute="value", readonly=True)

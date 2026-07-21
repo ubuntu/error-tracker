@@ -111,6 +111,13 @@ def retracers_results(request):
 
 
 @measure_view
+def retracers_queue_length(request):
+    c = {"graph_type": "queue-length"}
+    c.update(common_c())
+    return render(request, "retracers.html", c)
+
+
+@measure_view
 def instances_count(request):
     c = {"graph_type": "instances"}
     c.update(common_c())

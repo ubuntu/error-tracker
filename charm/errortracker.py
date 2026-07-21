@@ -13,8 +13,7 @@ def setup_systemd_timer(unit_name, description, command, calendar):
     systemd_unit_location = Path("/") / "etc" / "systemd" / "system"
     systemd_unit_location.mkdir(parents=True, exist_ok=True)
 
-    (systemd_unit_location / f"{unit_name}.service").write_text(
-        f"""
+    (systemd_unit_location / f"{unit_name}.service").write_text(f"""
 [Unit]
 Description={description}
 
@@ -23,10 +22,8 @@ Type=oneshot
 User=ubuntu
 Environment=PYTHONPATH={REPO_LOCATION}/src
 ExecStart={command}
-"""
-    )
-    (systemd_unit_location / f"{unit_name}.timer").write_text(
-        f"""
+""")
+    (systemd_unit_location / f"{unit_name}.timer").write_text(f"""
 [Unit]
 Description={description}
 
@@ -36,8 +33,7 @@ Persistent=true
 
 [Install]
 WantedBy=timers.target
-"""
-    )
+""")
 
     check_call(["systemctl", "daemon-reload"])
     check_call(["systemctl", "enable", "--now", f"{unit_name}.timer"])
@@ -116,8 +112,7 @@ class ErrorTracker:
         check_call(["apt-get", "install", "-y", "gunicorn"])
         systemd_unit_location = Path("/") / "etc" / "systemd" / "system"
         systemd_unit_location.mkdir(parents=True, exist_ok=True)
-        (systemd_unit_location / "daisy.service").write_text(
-            f"""
+        (systemd_unit_location / "daisy.service").write_text(f"""
 [Unit]
 Description=Daisy
 After=network.target
@@ -131,8 +126,7 @@ Restart=always
 
 [Install]
 WantedBy=multi-user.target
-"""
-        )
+""")
 
         check_call(["systemctl", "daemon-reload"])
 
@@ -147,7 +141,9 @@ WantedBy=multi-user.target
         failed = "--failed" if retracer_failed_queue else ""
         # Work around https://bugs.launchpad.net/ubuntu/+source/gdb/+bug/1818918
         # Apport will not be run as root, thus the included workaround here will hit ENOPERM
-        (Path("/") / "usr" / "lib" / "debug" / ".dwz").mkdir(parents=True, exist_ok=True)
+        (Path("/") / "usr" / "lib" / "debug" / ".dwz").mkdir(
+            parents=True, exist_ok=True
+        )
         logger.info("Installing additional retracer dependencies")
         check_call(
             [
@@ -162,8 +158,7 @@ WantedBy=multi-user.target
         logger.info("Configuring retracer systemd units")
         systemd_unit_location = Path("/") / "etc" / "systemd" / "system"
         systemd_unit_location.mkdir(parents=True, exist_ok=True)
-        (systemd_unit_location / "retracer@.service").write_text(
-            f"""
+        (systemd_unit_location / "retracer@.service").write_text(f"""
 [Unit]
 Description=Retracer
 
@@ -177,8 +172,7 @@ Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
-"""
-        )
+""")
 
         check_call(["systemctl", "daemon-reload"])
 
@@ -237,6 +231,12 @@ WantedBy=multi-user.target
             f"{REPO_LOCATION}/src/tools/swift_handle_old_cores.py",
             "*-*-* 06:45:00",  # every day at 06:45
         )
+        setup_systemd_timer(
+            "et-record-queue-lengths",
+            "Error Tracker - AMQP - Record queue lengths",
+            f"{REPO_LOCATION}/src/tools/record_queue_lengths.py",
+            "*-*-* *:0/5:00",  # every five minutes
+        )
 
     def configure_errors(self):
         logger.info("Configuring errors")
@@ -258,8 +258,7 @@ WantedBy=multi-user.target
         )
         systemd_unit_location = Path("/") / "etc" / "systemd" / "system"
         systemd_unit_location.mkdir(parents=True, exist_ok=True)
-        (systemd_unit_location / "errors.service").write_text(
-            f"""
+        (systemd_unit_location / "errors.service").write_text(f"""
 [Unit]
 Description=Error Tracker errors
 After=network.target
@@ -287,8 +286,7 @@ Restart=always
 
 [Install]
 WantedBy=multi-user.target
-"""
-        )
+""")
 
         check_call(["systemctl", "daemon-reload"])
 

@@ -368,6 +368,13 @@ class Retracer:
     def callback(self, msg):
         self._processing_callback = True
         log("Processing.")
+
+        # ack the message very early, to prevent them from staying forever
+        # in the queue in case the retracer gets OOM-killed or Cassandra is
+        # unreachable
+        log("ack'ing message from queue")
+        msg.channel.basic_ack(msg.delivery_tag)
+
         self.msg_body = ensure_str(msg.body)
         oops_id, provider = self.msg_body.split(":", 1)
         try:
@@ -382,11 +389,6 @@ class Retracer:
 
             metrics.meter("could_not_find_oops")
             return
-
-        # ack the message very early, to prevent them from staying forever in
-        # the queue in case the retracer gets OOM-killed
-        log("ack'ing message from queue")
-        msg.channel.basic_ack(msg.delivery_tag)
 
         # There are some items still in amqp queue that have already been
         # retraced, check for this and ack the message.

@@ -22,6 +22,7 @@ from .resources import (
     ReleasePackageVersionPockets,
     ReportsStateResource,
     RetraceAverageProcessingTimeResource,
+    RetraceQueueLengthResource,
     RetraceResultResource,
     SystemCrashesResource,
     SystemImageVersionsResource,
@@ -31,6 +32,7 @@ from .resources import (
 v1_api = Api(api_name="1.0")
 v1_api.register(RetraceResultResource())
 v1_api.register(RetraceAverageProcessingTimeResource())
+v1_api.register(RetraceQueueLengthResource())
 v1_api.register(InstanceCountResource())
 v1_api.register(ProblemCountResource())
 v1_api.register(DayOopsResource())
