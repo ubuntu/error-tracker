@@ -797,8 +797,8 @@ def get_queue_lengths(hours: int = 48):
         rows = Indexes.objects.filter(key=b"retrace_queue_length").all()
         results = {}
         for row in rows:
-            if row.column1 >= cutoff_str:
-                queue, ts = row.column1.split(":", 1)
+            queue, ts = row.column1.split(":", 1)
+            if ts >= cutoff_str:
                 if queue not in results:
                     results[queue] = []
                 results[queue].append({"timestamp": ts, "value": int(row.value)})
