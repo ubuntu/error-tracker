@@ -153,6 +153,14 @@ function instances_graph () {
 }
 
 function retracers_queue_length_graph () {
+    function hashColor(str) {
+        var hash = 0;
+        for (var i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        var hue = Math.abs(hash % 60) * 6;
+        return 'hsl(' + hue + ', 65%, 55%)';
+    }
     YUI().use('node', 'io-base', 'json-parse', function (Y) {
         var uri = '/api/1.0/retracer-queue-length/?hours=336&format=json';
         function complete (id, o, args) {
@@ -176,7 +184,7 @@ function retracers_queue_length_graph () {
                 data.push({
                     values: values,
                     key: queue.queue,
-                    color: '#7e2f8e'
+                    color: hashColor(queue.queue)
                 });
             }
             nv.addGraph(function () {
