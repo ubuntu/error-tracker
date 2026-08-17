@@ -787,7 +787,7 @@ def get_queue_lengths(hours: int = 48):
     cutoff = now - datetime.timedelta(hours=hours)
     cutoff_str = cutoff.strftime("%Y%m%d%H%M")
     try:
-        rows = Indexes.objects.filter(key=b"retrace_queue_length").all()
+        rows = Indexes.objects.filter(key=b"retrace_queue_length").limit(None).all()
         results = {}
         for row in rows:
             queue, ts = row.column1.split(":", 1)

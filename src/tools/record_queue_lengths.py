@@ -22,7 +22,9 @@ def prune_queue_lengths(days: int) -> int | None:
     cutoff = now - datetime.timedelta(days=days)
     cutoff_str = cutoff.strftime("%Y%m%d%H%M")
     try:
-        rows = cassandra_schema.Indexes.objects.filter(key=b"retrace_queue_length").all()
+        rows = (
+            cassandra_schema.Indexes.objects.filter(key=b"retrace_queue_length").limit(None).all()
+        )
     except cassandra_schema.DoesNotExist:
         return
 
