@@ -162,7 +162,7 @@ function retracers_queue_length_graph () {
         return 'hsl(' + hue + ', 65%, 55%)';
     }
     YUI().use('node', 'io-base', 'json-parse', function (Y) {
-        var uri = '/api/1.0/retracer-queue-length/?hours=336&format=json';
+        var uri = '/api/1.0/retracer-queue-length/?hours=168&format=json';
         function complete (id, o, args) {
             var response = Y.JSON.parse(o.response);
             var data = [];
