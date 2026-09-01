@@ -72,7 +72,10 @@ def create_minimal_report_from_bson(data):
 def submit(request, system_token):
     logger.info("Submit handler")
     logger.info(f"request: {request}")
-    data = request.data
+    try:
+        data = request.data
+    except ConnectionResetError:
+        return "Connection reset.", 400
     try:
         if not bson.is_valid(data):
             metrics.meter("invalid.invalid_bson")
