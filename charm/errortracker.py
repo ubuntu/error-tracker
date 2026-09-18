@@ -91,6 +91,7 @@ class ErrorTracker:
                     "python3-cassandra",
                     "python3-flask",
                     "python3-swiftclient",
+                    "python3-tenacity",
                     "python3-zstandard",
                 ]
             )
@@ -141,9 +142,7 @@ WantedBy=multi-user.target
         failed = "--failed" if retracer_failed_queue else ""
         # Work around https://bugs.launchpad.net/ubuntu/+source/gdb/+bug/1818918
         # Apport will not be run as root, thus the included workaround here will hit ENOPERM
-        (Path("/") / "usr" / "lib" / "debug" / ".dwz").mkdir(
-            parents=True, exist_ok=True
-        )
+        (Path("/") / "usr" / "lib" / "debug" / ".dwz").mkdir(parents=True, exist_ok=True)
         logger.info("Installing additional retracer dependencies")
         check_call(
             [

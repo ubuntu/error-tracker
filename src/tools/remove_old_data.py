@@ -1,111 +1,105 @@
 #!/usr/bin/python3
 
+# Remove all the OOPSes filed on a range of dates, to free up space in the
+# database. Note that this doesn't clean the Buckets pointing to those OOPSes,
+# see clean_buckets.py for that.
+
 import sys
-from binascii import hexlify
+from argparse import ArgumentParser
 from datetime import datetime, timedelta
-from time import sleep
+from pathlib import Path
 
-from cassandra import OperationTimedOut
+from cassandra import OperationTimedOut, Timeout
 from cassandra.cluster import NoHostAvailable
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from errortracker import cassandra
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-session = cassandra.cassandra_session()
+from errortracker import cassandra  # noqa: E402
+from errortracker.cassandra_schema import OOPS, DayOOPS  # noqa: E402
 
-# use a prepared statement which is less resource intensive
-oops_lookup_stmt = session.prepare('SELECT * FROM "OOPS" WHERE key = ?')
-oops_delete_stmt = session.prepare('DELETE FROM "OOPS" WHERE key = ?')
-dayoops_delete_stmt = session.prepare('DELETE FROM "DayOOPS" WHERE key = ? AND column1 = ?')
+cassandra.setup_cassandra()
 
 URL = "https://errors.ubuntu.com/oops/"
 
 
-def remove_dayoops(date, column1):
-    global dry_run
-    max_retries = 5
-    for i in range(max_retries):
-        period = 30 + (30 * i)
-        try:
-            if not dry_run:
-                session.execute(dayoops_delete_stmt, [date, column1])
-            break
-        except (OperationTimedOut, NoHostAvailable):
-            print("Sleeping %ss as we timed out when querying." % period)
-            sleep(period)
-            continue
-        else:
-            break
-    else:
-        print("Cassandra operation timed out %s times." % max_retries)
-        return False
-    # print("%s %s was removed from DayOOPS" % (date, column1))
-    return True
+def parse_args():
+    parser = ArgumentParser(description="Remove old OOPS data from the Error Tracker")
+    parser.add_argument(
+        "--no-dry-run",
+        action="store_true",
+        help="Actually delete the data, instead of only reporting what would be removed",
+    )
+    parser.add_argument("start_date", help="The first date to remove, as YYYY-MM-DD")
+    parser.add_argument("end_date", help="The last date to remove, as YYYY-MM-DD")
+    return parser.parse_args()
 
 
+@retry(
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(),
+    retry=retry_if_exception_type((Timeout, NoHostAvailable, OperationTimedOut)),
+)
 def remove_oops(oops_id):
-    global dry_run
-    max_retries = 5
-    for i in range(max_retries):
-        period = 30 + (30 * i)
-        try:
-            if not dry_run:
-                session.execute(oops_delete_stmt, [oops_id])
-            break
-        except (OperationTimedOut, NoHostAvailable):
-            print("Sleeping %ss as we timed out when deleting." % period)
-            sleep(period)
+    OOPS.objects.filter(key=oops_id).delete()
+
+
+@retry(
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(),
+    retry=retry_if_exception_type((Timeout, NoHostAvailable, OperationTimedOut)),
+)
+def remove_dayoops(day_key):
+    DayOOPS.objects.filter(key=day_key.encode()).delete()
+
+
+@retry(
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(),
+    retry=retry_if_exception_type((Timeout, NoHostAvailable, OperationTimedOut)),
+)
+def remove_day(day, dry_run):
+    """Remove every OOPS filed on the given datetime.date, returning how many
+    were found."""
+    day_key = day.strftime("%Y%m%d")
+    count = 0
+    for oops in DayOOPS.objects.filter(key=day_key.encode()).limit(None):
+        oops_id = oops.value
+        print(f"{URL}{oops_id.decode()} is from {day} and will be removed... ", end="")
+        count += 1
+        if dry_run:
+            print("SKIPPED (dry-run)")
             continue
-        else:
-            break
-    else:
-        print("Cassandra operation timed out %s times." % max_retries)
-        return False
-    # print("%s%s was removed from OOPS" % (URL, oops_id.decode()))
-    return True
+        remove_oops(oops_id)
+        print("SUCCESS")
+    if not dry_run:
+        remove_dayoops(day_key)
+    return count
 
 
-# Main
-if __name__ == "__main__":
-    global dry_run
-    if "--no-dry-run" in sys.argv:
-        dry_run = False
-        sys.argv.remove("--no-dry-run")
-    else:
-        dry_run = True
+def main():
+    args = parse_args()
+    dry_run = not args.no_dry_run
+    if dry_run:
         print("Running by default in dry-run mode. Pass --no-dry-run to really delete stuff.")
 
-    # Range of dates for which all OOPSes
-    start_date = datetime.strptime(sys.argv[1], "%Y-%m-%d").date()
-    end_date = datetime.strptime(sys.argv[2], "%Y-%m-%d").date()
+    start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date()
+    end_date = datetime.strptime(args.end_date, "%Y-%m-%d").date()
 
     assert start_date < end_date
 
-    print("Selected time range for deletion: %s - %s" % (start_date, end_date))
+    print(f"Selected time range for deletion: {start_date} - {end_date}")
 
-    count_success = 0
-    count_failure = 0
+    count = 0
     try:
         while start_date <= end_date:
+            count += remove_day(start_date, dry_run)
             start_date += timedelta(days=1)
-            hex_date = "0x" + hexlify(start_date.strftime("%Y%m%d").encode()).decode()
-
-            r_oopses_id = session.execute(
-                'SELECT column1, value FROM "DayOOPS" WHERE key = %s' % (hex_date)
-            )
-            for oops_id in r_oopses_id:
-                print(
-                    "%s%s is from %s and will be removed... "
-                    % (URL, oops_id.value.decode(), start_date),
-                    end="",
-                )
-                if remove_oops(oops_id.value) and remove_dayoops(start_date, oops_id.column1):
-                    print(" SUCCESS")
-                    count_success += 1
-                else:
-                    print(" FAILURE")
-                    count_failure += 1
     except KeyboardInterrupt:
         pass
-    print(
-        "Finishing cleaning OOPSes: %s successes and %s failures" % (count_success, count_failure)
-    )
+    verb = "would be removed" if dry_run else "were removed"
+    print(f"Finishing cleaning OOPSes: {count} {verb}")
+
+
+if __name__ == "__main__":
+    main()
