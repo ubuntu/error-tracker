@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from cassandra import OperationTimedOut, Timeout
+from cassandra import OperationTimedOut, Timeout, Unauthorized
 from cassandra.cluster import NoHostAvailable
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
@@ -38,7 +38,7 @@ def parse_args():
 @retry(
     stop=stop_after_attempt(10),
     wait=wait_exponential(),
-    retry=retry_if_exception_type((Timeout, NoHostAvailable, OperationTimedOut)),
+    retry=retry_if_exception_type((Timeout, NoHostAvailable, OperationTimedOut, Unauthorized)),
 )
 def remove_oops(oops_id):
     OOPS.objects.filter(key=oops_id).delete()
@@ -47,7 +47,7 @@ def remove_oops(oops_id):
 @retry(
     stop=stop_after_attempt(10),
     wait=wait_exponential(),
-    retry=retry_if_exception_type((Timeout, NoHostAvailable, OperationTimedOut)),
+    retry=retry_if_exception_type((Timeout, NoHostAvailable, OperationTimedOut, Unauthorized)),
 )
 def remove_dayoops(day_key):
     DayOOPS.objects.filter(key=day_key.encode()).delete()
@@ -56,7 +56,7 @@ def remove_dayoops(day_key):
 @retry(
     stop=stop_after_attempt(10),
     wait=wait_exponential(),
-    retry=retry_if_exception_type((Timeout, NoHostAvailable, OperationTimedOut)),
+    retry=retry_if_exception_type((Timeout, NoHostAvailable, OperationTimedOut, Unauthorized)),
 )
 def remove_day(day, dry_run):
     """Remove every OOPS filed on the given datetime.date, returning how many
