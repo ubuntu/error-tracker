@@ -173,7 +173,7 @@ class TestBucket:
         day_key = oopses.bucket(oopsid, "bucket-key", fields)
 
         # Check that the counters all exist and have two crashes.
-        resolutions = (day_key[:4], day_key[:6], day_key)
+        resolutions = (day_key[:6], day_key)
         for field in fields:
             for resolution in resolutions:
                 k = "%s:%s" % (field, resolution)

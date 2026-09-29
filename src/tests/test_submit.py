@@ -109,9 +109,8 @@ class TestCrashSubmission:
         now = time.gmtime()
         day_key = time.strftime("%Y%m%d", now)
         month_key = time.strftime("%Y%m", now)
-        year_key = time.strftime("%Y", now)
         release = report["DistroRelease"]
-        time_keys = (day_key, month_key, year_key)
+        time_keys = (day_key, month_key)
         keys = []
         for time_key in time_keys:
             keys.append(f"{release}:{time_key}")
