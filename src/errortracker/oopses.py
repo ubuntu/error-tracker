@@ -201,7 +201,7 @@ def bucket(oopsid, bucketid, fields=None, proposed_fields=False):
     cassandra_schema.DayBuckets.create(key=day_key, key2=bucketid, column1=oopsid, value=b"")
 
     if fields is not None:
-        resolutions = (day_key[:4], day_key[:6], day_key)
+        resolutions = (day_key[:6], day_key)
         # All buckets for the given resolution.
         for field in fields:
             for resolution in resolutions:
