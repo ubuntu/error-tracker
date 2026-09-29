@@ -47,6 +47,8 @@ podman run --name swift --network host --rm -d docker.io/openstackswift/saio
 You can then then run the tests with `pytest`:
 ```
 cd src
+make tests
+# Or manually:
 python3 -m pytest -o log_cli=1 -vv --log-level=INFO tests/
 ```
 

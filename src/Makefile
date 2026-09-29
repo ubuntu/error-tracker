@@ -2,7 +2,7 @@ BASE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 export PYTHONPATH := $(BASE_DIR)
 
-.PHONY: services-run daisy-run errors-run errors-shell retracer-run populate-test-data
+.PHONY: services-run daisy-run errors-run errors-shell retracer-run populate-test-data tests
 
 services-run:
 	podman run --replace --name cassandra --network host --rm -d -e HEAP_NEWSIZE=10M -e MAX_HEAP_SIZE=200M docker.io/cassandra
@@ -28,3 +28,6 @@ retracer-run:
 
 populate-test-data:
 	python3 $(BASE_DIR)tests/create_test_data.py
+
+tests:
+	python3 -m pytest -o log_cli=1 -vv --log-level=INFO tests/
