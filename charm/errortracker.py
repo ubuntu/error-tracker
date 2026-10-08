@@ -280,6 +280,7 @@ ExecStart=bash -c 'exec uwsgi \\
           --env PYTHONPATH={REPO_LOCATION}/src/ \\
           --max-requests 4000 \\
           --max-worker-lifetime 21600 \\
+          --listen 1024 \\
           --processes "$(($(nproc) * 2))"'
 Restart=always
 
