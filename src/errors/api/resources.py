@@ -61,6 +61,7 @@ release_color_mapping["Ubuntu 25.04"] = "#7e2f8e"  # violet
 release_color_mapping["Ubuntu 25.10"] = "#ff0900"  # red
 release_color_mapping["Ubuntu 26.04"] = "#ffae00"  # orange
 release_color_mapping["Ubuntu 26.10"] = "#ffe81a"  # yellow
+release_color_mapping["Ubuntu 27.04"] = "#7e2f8e"  # violet
 
 precise_standards_color_mapping = {
     "Ubuntu 12.10": "#8edbf4",
@@ -92,6 +93,7 @@ precise_standards_color_mapping = {
     "Ubuntu 25.10": "#9859a5",
     "Ubuntu 26.04": "#fabd39",
     "Ubuntu 26.10": "#f5efbc",
+    "Ubuntu 27.04": "#00faed",
 }
 # mapping of releases to codenames
 codenames = {
@@ -126,6 +128,7 @@ codenames = {
     "Ubuntu 25.10": "questing",
     "Ubuntu 26.04": "resolute",
     "Ubuntu 26.10": "stonking",
+    "Ubuntu 27.04": "tenacious",
 }
 
 
@@ -989,6 +992,7 @@ class VersionsResource(ErrorsResource):
     questing = fields.IntegerField(attribute="questing", **kwargs)
     resolute = fields.IntegerField(attribute="resolute", **kwargs)
     stonking = fields.IntegerField(attribute="stonking", **kwargs)
+    tenacious = fields.IntegerField(attribute="tenacious", **kwargs)
     derivatives = fields.IntegerField(attribute="derivatives", **kwargs)
     total = fields.IntegerField(attribute="total", **kwargs)
 
@@ -1078,9 +1082,7 @@ class BucketResource(ErrorsResource):
     metadata = fields.DictField(attribute="metadata", readonly=True)
     traceback = fields.CharField(attribute="traceback", readonly=True, null=True)
     stacktrace = fields.CharField(attribute="stacktrace", readonly=True, null=True)
-    thread_stacktrace = fields.CharField(
-        attribute="thread_stacktrace", readonly=True, null=True
-    )
+    thread_stacktrace = fields.CharField(attribute="thread_stacktrace", readonly=True, null=True)
 
     class Meta(ErrorsMeta):
         resource_name = "bucket"
@@ -1090,9 +1092,7 @@ class BucketResource(ErrorsResource):
         if not cassie.bucket_exists(bucket_id):
             raise NotFound("Bucket with ID '%s' not found." % bucket_id)
 
-        source_package = (
-            cassie.get_source_package_for_bucket(bucket_id) or "unknown package"
-        )
+        source_package = cassie.get_source_package_for_bucket(bucket_id) or "unknown package"
         metadata = cassie.get_metadata_for_bucket(bucket_id)
         traceback = cassie.get_traceback_for_bucket(bucket_id)
 
