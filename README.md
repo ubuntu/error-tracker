@@ -85,6 +85,19 @@ A sample is also available in `./tests/errortracker/integration/data/crash/`.
 
 ## More documentation
 
+### Diagnosing Daisy worker timeouts
+
+When Gunicorn aborts a worker after a timeout, Daisy's `worker_abort` hook logs
+the worker PID and dumps all Python thread stacks to stderr. For charm-managed
+deployments, inspect these alongside Gunicorn's `WORKER TIMEOUT` messages with:
+
+```bash
+journalctl -u daisy --since '30 minutes ago' --no-pager -o short-precise
+```
+
+The stack dump helps identify whether the worker was blocked in AMQP, storage,
+or another operation. The hook runs on SIGABRT; it cannot capture a SIGKILL.
+
 ### Opening a new series
 
 Many components of the Error Tracker need to be made aware of the new release.
