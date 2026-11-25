@@ -685,10 +685,17 @@ class Retracer:
                     self.remove(oops_id)
                     self.update_time_to_retrace(msg)
                 else:
-                    amqp_utils.enqueue(f"{oops_id}:swift", "failed_retrace_%s" % self.architecture)
-                    log("pushed message to failed queue")
-                    if not self.failed:
+                    queue = f"failed_retrace_{self.architecture}"
+                    if amqp_utils.enqueue(f"{oops_id}:swift", queue):
+                        logger.info("OOPS %s published to %s", oops_id, queue)
                         action = "moving to failed queue."
+                    else:
+                        logger.error(
+                            "Failed to publish OOPS %s to %s; input message was already acknowledged and retry dispatch is not confirmed",
+                            oops_id,
+                            queue,
+                        )
+                        action = "failed-queue publication failed; retry dispatch not confirmed."
                 log(m % (proc.returncode, action))
                 if invalid_core:
                     if unreportable_reason:
